@@ -18,6 +18,7 @@ from .engine.groups import GroupManager
 from .engine.show import ShowManager
 from .protocols.osc import OSCServer, LumosOSC
 from .protocols.midi_protocol import MIDIDriver
+from .protocols.timecode import TimecodeManager
 from .api import routes
 
 BASE_DIR = Path(__file__).parent.parent
@@ -82,6 +83,12 @@ async def lifespan(app: FastAPI):
     LumosOSC(osc, cm, pm, um)
 
     # ── Show manager ───────────────────────────────────────────────────────
+    tc = TimecodeManager()
+    # Wire MTC from MIDI driver to timecode manager
+    def on_midi_mtc(tc_dict: dict):
+        tc.handle_mtc_frame(tc_dict)
+    midi.on_mtc = on_midi_mtc
+
     sm = ShowManager(um, pm, cm, ee, gm, midi, osc)
     autosave_path = os.getenv("LUMOS_AUTOSAVE", str(BASE_DIR / "shows" / "autosave.json"))
     sm.set_autosave(autosave_path)
@@ -108,6 +115,7 @@ async def lifespan(app: FastAPI):
     routes.show_manager = sm
     routes.midi_driver = midi
     routes.osc_server_ref = osc
+    routes.timecode = tc
 
     # ── Start all services ─────────────────────────────────────────────────
     await um.start()

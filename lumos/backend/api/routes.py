@@ -786,3 +786,134 @@ async def show_load(body: ShowLoadRequest):
     await broadcast("show_loaded", {"path": body.path})
     await broadcast("patch_updated", patch.to_dict())
     return {"ok": True, "path": body.path}
+
+
+# ── Timecode ──────────────────────────────────────────────────────────────────
+
+timecode = None
+
+
+@router.get("/timecode")
+def timecode_status():
+    if not timecode:
+        return {"source": "none", "current": None}
+    return timecode.to_dict()
+
+
+@router.get("/timecode/devices")
+def timecode_devices():
+    from ..protocols.timecode import TimecodeManager
+    return TimecodeManager.list_audio_devices()
+
+
+class LTCStartRequest(BaseModel):
+    device_index: Optional[int] = None
+    sample_rate: int = 48000
+    fps: float = 25.0
+
+
+@router.post("/timecode/ltc/start")
+def timecode_ltc_start(body: LTCStartRequest):
+    if not timecode:
+        raise HTTPException(503)
+    ok = timecode.start_ltc(body.device_index, body.sample_rate, body.fps)
+    return {"ok": ok, "audio_available": ok}
+
+
+@router.post("/timecode/ltc/stop")
+def timecode_ltc_stop():
+    if not timecode:
+        raise HTTPException(503)
+    timecode.stop_ltc()
+    return {"ok": True}
+
+
+# ── RDM ───────────────────────────────────────────────────────────────────────
+
+_rdm_controller = None
+
+
+def _get_rdm():
+    global _rdm_controller
+    if _rdm_controller is None:
+        from ..protocols.rdm import RDMController
+        _rdm_controller = RDMController()
+    return _rdm_controller
+
+
+class RDMAttachRequest(BaseModel):
+    port: str
+
+
+class RDMSetAddressRequest(BaseModel):
+    uid: str
+    address: int
+
+
+class RDMSetPersonalityRequest(BaseModel):
+    uid: str
+    personality: int
+
+
+class RDMIdentifyRequest(BaseModel):
+    uid: str
+    on: bool = True
+
+
+def _parse_uid(uid_str: str):
+    parts = uid_str.split(":")
+    if len(parts) != 2:
+        raise HTTPException(400, "UID must be MFRID:DEVID (hex)")
+    try:
+        return (int(parts[0], 16), int(parts[1], 16))
+    except ValueError:
+        raise HTTPException(400, "Invalid UID hex")
+
+
+@router.post("/rdm/attach")
+def rdm_attach(body: RDMAttachRequest):
+    rdm = _get_rdm()
+    if not universes or not universes.serial_manager:
+        raise HTTPException(503, "Serial manager not available")
+    rdm.attach_serial(universes.serial_manager, body.port)
+    return {"ok": True, "port": body.port}
+
+
+@router.post("/rdm/discover")
+def rdm_discover():
+    import concurrent.futures
+    rdm = _get_rdm()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+        future = ex.submit(rdm.discover)
+        devices = future.result(timeout=30)
+    return [d.to_dict() for d in devices]
+
+
+@router.get("/rdm/devices")
+def rdm_devices():
+    rdm = _get_rdm()
+    return [d.to_dict() for d in rdm.devices]
+
+
+@router.post("/rdm/address")
+def rdm_set_address(body: RDMSetAddressRequest):
+    rdm = _get_rdm()
+    uid = _parse_uid(body.uid)
+    ok = rdm.set_dmx_address(uid, body.address)
+    return {"ok": ok}
+
+
+@router.post("/rdm/personality")
+def rdm_set_personality(body: RDMSetPersonalityRequest):
+    rdm = _get_rdm()
+    uid = _parse_uid(body.uid)
+    ok = rdm.set_personality(uid, body.personality)
+    return {"ok": ok}
+
+
+@router.post("/rdm/identify")
+def rdm_identify(body: RDMIdentifyRequest):
+    rdm = _get_rdm()
+    uid = _parse_uid(body.uid)
+    ok = rdm.identify_device(uid, body.on)
+    return {"ok": ok}
