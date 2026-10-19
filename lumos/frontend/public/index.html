@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lumos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-0: #0a0a0f;
+      --bg-1: #111118;
+      --bg-2: #181820;
+      --bg-3: #20202c;
+      --bg-4: #2a2a38;
+      --border: #2e2e40;
+      --border-hi: #4a4a68;
+      --text-0: #e8e8f0;
+      --text-1: #a8a8c0;
+      --text-2: #6868a0;
+      --accent: #7c6fcd;
+      --accent-hi: #9d8ff0;
+      --accent-lo: #3d3870;
+      --green: #4caf78;
+      --red: #e05555;
+      --amber: #f0a030;
+      --cyan: #40b8d0;
+      --active: #7c6fcd;
+      --radius: 6px;
+      --radius-lg: 10px;
+      --font: 'Inter', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg-0);
+      color: var(--text-0);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      font-size: 13px;
+    }
+
+    /* ── Top Bar ──────────────────────────────────────────────────────────── */
+    #topbar {
+      height: 46px;
+      background: var(--bg-1);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 16px;
+      flex-shrink: 0;
+      z-index: 100;
+    }
+    .logo {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--accent-hi);
+      letter-spacing: -0.5px;
+    }
+    .logo span { color: var(--text-2); font-weight: 400; font-size: 11px; margin-left: 6px; }
+    .tab-bar { display: flex; gap: 2px; flex: 1; }
+    .tab {
+      padding: 6px 14px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      color: var(--text-1);
+      font-size: 12px;
+      font-weight: 500;
+      transition: all .15s;
+      user-select: none;
+      border: 1px solid transparent;
+    }
+    .tab:hover { background: var(--bg-3); color: var(--text-0); }
+    .tab.active { background: var(--accent-lo); color: var(--accent-hi); border-color: var(--accent); }
+    .status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+    .status-dot.warn { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+    .status-dot.off { background: var(--border); box-shadow: none; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; }
+    .small-label { font-size: 11px; color: var(--text-2); }
+
+    /* ── Layout ───────────────────────────────────────────────────────────── */
+    #main { flex: 1; display: flex; overflow: hidden; }
+
+    .panel {
+      background: var(--bg-1);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 10px 14px 8px;
+      border-bottom: 1px solid var(--border);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-2);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .panel-header .actions { margin-left: auto; display: flex; gap: 4px; }
+    .panel-body { flex: 1; overflow-y: auto; padding: 8px; }
+
+    /* ── Buttons ──────────────────────────────────────────────────────────── */
+    .btn {
+      padding: 5px 12px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border-hi);
+      background: var(--bg-3);
+      color: var(--text-0);
+      cursor: pointer;
+      font-size: 12px;
+      font-family: var(--font);
+      font-weight: 500;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn:hover { background: var(--bg-4); border-color: var(--accent); }
+    .btn.primary { background: var(--accent-lo); border-color: var(--accent); color: var(--accent-hi); }
+    .btn.primary:hover { background: var(--accent); color: #fff; }
+    .btn.danger { border-color: var(--red); color: var(--red); }
+    .btn.danger:hover { background: rgba(224,85,85,.15); }
+    .btn.icon { padding: 4px 8px; font-size: 14px; }
+    .btn.sm { padding: 3px 8px; font-size: 11px; }
+
+    /* ── Tab pages ────────────────────────────────────────────────────────── */
+    .page { display: none; flex: 1; overflow: hidden; }
+    .page.active { display: flex; }
+
+    /* ══ PATCH PAGE ══════════════════════════════════════════════════════════ */
+    #page-patch {
+      flex-direction: row;
+    }
+    #patch-list { width: 320px; min-width: 260px; }
+    #patch-detail { flex: 1; }
+    #library-panel { width: 300px; min-width: 240px; border-left: 1px solid var(--border); border-right: none; }
+
+    .fixture-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 10px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background .1s;
+      border: 1px solid transparent;
+    }
+    .fixture-row:hover { background: var(--bg-2); }
+    .fixture-row.selected { background: var(--bg-3); border-color: var(--accent-lo); }
+    .fixture-row.selected .fix-name { color: var(--accent-hi); }
+    .fix-addr {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--text-2);
+      min-width: 56px;
+    }
+    .fix-name { font-weight: 500; flex: 1; }
+    .fix-model { font-size: 11px; color: var(--text-2); }
+    .fix-group-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: var(--bg-4);
+      color: var(--text-1);
+    }
+    .fix-sel-check {
+      width: 14px; height: 14px;
+      border-radius: 3px;
+      border: 1.5px solid var(--border-hi);
+      background: transparent;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 9px;
+      color: transparent;
+    }
+    .fix-sel-check.checked { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── Fixture detail / channel editor ─────────────────────────────────── */
+    #ch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 8px;
+      padding: 8px;
+    }
+    .ch-card {
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ch-name { font-size: 11px; color: var(--text-1); font-weight: 500; }
+    .ch-group-tag {
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 3px;
+      align-self: flex-start;
+    }
+    .ch-group-intensity { background: rgba(240,160,48,.15); color: var(--amber); }
+    .ch-group-color { background: rgba(76,175,120,.15); color: var(--green); }
+    .ch-group-pan, .ch-group-tilt { background: rgba(64,184,208,.15); color: var(--cyan); }
+    .ch-group-shutter { background: rgba(224,85,85,.15); color: var(--red); }
+    .ch-group-other { background: var(--bg-4); color: var(--text-2); }
+    .ch-value-display {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 600;
+      text-align: right;
+      color: var(--text-0);
+    }
+    .ch-slider {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: var(--bg-4);
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    .ch-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--accent-hi);
+      cursor: pointer;
+    }
+    .ch-percent { font-size: 10px; color: var(--text-2); text-align: right; }
+
+    /* ── Capability hint ─────────────────────────────────────────────────── */
+    .cap-hint {
+      font-size: 10px;
+      color: var(--cyan);
+      padding: 2px 0;
+      min-height: 14px;
+    }
+
+    /* ══ CUE PAGE ════════════════════════════════════════════════════════════ */
+    #page-cues { flex-direction: row; }
+    #cuelist-panel { width: 280px; min-width: 220px; }
+    #cue-editor { flex: 1; }
+
+    .cue-list-item {
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid transparent;
+    }
+    .cue-list-item:hover { background: var(--bg-2); }
+    .cue-list-item.selected { background: var(--bg-3); border-color: var(--accent-lo); }
+    .cl-name { font-weight: 500; flex: 1; }
+    .cl-count { font-size: 11px; color: var(--text-2); }
+
+    .cue-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      border-left: 3px solid transparent;
+    }
+    .cue-row:hover { background: var(--bg-2); }
+    .cue-row.current { border-left-color: var(--accent-hi); background: var(--bg-3); }
+    .cue-num { font-family: var(--mono); font-size: 11px; color: var(--text-2); min-width: 28px; }
+    .cue-name { flex: 1; font-weight: 500; }
+    .cue-fade { font-size: 11px; color: var(--text-2); font-family: var(--mono); }
+    .cue-count { font-size: 11px; color: var(--text-2); }
+
+    .go-btn {
+      width: 100%;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 700;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-lg);
+      color: #fff;
+      cursor: pointer;
+      letter-spacing: 1px;
+      transition: all .15s;
+      margin-top: 8px;
+    }
+    .go-btn:hover { background: var(--accent-hi); transform: translateY(-1px); }
+    .go-btn:active { transform: translateY(0); }
+
+    /* ══ MORPH PAGE ══════════════════════════════════════════════════════════ */
+    #page-morph { flex-direction: row; }
+    #morph-source { width: 300px; }
+    #morph-target { width: 320px; }
+    #morph-preview { flex: 1; }
+
+    .mapping-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      border-radius: var(--radius);
+    }
+    .mapping-row:hover { background: var(--bg-2); }
+    .map-src { flex: 1; font-size: 12px; }
+    .map-arrow { color: var(--text-2); font-size: 12px; }
+    .map-tgt { flex: 1; font-size: 12px; }
+    .map-conf {
+      font-size: 10px;
+      padding: 2px 5px;
+      border-radius: 3px;
+      font-family: var(--mono);
+      min-width: 36px;
+      text-align: center;
+    }
+    .conf-high { background: rgba(76,175,120,.2); color: var(--green); }
+    .conf-med { background: rgba(240,160,48,.2); color: var(--amber); }
+    .conf-low { background: rgba(224,85,85,.2); color: var(--red); }
+    .unmapped-tag { font-size: 11px; color: var(--red); padding: 3px 0; }
+    .warning-box {
+      background: rgba(240,160,48,.1);
+      border: 1px solid rgba(240,160,48,.3);
+      border-radius: var(--radius);
+      padding: 8px 12px;
+      font-size: 12px;
+      color: var(--amber);
+      margin: 8px;
+    }
+    .coverage-bar {
+      height: 6px;
+      background: var(--bg-4);
+      border-radius: 3px;
+      overflow: hidden;
+      margin: 4px 0;
+    }
+    .coverage-fill {
+      height: 100%;
+      background: var(--green);
+      border-radius: 3px;
+      transition: width .3s;
+    }
+
+    /* ══ OSC PAGE ════════════════════════════════════════════════════════════ */
+    #page-osc {
+      flex-direction: column;
+      padding: 20px;
+      overflow-y: auto;
+      gap: 16px;
+    }
+    .osc-section {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      max-width: 700px;
+    }
+    .osc-section h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-0); }
+    .osc-path {
+      font-family: var(--mono);
+      font-size: 12px;
+      background: var(--bg-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .osc-path .path { color: var(--cyan); flex: 1; }
+    .osc-path .args-hint { color: var(--text-2); font-size: 11px; }
+    .osc-path .desc { color: var(--text-1); font-size: 11px; }
+    .form-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .form-row label { font-size: 12px; color: var(--text-1); min-width: 80px; }
+    .form-row input {
+      flex: 1;
+      background: var(--bg-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 5px 10px;
+      color: var(--text-0);
+      font-family: var(--mono);
+      font-size: 12px;
+      outline: none;
+    }
+    .form-row input:focus { border-color: var(--accent); }
+    .feedback-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+    .feedback-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 10px;
+      background: var(--bg-3);
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+    .feedback-item .fbi-addr { flex: 1; color: var(--cyan); }
+
+    /* ── Universe DMX view ──────────────────────────────────────────────────── */
+    #page-dmx { flex-direction: column; overflow: hidden; }
+    .dmx-universe-tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    #dmx-grid {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+      gap: 3px;
+      align-content: start;
+    }
+    .dmx-cell {
+      border-radius: 4px;
+      padding: 3px 4px;
+      background: var(--bg-2);
+      border: 1px solid var(--border);
+      text-align: center;
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .dmx-cell:hover { border-color: var(--accent); }
+    .dmx-cell .dmx-ch { font-family: var(--mono); font-size: 9px; color: var(--text-2); }
+    .dmx-cell .dmx-val { font-family: var(--mono); font-size: 11px; font-weight: 600; }
+
+    /* ── Modals ───────────────────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      display: none;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-2);
+      border: 1px solid var(--border-hi);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      width: 500px;
+      max-width: 95vw;
+      max-height: 85vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .modal h2 { font-size: 15px; font-weight: 600; }
+    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+
+    /* ── Search ───────────────────────────────────────────────────────────── */
+    .search-input {
+      width: 100%;
+      background: var(--bg-3);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 6px 10px;
+      color: var(--text-0);
+      font-family: var(--font);
+      font-size: 12px;
+      outline: none;
+      margin-bottom: 6px;
+    }
+    .search-input:focus { border-color: var(--accent); }
+
+    /* ── Scrollbar ────────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
+
+    /* ── Misc ─────────────────────────────────────────────────────────────── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      height: 100%; color: var(--text-2); gap: 8px;
+      font-size: 13px;
+    }
+    .empty-state .icon { font-size: 32px; }
+    hr.divider { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+  </style>
+</head>
+<body>
+  <!-- Top Bar -->
+  <div id="topbar">
+    <div class="logo">⚡ Lumos <span>v0.1</span></div>
+    <div class="tab-bar">
+      <div class="tab active" onclick="showPage('patch')" id="tab-patch">Patch</div>
+      <div class="tab" onclick="showPage('cues')" id="tab-cues">Cues</div>
+      <div class="tab" onclick="showPage('dmx')" id="tab-dmx">DMX</div>
+      <div class="tab" onclick="showPage('morph')" id="tab-morph">Morph</div>
+      <div class="tab" onclick="showPage('osc')" id="tab-osc">OSC</div>
+    </div>
+    <div class="topbar-right">
+      <div class="status-dot off" id="ws-dot" title="WebSocket"></div>
+      <span class="small-label" id="ws-label">Disconnected</span>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+
+    <!-- PATCH PAGE -->
+    <div class="page active" id="page-patch">
+      <div class="panel" id="patch-list">
+        <div class="panel-header">
+          Patch
+          <div class="actions">
+            <button class="btn sm primary" onclick="openAddFixture()">+ Add</button>
+          </div>
+        </div>
+        <div class="panel-body" id="patch-list-body"></div>
+      </div>
+      <div class="panel" id="patch-detail" style="border-right:none;">
+        <div class="panel-header" id="detail-header">Select a fixture</div>
+        <div id="ch-grid"></div>
+      </div>
+      <div class="panel" id="library-panel">
+        <div class="panel-header">Library</div>
+        <div class="panel-body">
+          <input class="search-input" id="lib-search" placeholder="Search fixtures…" oninput="filterLibrary()">
+          <div id="lib-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CUES PAGE -->
+    <div class="page" id="page-cues">
+      <div class="panel" id="cuelist-panel">
+        <div class="panel-header">
+          Cue Lists
+          <div class="actions">
+            <button class="btn sm primary" onclick="createCueList()">+ New</button>
+          </div>
+        </div>
+        <div class="panel-body" id="cuelist-body"></div>
+      </div>
+      <div class="panel" id="cue-editor" style="border-right:none;">
+        <div class="panel-header" id="cue-editor-header">Select a cue list</div>
+        <div class="panel-body" id="cue-editor-body"></div>
+      </div>
+    </div>
+
+    <!-- DMX PAGE -->
+    <div class="page" id="page-dmx">
+      <div class="dmx-universe-tabs" id="dmx-tabs"></div>
+      <div id="dmx-grid"></div>
+    </div>
+
+    <!-- MORPH PAGE -->
+    <div class="page" id="page-morph">
+      <div class="panel" id="morph-source">
+        <div class="panel-header">
+          Source Fixtures
+          <div class="actions">
+            <span class="small-label" id="morph-sel-count">0 selected</span>
+          </div>
+        </div>
+        <div class="panel-body" id="morph-source-list"></div>
+      </div>
+      <div class="panel" id="morph-target">
+        <div class="panel-header">Target Fixture Type</div>
+        <div class="panel-body">
+          <input class="search-input" id="morph-lib-search" placeholder="Search target…" oninput="filterMorphLib()">
+          <div id="morph-lib-list"></div>
+        </div>
+      </div>
+      <div class="panel" id="morph-preview" style="border-right:none;">
+        <div class="panel-header">
+          Morph Preview
+          <div class="actions">
+            <button class="btn sm primary" id="morph-apply-btn" onclick="applyMorph()" disabled>Apply Morph</button>
+          </div>
+        </div>
+        <div class="panel-body" id="morph-preview-body">
+          <div class="empty-state"><div class="icon">🔀</div>Select source fixtures and a target type</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OSC PAGE -->
+    <div class="page" id="page-osc">
+      <div class="osc-section">
+        <h3>OSC Server Status</h3>
+        <div id="osc-status-display">Loading…</div>
+      </div>
+      <div class="osc-section">
+        <h3>Feedback Targets (TouchOSC, Lemur, QLab…)</h3>
+        <div class="form-row">
+          <label>IP Address</label>
+          <input id="osc-fb-host" type="text" placeholder="192.168.1.100" value="">
+        </div>
+        <div class="form-row">
+          <label>Port</label>
+          <input id="osc-fb-port" type="number" placeholder="9000" value="9000">
+        </div>
+        <button class="btn primary" onclick="addOscFeedback()">Add Feedback Target</button>
+        <div class="feedback-list" id="feedback-list"></div>
+      </div>
+      <div class="osc-section">
+        <h3>OSC Address Reference</h3>
+        <div class="osc-path"><span class="path">/lumos/master/intensity</span><span class="args-hint">f 0.0–1.0</span><span class="desc">Master intensity</span></div>
+        <div class="osc-path"><span class="path">/lumos/dmx/&lt;universe&gt;/&lt;channel&gt;</span><span class="args-hint">i 0–255</span><span class="desc">Raw DMX channel</span></div>
+        <div class="osc-path"><span class="path">/lumos/fixture/&lt;id&gt;/&lt;channel&gt;</span><span class="args-hint">i 0–255</span><span class="desc">Fixture channel by name</span></div>
+        <div class="osc-path"><span class="path">/lumos/fixture/&lt;id&gt;/intensity</span><span class="args-hint">f 0.0–1.0</span><span class="desc">Fixture dimmer shorthand</span></div>
+        <div class="osc-path"><span class="path">/lumos/fixture/&lt;id&gt;/flash</span><span class="args-hint">i 0/1</span><span class="desc">Flash on/off</span></div>
+        <div class="osc-path"><span class="path">/lumos/cue/&lt;list_id&gt;/go</span><span class="args-hint">i 1</span><span class="desc">Advance cue list</span></div>
+        <div class="osc-path"><span class="path">/lumos/cue/&lt;list_id&gt;/&lt;index&gt;</span><span class="args-hint">i 1</span><span class="desc">Jump to cue by index</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal: Add Fixture -->
+  <div class="modal-overlay" id="modal-add-fixture">
+    <div class="modal">
+      <h2>Add Fixture to Patch</h2>
+      <div>
+        <label style="font-size:12px;color:var(--text-1)">Fixture Type</label>
+        <select id="af-def" style="width:100%;margin-top:4px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-0);font-size:12px;outline:none;">
+          <option value="">Select…</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-1)">Mode</label>
+        <select id="af-mode" style="width:100%;margin-top:4px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-0);font-size:12px;outline:none;"></select>
+      </div>
+      <div class="form-row"><label>Name</label><input id="af-name" type="text" placeholder="Fixture 1"></div>
+      <div class="form-row"><label>Universe</label><input id="af-universe" type="number" value="1" min="1"></div>
+      <div class="form-row"><label>Address</label><input id="af-address" type="number" value="1" min="1" max="512"></div>
+      <div class="form-row"><label>Group</label><input id="af-group" type="text" value="Default"></div>
+      <div id="af-conflict-warn" style="color:var(--red);font-size:12px;display:none;"></div>
+      <div class="modal-footer">
+        <button class="btn" onclick="closeModal('modal-add-fixture')">Cancel</button>
+        <button class="btn primary" onclick="confirmAddFixture()">Add Fixture</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // ── State ────────────────────────────────────────────────────────────────
+  const state = {
+    fixtures: [],
+    library: [],
+    cueLists: [],
+    universes: [],
+    selectedFixture: null,
+    selectedCueList: null,
+    dmxData: {},      // uid -> Uint8Array(512)
+    currentDmxUniverse: 1,
+    morphSelected: new Set(),
+    morphTargetDef: null,
+    morphPreview: null,
+  };
+
+  let ws = null;
+  const API = window.location.protocol + '//' + window.location.host + '/api';
+
+  // ── WebSocket ────────────────────────────────────────────────────────────
+  function connectWS() {
+    const wsUrl = (window.location.protocol === 'https:' ? 'wss:' : 'ws:')
+      + '//' + window.location.host + '/api/ws';
+    ws = new WebSocket(wsUrl);
+    ws.onopen = () => {
+      document.getElementById('ws-dot').className = 'status-dot';
+      document.getElementById('ws-label').textContent = 'Connected';
+    };
+    ws.onclose = () => {
+      document.getElementById('ws-dot').className = 'status-dot off';
+      document.getElementById('ws-label').textContent = 'Disconnected';
+      setTimeout(connectWS, 2000);
+    };
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+      handleWSEvent(msg.event, msg.data);
+    };
+  }
+
+  function handleWSEvent(event, data) {
+    if (event === 'init') {
+      state.universes = data.universes;
+      state.fixtures = data.fixtures;
+      state.cueLists = data.cue_lists;
+      renderAll();
+    } else if (event === 'patch_updated') {
+      state.fixtures = data;
+      renderPatch();
+      renderMorphSource();
+    } else if (event === 'dmx_update') {
+      if (!state.dmxData[data.universe]) {
+        state.dmxData[data.universe] = new Uint8Array(512);
+      }
+      for (let i = 0; i < data.data.length; i++) {
+        state.dmxData[data.universe][i] = data.data[i];
+      }
+      if (data.universe === state.currentDmxUniverse) renderDMXGrid();
+    } else if (event === 'channel_update') {
+      // Update slider if visible
+      const slider = document.querySelector(`[data-fixture="${data.fixture_id}"][data-channel="${data.channel}"]`);
+      if (slider) updateSliderDisplay(slider, data.value);
+    } else if (event === 'cue_go') {
+      renderCueEditor();
+    }
+  }
+
+  function wsSend(action, data) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action, data }));
+    }
+  }
+
+  // ── API helpers ───────────────────────────────────────────────────────────
+  async function api(method, path, body) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch(API + path, opts);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById('page-' + name).classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'osc') loadOSCStatus();
+    if (name === 'dmx') renderDMXTabs();
+    if (name === 'morph') { renderMorphSource(); renderMorphLib(); }
+  }
+
+  // ── Render All ────────────────────────────────────────────────────────────
+  async function renderAll() {
+    await loadLibrary();
+    renderPatch();
+    renderCueLists();
+    renderDMXTabs();
+    renderMorphLib();
+    renderMorphSource();
+  }
+
+  async function loadLibrary() {
+    state.library = await api('GET', '/library');
+    renderLibrary();
+    populateAddFixtureModal();
+  }
+
+  // ── PATCH ─────────────────────────────────────────────────────────────────
+  function renderPatch() {
+    const body = document.getElementById('patch-list-body');
+    if (!state.fixtures.length) {
+      body.innerHTML = '<div class="empty-state"><div class="icon">💡</div>No fixtures patched</div>';
+      return;
+    }
+    const groups = {};
+    for (const f of state.fixtures) {
+      if (!groups[f.group]) groups[f.group] = [];
+      groups[f.group].push(f);
+    }
+    let html = '';
+    for (const [group, fixtures] of Object.entries(groups)) {
+      html += `<div style="font-size:10px;color:var(--text-2);padding:6px 10px 2px;font-weight:600;letter-spacing:.6px;text-transform:uppercase">${group}</div>`;
+      for (const f of fixtures) {
+        const isSelected = state.selectedFixture?.id === f.id;
+        html += `<div class="fixture-row ${isSelected ? 'selected' : ''}" onclick="selectFixture('${f.id}')">
+          <span class="fix-addr">U${f.universe}/${f.address}</span>
+          <span class="fix-name">${f.name}</span>
+          <span class="fix-model">${f.definition_id.split('::')[1] || ''}</span>
+          <button class="btn icon danger" onclick="event.stopPropagation();removeFixture('${f.id}')" title="Remove">✕</button>
+        </div>`;
+      }
+    }
+    body.innerHTML = html;
+  }
+
+  function selectFixture(id) {
+    state.selectedFixture = state.fixtures.find(f => f.id === id);
+    renderPatch();
+    renderChannelEditor();
+  }
+
+  function renderChannelEditor() {
+    const f = state.selectedFixture;
+    const grid = document.getElementById('ch-grid');
+    const header = document.getElementById('detail-header');
+    if (!f) {
+      header.textContent = 'Select a fixture';
+      grid.innerHTML = '';
+      return;
+    }
+    header.innerHTML = `${f.name} <span style="color:var(--text-2);font-weight:400;font-size:11px">${f.definition_id} · ${f.mode} · U${f.universe}@${f.address}</span>`;
+
+    const fdef = state.library.find(d => d.id === f.definition_id);
+    if (!fdef) { grid.innerHTML = ''; return; }
+
+    let html = '';
+    for (const chName of f.channels) {
+      const group = fdef.channels?.[chName]?.group || 'other';
+      const groupClass = 'ch-group-' + (group.toLowerCase().replace(/_/g, '-').split('-')[0]);
+      html += `<div class="ch-card">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="ch-name">${chName}</span>
+          <span class="ch-group-tag ${groupClass}">${group}</span>
+        </div>
+        <div class="ch-value-display" id="val-${f.id}-${chName}">0</div>
+        <input type="range" min="0" max="255" value="0" class="ch-slider"
+          data-fixture="${f.id}" data-channel="${chName}"
+          oninput="onSliderInput(this)">
+        <div style="display:flex;justify-content:space-between">
+          <span class="cap-hint" id="cap-${f.id}-${chName}"></span>
+          <span class="ch-percent" id="pct-${f.id}-${chName}">0%</span>
+        </div>
+      </div>`;
+    }
+    grid.innerHTML = html;
+  }
+
+  function onSliderInput(el) {
+    const val = parseInt(el.value);
+    updateSliderDisplay(el, val);
+    wsSend('set_channel', {
+      fixture_id: el.dataset.fixture,
+      channel: el.dataset.channel,
+      value: val,
+    });
+  }
+
+  function updateSliderDisplay(el, val) {
+    el.value = val;
+    const fid = el.dataset.fixture;
+    const ch = el.dataset.channel;
+    const valEl = document.getElementById(`val-${fid}-${ch}`);
+    const pctEl = document.getElementById(`pct-${fid}-${ch}`);
+    if (valEl) valEl.textContent = val;
+    if (pctEl) pctEl.textContent = Math.round(val/255*100) + '%';
+    // Capability hint
+    const capEl = document.getElementById(`cap-${fid}-${ch}`);
+    if (capEl) {
+      const f = state.fixtures.find(x => x.id === fid);
+      const fdef = f && state.library.find(d => d.id === f.definition_id);
+      const caps = fdef?.channels?.[ch]?.capabilities || [];
+      const cap = caps.find(c => val >= c.min && val <= c.max);
+      capEl.textContent = cap ? cap.name : '';
+    }
+  }
+
+  async function removeFixture(id) {
+    if (!confirm('Remove this fixture from patch?')) return;
+    await api('DELETE', `/patch/${id}`);
+    if (state.selectedFixture?.id === id) {
+      state.selectedFixture = null;
+      document.getElementById('ch-grid').innerHTML = '';
+    }
+  }
+
+  // ── Library ───────────────────────────────────────────────────────────────
+  function renderLibrary(filtered) {
+    const list = document.getElementById('lib-list');
+    const items = filtered || state.library;
+    if (!items.length) {
+      list.innerHTML = '<div style="color:var(--text-2);font-size:12px;padding:8px">No fixtures found</div>';
+      return;
+    }
+    let html = '';
+    let mfr = null;
+    for (const f of items) {
+      if (f.manufacturer !== mfr) {
+        mfr = f.manufacturer;
+        html += `<div style="font-size:10px;color:var(--text-2);padding:5px 8px 2px;font-weight:600;text-transform:uppercase;letter-spacing:.6px">${mfr}</div>`;
+      }
+      html += `<div style="padding:5px 8px;border-radius:var(--radius);cursor:pointer;display:flex;align-items:center;gap:6px"
+        onmouseenter="this.style.background='var(--bg-3)'"
+        onmouseleave="this.style.background=''">
+        <span style="flex:1;font-size:12px">${f.model}</span>
+        <span style="font-size:10px;color:var(--text-2)">${f.type}</span>
+        <span style="font-size:10px;color:var(--text-2)">${f.modes?.[0]?.channels || '?'}ch</span>
+      </div>`;
+    }
+    list.innerHTML = html;
+  }
+
+  function filterLibrary() {
+    const q = document.getElementById('lib-search').value.toLowerCase();
+    if (!q) { renderLibrary(); return; }
+    const filtered = state.library.filter(f =>
+      f.manufacturer.toLowerCase().includes(q) ||
+      f.model.toLowerCase().includes(q) ||
+      f.type.toLowerCase().includes(q)
+    );
+    renderLibrary(filtered);
+  }
+
+  // ── Add Fixture Modal ──────────────────────────────────────────────────────
+  function populateAddFixtureModal() {
+    const sel = document.getElementById('af-def');
+    sel.innerHTML = '<option value="">Select…</option>';
+    let mfr = null;
+    let group = null;
+    for (const f of state.library) {
+      if (f.manufacturer !== mfr) {
+        if (group) sel.appendChild(group);
+        mfr = f.manufacturer;
+        group = document.createElement('optgroup');
+        group.label = mfr;
+      }
+      const opt = document.createElement('option');
+      opt.value = f.id;
+      opt.textContent = f.model;
+      opt._modes = f.modes;
+      group.appendChild(opt);
+    }
+    if (group) sel.appendChild(group);
+    sel.onchange = () => updateModeSelect(sel);
+  }
+
+  function updateModeSelect(sel) {
+    const modeSel = document.getElementById('af-mode');
+    const selectedOpt = sel.options[sel.selectedIndex];
+    const modes = selectedOpt._modes || [];
+    modeSel.innerHTML = modes.map(m => `<option value="${m.name}">${m.name} (${m.channels}ch)</option>`).join('');
+  }
+
+  function openAddFixture() {
+    document.getElementById('modal-add-fixture').classList.add('open');
+  }
+
+  function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+  }
+
+  async function confirmAddFixture() {
+    const defId = document.getElementById('af-def').value;
+    const mode = document.getElementById('af-mode').value;
+    const name = document.getElementById('af-name').value || 'Fixture';
+    const universe = parseInt(document.getElementById('af-universe').value);
+    const address = parseInt(document.getElementById('af-address').value);
+    const group = document.getElementById('af-group').value || 'Default';
+    if (!defId) return;
+    try {
+      await api('POST', '/patch', { definition_id: defId, name, universe, address, mode, group });
+      closeModal('modal-add-fixture');
+    } catch (e) {
+      document.getElementById('af-conflict-warn').textContent = e.message;
+      document.getElementById('af-conflict-warn').style.display = 'block';
+    }
+  }
+
+  // ── CUES ──────────────────────────────────────────────────────────────────
+  function renderCueLists() {
+    const body = document.getElementById('cuelist-body');
+    if (!state.cueLists.length) {
+      body.innerHTML = '<div class="empty-state"><div class="icon">🎭</div>No cue lists</div>';
+      return;
+    }
+    let html = '';
+    for (const cl of state.cueLists) {
+      const isSelected = state.selectedCueList?.id === cl.id;
+      html += `<div class="cue-list-item ${isSelected ? 'selected' : ''}" onclick="selectCueList('${cl.id}')">
+        <span class="cl-name">${cl.name}</span>
+        <span class="cl-count">${cl.cues.length} cues</span>
+      </div>`;
+    }
+    body.innerHTML = html;
+  }
+
+  function selectCueList(id) {
+    state.selectedCueList = state.cueLists.find(c => c.id === id);
+    renderCueLists();
+    renderCueEditor();
+  }
+
+  function renderCueEditor() {
+    const cl = state.selectedCueList;
+    const body = document.getElementById('cue-editor-body');
+    const header = document.getElementById('cue-editor-header');
+    if (!cl) {
+      header.textContent = 'Select a cue list';
+      body.innerHTML = '';
+      return;
+    }
+    header.innerHTML = `${cl.name} <span style="color:var(--text-2);font-size:11px">${cl.cues.length} cues</span>`;
+
+    // Refresh from server
+    const serverCl = state.cueLists.find(x => x.id === cl.id);
+    const currentIdx = serverCl?.current_index ?? -1;
+
+    let html = `<button class="go-btn" onclick="goCue('${cl.id}')">▶ GO</button>`;
+    html += `<div style="margin-top:12px">`;
+    if (!cl.cues.length) {
+      html += '<div style="color:var(--text-2);font-size:12px;text-align:center;padding:20px">No cues — add fixtures and record cues</div>';
+    }
+    for (let i = 0; i < cl.cues.length; i++) {
+      const cue = cl.cues[i];
+      const isCurrent = i === currentIdx;
+      html += `<div class="cue-row ${isCurrent ? 'current' : ''}" onclick="goToCue('${cl.id}', ${i})">
+        <span class="cue-num">${i + 1}</span>
+        <span class="cue-name">${cue.name}</span>
+        <span class="cue-fade">${cue.fade_in > 0 ? cue.fade_in.toFixed(1) + 's' : '—'}</span>
+        <span class="cue-count">${cue.values?.length || 0} ch</span>
+      </div>`;
+    }
+    html += '</div>';
+    html += `<div style="padding:8px;margin-top:8px;border-top:1px solid var(--border);display:flex;gap:6px">
+      <button class="btn sm" onclick="recordCue('${cl.id}')">⬤ Record Cue</button>
+    </div>`;
+    body.innerHTML = html;
+  }
+
+  async function createCueList() {
+    const name = prompt('Cue list name:', 'Main List');
+    if (!name) return;
+    const cl = await api('POST', '/cuelists', { name });
+    state.cueLists.push(cl);
+    renderCueLists();
+    selectCueList(cl.id);
+  }
+
+  async function goCue(clId) {
+    await api('POST', `/cuelists/${clId}/go`);
+    const cl = state.cueLists.find(x => x.id === clId);
+    if (cl && cl.current_index < cl.cues.length - 1) {
+      cl.current_index++;
+    }
+    renderCueEditor();
+  }
+
+  async function goToCue(clId, index) {
+    await api('POST', `/cuelists/${clId}/go/${index}`);
+    const cl = state.cueLists.find(x => x.id === clId);
+    if (cl) cl.current_index = index;
+    renderCueEditor();
+  }
+
+  async function recordCue(clId) {
+    const name = prompt('Cue name:', `Cue ${(state.cueLists.find(x=>x.id===clId)?.cues.length||0)+1}`);
+    if (!name) return;
+    const fadeIn = parseFloat(prompt('Fade in (seconds):', '0') || '0');
+    const cue = await api('POST', `/cuelists/${clId}/cues`, { name, fade_in: fadeIn });
+    // Record current slider values
+    const sliders = document.querySelectorAll('.ch-slider');
+    for (const s of sliders) {
+      const val = parseInt(s.value);
+      if (val > 0) {
+        try {
+          await api('POST', `/cuelists/${clId}/cues/${cue.id}/values`, {
+            fixture_id: s.dataset.fixture,
+            channel: s.dataset.channel,
+            value: val,
+          });
+        } catch (e) {}
+      }
+    }
+    const cl = state.cueLists.find(x => x.id === clId);
+    if (cl) { cl.cues.push(cue); renderCueEditor(); }
+  }
+
+  // ── DMX ───────────────────────────────────────────────────────────────────
+  function renderDMXTabs() {
+    const tabs = document.getElementById('dmx-tabs');
+    tabs.innerHTML = state.universes.map(u =>
+      `<button class="btn ${u.id === state.currentDmxUniverse ? 'primary' : ''}" onclick="selectDMXUniverse(${u.id})">${u.name || 'U'+u.id}</button>`
+    ).join('');
+    renderDMXGrid();
+  }
+
+  function selectDMXUniverse(uid) {
+    state.currentDmxUniverse = uid;
+    renderDMXTabs();
+  }
+
+  function renderDMXGrid() {
+    const grid = document.getElementById('dmx-grid');
+    const data = state.dmxData[state.currentDmxUniverse] || new Uint8Array(512);
+    let html = '';
+    for (let i = 0; i < 512; i++) {
+      const val = data[i];
+      const intensity = val / 255;
+      const bg = `rgba(124,111,205,${intensity * 0.6})`;
+      const color = intensity > 0.5 ? 'var(--text-0)' : 'var(--text-1)';
+      html += `<div class="dmx-cell" style="background:${bg}" title="Channel ${i+1}: ${val}">
+        <div class="dmx-ch">${i+1}</div>
+        <div class="dmx-val" style="color:${color}">${val}</div>
+      </div>`;
+    }
+    grid.innerHTML = html;
+  }
+
+  // ── MORPH ─────────────────────────────────────────────────────────────────
+  function renderMorphSource() {
+    const list = document.getElementById('morph-source-list');
+    let html = '';
+    for (const f of state.fixtures) {
+      const isSelected = state.morphSelected.has(f.id);
+      html += `<div class="fixture-row" onclick="toggleMorphSelect('${f.id}')">
+        <div class="fix-sel-check ${isSelected ? 'checked' : ''}" id="mchk-${f.id}">${isSelected ? '✓' : ''}</div>
+        <span class="fix-addr">U${f.universe}/${f.address}</span>
+        <span class="fix-name">${f.name}</span>
+        <span class="fix-model">${f.definition_id.split('::')[1] || ''}</span>
+      </div>`;
+    }
+    list.innerHTML = html || '<div class="empty-state" style="height:auto;padding:20px"><div class="icon">💡</div>No fixtures patched</div>';
+    document.getElementById('morph-sel-count').textContent = state.morphSelected.size + ' selected';
+  }
+
+  function toggleMorphSelect(id) {
+    if (state.morphSelected.has(id)) {
+      state.morphSelected.delete(id);
+    } else {
+      state.morphSelected.add(id);
+    }
+    renderMorphSource();
+    updateMorphPreview();
+  }
+
+  function renderMorphLib(filtered) {
+    const list = document.getElementById('morph-lib-list');
+    const items = filtered || state.library;
+    let html = '';
+    let mfr = null;
+    for (const f of items) {
+      if (f.manufacturer !== mfr) {
+        mfr = f.manufacturer;
+        html += `<div style="font-size:10px;color:var(--text-2);padding:5px 8px 2px;font-weight:600;text-transform:uppercase;letter-spacing:.6px">${mfr}</div>`;
+      }
+      const isSel = state.morphTargetDef?.id === f.id;
+      html += `<div class="fixture-row ${isSel ? 'selected' : ''}" onclick="selectMorphTarget('${f.id}')">
+        <span style="flex:1;font-size:12px">${f.model}</span>
+        <span style="font-size:10px;color:var(--text-2)">${f.type}</span>
+      </div>`;
+    }
+    list.innerHTML = html || '<div style="color:var(--text-2);font-size:12px;padding:8px">No fixtures</div>';
+  }
+
+  function filterMorphLib() {
+    const q = document.getElementById('morph-lib-search').value.toLowerCase();
+    if (!q) { renderMorphLib(); return; }
+    renderMorphLib(state.library.filter(f =>
+      f.manufacturer.toLowerCase().includes(q) ||
+      f.model.toLowerCase().includes(q)
+    ));
+  }
+
+  function selectMorphTarget(id) {
+    state.morphTargetDef = state.library.find(f => f.id === id);
+    renderMorphLib();
+    updateMorphPreview();
+  }
+
+  async function updateMorphPreview() {
+    const body = document.getElementById('morph-preview-body');
+    const applyBtn = document.getElementById('morph-apply-btn');
+    if (!state.morphSelected.size || !state.morphTargetDef) {
+      body.innerHTML = '<div class="empty-state"><div class="icon">🔀</div>Select source fixtures and a target type</div>';
+      applyBtn.disabled = true;
+      state.morphPreview = null;
+      return;
+    }
+    try {
+      const preview = await api('POST', '/morph/preview', {
+        source_fixture_ids: Array.from(state.morphSelected),
+        target_definition_id: state.morphTargetDef.id,
+        target_mode: '',
+      });
+      state.morphPreview = preview;
+      applyBtn.disabled = false;
+      renderMorphPreview(preview);
+    } catch (e) {
+      body.innerHTML = `<div style="color:var(--red);padding:12px">${e.message}</div>`;
+    }
+  }
+
+  function renderMorphPreview(preview) {
+    const body = document.getElementById('morph-preview-body');
+    const coverage = Math.round(preview.coverage * 100);
+    let html = '';
+
+    // Header stats
+    html += `<div style="padding:12px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <span style="font-size:13px;font-weight:600">${preview.source_fixture_ids.length} fixture${preview.source_fixture_ids.length>1?'s':''} → ${state.morphTargetDef.model}</span>
+        <span style="font-size:12px;color:var(--text-2)">Mode: ${preview.target_mode || 'default'}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--text-2)">Channel coverage:</span>
+        <div class="coverage-bar" style="flex:1"><div class="coverage-fill" style="width:${coverage}%;background:${coverage>80?'var(--green)':coverage>50?'var(--amber)':'var(--red)'}"></div></div>
+        <span style="font-size:12px;font-family:var(--mono);color:${coverage>80?'var(--green)':coverage>50?'var(--amber)':'var(--red)'}">${coverage}%</span>
+      </div>
+    </div>`;
+
+    // Warnings
+    for (const w of preview.warnings) {
+      html += `<div class="warning-box">⚠ ${w}</div>`;
+    }
+
+    // Mappings
+    html += `<div style="padding:8px;font-size:11px;color:var(--text-2);font-weight:600;padding-top:12px">CHANNEL MAPPINGS (${preview.channel_mappings.length})</div>`;
+    for (const m of preview.channel_mappings) {
+      const conf = Math.round(m.confidence * 100);
+      const confClass = conf >= 80 ? 'conf-high' : conf >= 50 ? 'conf-med' : 'conf-low';
+      html += `<div class="mapping-row">
+        <span class="map-src">${m.source}</span>
+        <span class="map-arrow">→</span>
+        <span class="map-tgt">${m.target}</span>
+        <span class="map-conf ${confClass}">${conf}%</span>
+      </div>`;
+    }
+
+    if (preview.unmapped_source.length) {
+      html += `<div style="padding:8px;font-size:11px;color:var(--text-2);font-weight:600;padding-top:12px">UNMAPPED SOURCE CHANNELS</div>`;
+      for (const ch of preview.unmapped_source) {
+        html += `<div class="unmapped-tag" style="padding:3px 12px">✕ ${ch}</div>`;
+      }
+    }
+
+    body.innerHTML = html;
+  }
+
+  async function applyMorph() {
+    if (!state.morphPreview) return;
+    const srcNames = Array.from(state.morphSelected)
+      .map(id => state.fixtures.find(f => f.id === id)?.name)
+      .filter(Boolean).join(', ');
+    if (!confirm(`Apply morph?\n\n${srcNames}\n→ ${state.morphTargetDef.model}\n\nThis will update all cue data. This cannot be undone.`)) return;
+    const result = await api('POST', '/morph/apply', {
+      source_fixture_ids: Array.from(state.morphSelected),
+      target_definition_id: state.morphTargetDef.id,
+      target_mode: state.morphPreview.target_mode,
+    });
+    alert(`Morph applied!\n${result.new_ids.length} fixtures replaced\n${result.cue_updates} cue entries updated\n${result.mappings_applied} channel mappings applied`);
+    state.morphSelected.clear();
+    state.morphPreview = null;
+    document.getElementById('morph-preview-body').innerHTML = '<div class="empty-state"><div class="icon">✅</div>Morph applied successfully</div>';
+  }
+
+  // ── OSC ────────────────────────────────────────────────────────────────────
+  async function loadOSCStatus() {
+    const status = await api('GET', '/osc/status');
+    const el = document.getElementById('osc-status-display');
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <div class="status-dot ${status.running ? '' : 'off'}"></div>
+      <span>${status.running ? `Listening on UDP :${status.port}` : 'Not running'}</span>
+    </div>`;
+    const list = document.getElementById('feedback-list');
+    list.innerHTML = (status.feedback_targets || []).map(([h, p]) =>
+      `<div class="feedback-item">
+        <span class="fbi-addr">${h}:${p}</span>
+        <button class="btn sm danger" onclick="removeOscFeedback('${h}', ${p})">Remove</button>
+      </div>`
+    ).join('') || '<div style="color:var(--text-2);font-size:12px">No feedback targets</div>';
+  }
+
+  async function addOscFeedback() {
+    const host = document.getElementById('osc-fb-host').value;
+    const port = parseInt(document.getElementById('osc-fb-port').value);
+    if (!host || !port) return;
+    await api('POST', '/osc/feedback/add', { host, port });
+    loadOSCStatus();
+  }
+
+  async function removeOscFeedback(host, port) {
+    await api('POST', '/osc/feedback/remove', { host, port });
+    loadOSCStatus();
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  connectWS();
+  // Initial REST load (WS init event will also populate)
+  (async () => {
+    try {
+      state.fixtures = await api('GET', '/patch');
+      state.cueLists = await api('GET', '/cuelists');
+      state.universes = await api('GET', '/universes');
+      await renderAll();
+    } catch (e) {
+      console.error('Init error:', e);
+    }
+  })();
+  </script>
+</body>
+</html>
