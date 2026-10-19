@@ -13,6 +13,9 @@ mido>=1.3.0                      # MIDI I/O (pure-Python, no native build requir
 # Serial / USB DMX (Enttec, RDM)
 pyserial>=3.5                    # serial port access for DMX and RDM
 
+# PDF generation (technical rider export)
+reportlab>=4.0.0                 # full-featured PDF library, pure Python
+
 # ── Optional extras — install as needed ──────────────────────────────────────
 # Real MIDI hardware I/O backend for mido (requires OS MIDI stack):
 #   pip install python-rtmidi

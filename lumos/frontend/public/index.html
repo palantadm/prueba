@@ -483,6 +483,27 @@
     <h3>Current Show State</h3>
     <div id="show-stats-body"></div>
   </div>
+  <div class="show-section">
+    <h3>📄 Technical Rider — PDF Export</h3>
+    <div class="field"><label>Show Name</label><input type="text" id="rider-show" placeholder="My Production" style="width:100%"></div>
+    <div style="display:flex;gap:10px">
+      <div class="field" style="flex:1"><label>Venue</label><input type="text" id="rider-venue" placeholder="Teatro Principal"></div>
+      <div class="field" style="width:120px"><label>Date</label><input type="date" id="rider-date"></div>
+    </div>
+    <div class="field"><label>Page Size</label>
+      <select id="rider-pagesize" style="width:100px">
+        <option value="A4" selected>A4</option>
+        <option value="Letter">Letter</option>
+      </select>
+    </div>
+    <div class="field"><label>Production Notes</label>
+      <textarea id="rider-notes" rows="3" style="width:100%;background:var(--bg-0);color:var(--text-0);border:1px solid var(--border);border-radius:var(--radius);padding:6px;font-family:var(--font);font-size:12px;resize:vertical" placeholder="Special requirements, contacts, notes for the crew…"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button class="btn primary" onclick="downloadRider()">⬇ Download Rider PDF</button>
+      <span id="rider-msg" style="font-size:11px;color:var(--text-2)"></span>
+    </div>
+  </div>
 </div>
 
 </div><!-- #main -->
@@ -713,7 +734,11 @@ document.querySelectorAll('.tab[data-page]').forEach(t => {
     if (page === 'osc') loadOscStatus();
     if (page === 'midi') loadMidiPorts();
     if (page === 'protocols') loadProtocolsPage();
-    if (page === 'show') loadShowStats();
+    if (page === 'show') {
+      loadShowStats();
+      const d = document.getElementById('rider-date');
+      if (!d.value) d.value = new Date().toISOString().split('T')[0];
+    }
   });
 });
 
@@ -1382,6 +1407,55 @@ async function loadShow() {
   document.getElementById('show-msg').textContent = res.ok ? `Loaded ${path}` : 'Load failed!';
   document.getElementById('show-msg').style.color = res.ok ? 'var(--green)' : 'var(--red)';
 }
+async function downloadRider() {
+  const msg = document.getElementById('rider-msg');
+  msg.style.color = 'var(--text-2)';
+  msg.textContent = 'Generating PDF…';
+
+  // Pre-fill show name from path if empty
+  const showNameEl = document.getElementById('rider-show');
+  if (!showNameEl.value) {
+    const p = document.getElementById('show-path').value;
+    showNameEl.value = p.split('/').pop().replace('.json','') || 'My Show';
+  }
+
+  const body = {
+    show_name:  document.getElementById('rider-show').value || 'Show',
+    venue:      document.getElementById('rider-venue').value,
+    date:       document.getElementById('rider-date').value,
+    notes:      document.getElementById('rider-notes').value,
+    page_size:  document.getElementById('rider-pagesize').value,
+  };
+
+  try {
+    const res = await fetch(`${API}/show/rider`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({detail: res.statusText}));
+      msg.style.color = 'var(--red)';
+      msg.textContent = `Error: ${err.detail || res.statusText}`;
+      return;
+    }
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const cd   = res.headers.get('Content-Disposition') || '';
+    const fnMatch = cd.match(/filename="([^"]+)"/);
+    a.download = fnMatch ? fnMatch[1] : 'lumos_rider.pdf';
+    a.href = url;
+    a.click();
+    URL.revokeObjectURL(url);
+    msg.style.color = 'var(--green)';
+    msg.textContent = `Downloaded ${a.download}`;
+  } catch(e) {
+    msg.style.color = 'var(--red)';
+    msg.textContent = `Failed: ${e.message}`;
+  }
+}
+
 async function loadShowStats() {
   const data = await fetch(`${API}/show`).then(r => r.json()).catch(() => ({}));
   const body = document.getElementById('show-stats-body');

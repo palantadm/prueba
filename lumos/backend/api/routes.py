@@ -3,6 +3,7 @@ import asyncio
 import json
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from ..engine.fixture import FixtureInstance, FixtureLibrary, PatchManager
@@ -917,3 +918,49 @@ def rdm_identify(body: RDMIdentifyRequest):
     uid = _parse_uid(body.uid)
     ok = rdm.identify_device(uid, body.on)
     return {"ok": ok}
+
+
+# ── Technical Rider PDF ───────────────────────────────────────────────────────
+
+class RiderRequest(BaseModel):
+    show_name: str = "Show"
+    venue: str = ""
+    date: str = ""
+    notes: str = ""
+    page_size: str = "A4"   # A4 | Letter
+
+
+@router.post("/show/rider")
+async def generate_rider(body: RiderRequest):
+    """Generate and download the technical rider as a PDF."""
+    if not patch or not universes:
+        raise HTTPException(503, "Engine not ready")
+    try:
+        from ..engine.rider import generate_rider_pdf, REPORTLAB_AVAILABLE
+        if not REPORTLAB_AVAILABLE:
+            raise HTTPException(503, "reportlab not installed: pip install reportlab")
+        from reportlab.lib.pagesizes import A4, letter
+        page_size = letter if body.page_size.lower() == "letter" else A4
+        pdf_bytes = generate_rider_pdf(
+            patch=patch,
+            universes=universes,
+            cues=cues,
+            effects=effects,
+            groups=groups,
+            show_name=body.show_name,
+            venue=body.venue,
+            date_str=body.date,
+            notes=body.notes,
+            page_size=page_size,
+        )
+        safe_name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in body.show_name).strip()
+        filename = f"lumos_rider_{safe_name or 'show'}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except ImportError as e:
+        raise HTTPException(503, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"PDF generation failed: {e}")
