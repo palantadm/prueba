@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumos — 3D Stage Visualizer</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#000; overflow:hidden; font-family:'Inter',system-ui,sans-serif; }
+  #canvas-container { width:100vw; height:100vh; }
+
+  #overlay {
+    position:fixed; top:0; left:0; right:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px;
+    background:linear-gradient(to bottom,rgba(0,0,0,.7),transparent);
+    pointer-events:none;
+    z-index:10;
+  }
+  .ov-logo { color:#9d8ff0; font-size:15px; font-weight:700; pointer-events:auto; }
+  .ov-logo a { color:inherit; text-decoration:none; }
+  .ov-controls { display:flex; gap:8px; pointer-events:auto; }
+  .ov-btn {
+    padding:5px 12px; border-radius:5px; border:1px solid rgba(255,255,255,.2);
+    background:rgba(0,0,0,.5); color:#ccc; cursor:pointer; font-size:12px;
+    transition:all .15s; backdrop-filter:blur(4px);
+  }
+  .ov-btn:hover { background:rgba(255,255,255,.1); color:#fff; }
+  .ov-btn.active { background:rgba(124,111,205,.4); border-color:#7c6fcd; color:#9d8ff0; }
+
+  #info-panel {
+    position:fixed; bottom:0; left:0; right:0;
+    padding:8px 16px;
+    background:linear-gradient(to top,rgba(0,0,0,.7),transparent);
+    display:flex; gap:16px; align-items:center;
+    pointer-events:none;
+    font-size:11px; color:rgba(255,255,255,.4);
+  }
+  .info-fix {
+    display:flex; align-items:center; gap:6px;
+  }
+  .fix-color-dot {
+    width:8px; height:8px; border-radius:50%;
+  }
+
+  #ws-status {
+    position:fixed; top:10px; right:16px;
+    display:flex; align-items:center; gap:6px;
+    font-size:11px; color:rgba(255,255,255,.4);
+    z-index:20;
+  }
+  .ws-dot { width:6px; height:6px; border-radius:50%; background:#4caf78; }
+  .ws-dot.off { background:#666; }
+
+  #haze-control {
+    position:fixed; left:16px; bottom:40px;
+    display:flex; flex-direction:column; gap:4px;
+    pointer-events:auto; z-index:10;
+  }
+  .ctrl-label { font-size:10px; color:rgba(255,255,255,.4); }
+  input[type=range].vctrl {
+    -webkit-appearance:none; width:100px; height:3px;
+    background:rgba(255,255,255,.15); border-radius:2px; outline:none;
+  }
+  input[type=range].vctrl::-webkit-slider-thumb {
+    -webkit-appearance:none; width:10px; height:10px;
+    border-radius:50%; background:#7c6fcd; cursor:pointer;
+  }
+
+  #loading {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:#000; color:#9d8ff0; font-size:14px; z-index:100;
+    flex-direction:column; gap:8px;
+  }
+  .spinner {
+    width:28px; height:28px; border:2px solid rgba(124,111,205,.3);
+    border-top-color:#9d8ff0; border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div>Loading visualizer…</div>
+<div id="canvas-container"></div>
+
+<div id="overlay">
+  <div class="ov-logo"><a href="/">⚡ Lumos</a> <span style="font-size:11px;color:#666;font-weight:400">3D Visualizer</span></div>
+  <div class="ov-controls">
+    <button class="ov-btn active" id="btn-beams" onclick="toggleBeams()">Beams</button>
+    <button class="ov-btn active" id="btn-bloom" onclick="toggleBloom()">Bloom</button>
+    <button class="ov-btn" id="btn-shadows" onclick="toggleShadows()">Shadows</button>
+    <button class="ov-btn" id="btn-grid" onclick="toggleGrid()">Grid</button>
+    <button class="ov-btn" id="btn-reset" onclick="resetCamera()">Reset Camera</button>
+  </div>
+</div>
+
+<div id="ws-status">
+  <div class="ws-dot off" id="ws-dot"></div>
+  <span id="ws-label">Connecting…</span>
+</div>
+
+<div id="haze-control">
+  <div class="ctrl-label">HAZE</div>
+  <input type="range" class="vctrl" id="haze-slider" min="0" max="100" value="40" oninput="updateHaze(this.value)">
+  <div class="ctrl-label" style="margin-top:6px">AMBIENT</div>
+  <input type="range" class="vctrl" id="ambient-slider" min="0" max="60" value="8" oninput="updateAmbient(this.value)">
+</div>
+
+<div id="info-panel" id="info-panel"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ── Scene setup ─────────────────────────────────────────────────────────────
+const container = document.getElementById('canvas-container');
+const W = () => window.innerWidth, H = () => window.innerHeight;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(W(), H());
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = false;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.8;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000004);
+scene.fog = new THREE.FogExp2(0x000010, 0.012);
+
+const camera = new THREE.PerspectiveCamera(60, W()/H(), 0.1, 200);
+camera.position.set(0, 8, 18);
+camera.lookAt(0, 2, 0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 3;
+controls.maxDistance = 60;
+controls.maxPolarAngle = Math.PI * 0.85;
+controls.update();
+
+// ── Post-processing ──────────────────────────────────────────────────────────
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(W(), H()),
+  1.4,   // strength
+  0.5,   // radius
+  0.05   // threshold
+);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+// ── Ambient / hemisphere ──────────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x101018, 0.08);
+scene.add(ambientLight);
+const hemiLight = new THREE.HemisphereLight(0x080818, 0x000000, 0.05);
+scene.add(hemiLight);
+
+// ── Stage geometry ───────────────────────────────────────────────────────────
+
+// Stage floor — reflective black surface
+const floorGeo = new THREE.PlaneGeometry(30, 20);
+const floorMat = new THREE.MeshStandardMaterial({
+  color: 0x0a0a10,
+  roughness: 0.15,
+  metalness: 0.05,
+  envMapIntensity: 1.0,
+});
+const floor = new THREE.Mesh(floorGeo, floorMat);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+scene.add(floor);
+
+// Stage edge glow strip
+const stripGeo = new THREE.PlaneGeometry(14, 0.08);
+const stripMat = new THREE.MeshBasicMaterial({ color: 0x332255 });
+const strip = new THREE.Mesh(stripGeo, stripMat);
+strip.rotation.x = -Math.PI/2;
+strip.position.set(0, 0.001, 6);
+scene.add(strip);
+
+// Back wall / cyc
+const cycGeo = new THREE.PlaneGeometry(30, 16);
+const cycMat = new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.9, metalness: 0.0 });
+const cyc = new THREE.Mesh(cycGeo, cycMat);
+cyc.position.set(0, 8, -10);
+cyc.receiveShadow = true;
+scene.add(cyc);
+
+// Side walls (black masking)
+const maskL = new THREE.Mesh(
+  new THREE.PlaneGeometry(20, 16),
+  new THREE.MeshStandardMaterial({ color: 0x030305, roughness: 1 })
+);
+maskL.rotation.y = Math.PI/2;
+maskL.position.set(-15, 8, 0);
+scene.add(maskL);
+const maskR = maskL.clone();
+maskR.rotation.y = -Math.PI/2;
+maskR.position.set(15, 8, 0);
+scene.add(maskR);
+
+// Grid helper (toggle)
+const gridHelper = new THREE.GridHelper(30, 30, 0x1a1a2e, 0x111128);
+gridHelper.position.y = 0.002;
+gridHelper.visible = false;
+scene.add(gridHelper);
+
+// ── Truss ────────────────────────────────────────────────────────────────────
+function makeTruss(x1, x2, y, z) {
+  const group = new THREE.Group();
+  // Main tubes
+  const tubeGeo = new THREE.CylinderGeometry(0.04, 0.04, x2-x1, 8);
+  const tubeMat = new THREE.MeshStandardMaterial({ color: 0x555570, roughness: 0.4, metalness: 0.8 });
+  const offsets = [[-0.12, -0.12], [0.12, -0.12], [-0.12, 0.12], [0.12, 0.12]];
+  for (const [oy, oz] of offsets) {
+    const t = new THREE.Mesh(tubeGeo, tubeMat);
+    t.rotation.z = Math.PI/2;
+    t.position.set((x1+x2)/2, oy, oz);
+    group.add(t);
+  }
+  // Cross bracing
+  const crossMat = new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.5, metalness: 0.7 });
+  for (let x = x1; x < x2; x += 0.8) {
+    const len = 0.34;
+    const crossGeo = new THREE.CylinderGeometry(0.02, 0.02, len, 4);
+    for (const [oy, oz] of [[-0.12, -0.12], [0.12, -0.12]]) {
+      const c = new THREE.Mesh(crossGeo, crossMat);
+      c.rotation.z = Math.PI/4;
+      c.position.set(x, 0, oz);
+      group.add(c);
+    }
+  }
+  group.position.set(0, y, z);
+  return group;
+}
+
+const truss1 = makeTruss(-7, 7, 9, -2);
+const truss2 = makeTruss(-5, 5, 8, 2);
+scene.add(truss1, truss2);
+
+// ── Haze ─────────────────────────────────────────────────────────────────────
+let hazeStrength = 0.40;
+const hazeParticles = (() => {
+  const N = 3000;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3);
+  const sizes = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    pos[i*3]   = (Math.random()-0.5)*28;
+    pos[i*3+1] = Math.random()*12;
+    pos[i*3+2] = (Math.random()-0.5)*18;
+    sizes[i] = 0.8 + Math.random()*2.4;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+  const mat = new THREE.PointsMaterial({
+    color: 0x8888cc,
+    size: 0.18,
+    transparent: true,
+    opacity: 0,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+  return pts;
+})();
+
+window.updateHaze = (v) => {
+  hazeStrength = v / 100;
+  hazeParticles.material.opacity = hazeStrength * 0.025;
+  scene.fog.density = 0.004 + hazeStrength * 0.022;
+};
+window.updateAmbient = (v) => {
+  ambientLight.intensity = (v / 100) * 0.5;
+};
+updateHaze(40);
+
+// ── Fixture system ────────────────────────────────────────────────────────────
+
+class FixtureViz {
+  constructor(data) {
+    this.data = data;
+    this.group = new THREE.Group();
+    this.beamGroup = new THREE.Group();
+
+    // Channel state
+    this.channels = {};
+    this.targetPan = 0;
+    this.targetTilt = 0;
+    this.currentPan = 0;
+    this.currentTilt = 0;
+    this.color = new THREE.Color(1, 1, 1);
+    this.intensity = 0;
+
+    this._buildBody();
+    this._buildBeam();
+
+    // Position from stage coords or default grid
+    const pos = data.position || [0, 0, 0];
+    this.group.position.set(pos[0], pos[1] || 9, pos[2]);
+    this.beamGroup.position.copy(this.group.position);
+
+    scene.add(this.group);
+    scene.add(this.beamGroup);
+  }
+
+  _buildBody() {
+    // Body housing
+    const bodyGeo = new THREE.BoxGeometry(0.18, 0.22, 0.14);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2a, roughness: 0.3, metalness: 0.7 });
+    this.bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+    this.group.add(this.bodyMesh);
+
+    // Yoke
+    const yokeGeo = new THREE.TorusGeometry(0.15, 0.018, 8, 16, Math.PI);
+    const yokeMat = new THREE.MeshStandardMaterial({ color: 0x222236, roughness: 0.4, metalness: 0.8 });
+    this.yokeMesh = new THREE.Mesh(yokeGeo, yokeMat);
+    this.yokeMesh.rotation.y = Math.PI/2;
+    this.group.add(this.yokeMesh);
+
+    // Head (rotates for tilt)
+    this.headGroup = new THREE.Group();
+    const headGeo = new THREE.CylinderGeometry(0.07, 0.10, 0.18, 12);
+    const headMat = new THREE.MeshStandardMaterial({ color: 0x252535, roughness: 0.25, metalness: 0.75 });
+    this.headMesh = new THREE.Mesh(headGeo, headMat);
+    this.headMesh.rotation.x = Math.PI/2;
+    this.headGroup.add(this.headMesh);
+
+    // Lens glow
+    const lensGeo = new THREE.CircleGeometry(0.065, 16);
+    this.lensMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    this.lensMesh = new THREE.Mesh(lensGeo, this.lensMat);
+    this.lensMesh.position.z = 0.09;
+    this.headGroup.add(this.lensMesh);
+
+    this.group.add(this.headGroup);
+  }
+
+  _buildBeam() {
+    // Volumetric cone — additive, transparent
+    const coneH = 16;
+    const coneR = coneH * Math.tan(THREE.MathUtils.degToRad(10));
+    const coneGeo = new THREE.ConeGeometry(coneR, coneH, 32, 8, true);
+    this.coneMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      side: THREE.FrontSide,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.coneMesh = new THREE.Mesh(coneGeo, this.coneMat);
+    // Cone tip starts at origin, opens downward
+    this.coneMesh.position.y = -coneH / 2 - 0.09;
+    this.beamGroup.add(this.coneMesh);
+
+    // Inner bright core
+    const coreGeo = new THREE.ConeGeometry(coneR * 0.18, coneH, 16, 1, true);
+    this.coreMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    const coreMesh = new THREE.Mesh(coreGeo, this.coreMat);
+    coreMesh.position.y = -coneH / 2 - 0.09;
+    this.beamGroup.add(coreMesh);
+
+    // Floor pool (gobo/circle at intersection)
+    const poolGeo = new THREE.CircleGeometry(1.2, 32);
+    this.poolMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.poolMesh = new THREE.Mesh(poolGeo, this.poolMat);
+    this.poolMesh.rotation.x = -Math.PI/2;
+    this.poolMesh.position.y = -this.group.position.y + 0.01;
+    this.beamGroup.add(this.poolMesh);
+
+    // Three.js SpotLight for actual scene illumination
+    this.spotlight = new THREE.SpotLight(0xffffff, 0, 30, Math.PI/8, 0.4, 1.2);
+    this.spotlight.position.set(0, 0, 0);
+    this.spotlight.target.position.set(0, -12, 0);
+    this.beamGroup.add(this.spotlight);
+    this.beamGroup.add(this.spotlight.target);
+  }
+
+  setChannels(channelValues) {
+    this.channels = { ...this.channels, ...channelValues };
+    this._applyChannels();
+  }
+
+  _applyChannels() {
+    const ch = this.channels;
+    // Intensity (from any intensity-group channel)
+    const dimmer = ch['Dimmer'] ?? ch['Intensity'] ?? ch['Master'] ?? 0;
+    this.intensity = dimmer / 255;
+
+    // Color
+    const r = (ch['Red'] ?? 255) / 255;
+    const g = (ch['Green'] ?? 255) / 255;
+    const b = (ch['Blue'] ?? 255) / 255;
+    this.color.setRGB(r, g, b);
+
+    // Pan (0-255 → -270° to +270°)
+    const panRaw = ch['Pan'] ?? 128;
+    const panFine = (ch['Pan Fine'] ?? 0) / 255 / 255;
+    this.targetPan = ((panRaw / 255 + panFine) - 0.5) * Math.PI * 3;
+
+    // Tilt (0-255 → -120° to +120°)
+    const tiltRaw = ch['Tilt'] ?? 128;
+    const tiltFine = (ch['Tilt Fine'] ?? 0) / 255 / 255;
+    this.targetTilt = ((tiltRaw / 255 + tiltFine) - 0.5) * Math.PI * 1.33;
+
+    // Color wheel fallback
+    const cw = ch['Color Wheel'];
+    if (cw !== undefined) {
+      const cwColor = getColorWheelColor(cw);
+      if (cwColor) this.color.multiply(cwColor);
+    }
+
+    // Shutter
+    const shutter = ch['Shutter'];
+    const shutterOpen = shutter === undefined || (shutter >= 32 && shutter < 64) || shutter >= 128;
+    if (!shutterOpen) this.intensity = 0;
+  }
+
+  update(dt) {
+    // Smooth pan/tilt interpolation
+    const speed = 1 - Math.exp(-dt * 6);
+    this.currentPan += (this.targetPan - this.currentPan) * speed;
+    this.currentTilt += (this.targetTilt - this.currentTilt) * speed;
+
+    // Apply rotation to head group (yoke = pan, head = tilt)
+    this.group.rotation.y = this.currentPan;
+    this.headGroup.rotation.x = this.currentTilt;
+
+    // Beam direction follows head
+    this.beamGroup.rotation.copy(this.group.rotation);
+
+    // Intensity / color
+    const eff = this.intensity * hazeStrength * 0.38 + this.intensity * 0.04;
+    this.coneMat.opacity = eff * 0.7;
+    this.coreMat.opacity = eff * 1.2;
+    this.poolMat.opacity = this.intensity * 0.28;
+
+    const col = this.color;
+    this.coneMat.color.copy(col);
+    this.coreMat.color.copy(col);
+    this.poolMat.color.copy(col);
+    this.lensMat.color.setRGB(
+      col.r * this.intensity,
+      col.g * this.intensity,
+      col.b * this.intensity
+    );
+    this.spotlight.color.copy(col);
+    this.spotlight.intensity = this.intensity * 25;
+  }
+
+  dispose() {
+    scene.remove(this.group);
+    scene.remove(this.beamGroup);
+  }
+}
+
+function getColorWheelColor(val) {
+  const ranges = [
+    [0,7,   new THREE.Color(1,1,1)],
+    [8,15,  new THREE.Color(1,0.1,0.1)],
+    [16,23, new THREE.Color(1,0.9,0.1)],
+    [24,31, new THREE.Color(0.1,1,0.2)],
+    [32,39, new THREE.Color(0.1,0.3,1)],
+    [40,47, new THREE.Color(1,0.1,0.8)],
+    [48,55, new THREE.Color(0.1,0.9,1)],
+  ];
+  for (const [mn, mx, col] of ranges) {
+    if (val >= mn && val <= mx) return col;
+  }
+  return null;
+}
+
+// ── Fixture manager ───────────────────────────────────────────────────────────
+const fixtureVizMap = new Map(); // fixture_id -> FixtureViz
+
+function positionFixtureOnTruss(index, total, truss) {
+  // Auto-layout fixtures on truss
+  const x = total <= 1 ? 0 : (index / (total - 1) - 0.5) * 12;
+  return truss === 0
+    ? new THREE.Vector3(x, 9, -2)
+    : new THREE.Vector3(x, 8, 2);
+}
+
+function syncFixtures(patchData) {
+  const existing = new Set(fixtureVizMap.keys());
+  const incoming = new Set(patchData.map(f => f.id));
+
+  // Remove stale
+  for (const id of existing) {
+    if (!incoming.has(id)) {
+      fixtureVizMap.get(id).dispose();
+      fixtureVizMap.delete(id);
+    }
+  }
+
+  // Add new
+  const truss0 = patchData.filter((_, i) => i % 2 === 0);
+  const truss1 = patchData.filter((_, i) => i % 2 === 1);
+  for (let i = 0; i < patchData.length; i++) {
+    const f = patchData[i];
+    if (!fixtureVizMap.has(f.id)) {
+      const isOdd = i % 2;
+      const group = isOdd ? truss1 : truss0;
+      const groupIdx = isOdd ? truss1.indexOf(f) : truss0.indexOf(f);
+      const pos = positionFixtureOnTruss(groupIdx, group.length, isOdd);
+      const fdata = { ...f, position: [pos.x, pos.y, pos.z] };
+      fixtureVizMap.set(f.id, new FixtureViz(fdata));
+    }
+  }
+  updateInfoPanel(patchData);
+}
+
+function updateInfoPanel(fixtures) {
+  const el = document.getElementById('info-panel');
+  if (!fixtures.length) { el.innerHTML = ''; return; }
+  el.innerHTML = fixtures.slice(0, 8).map(f => {
+    const viz = fixtureVizMap.get(f.id);
+    if (!viz) return '';
+    const c = viz.color;
+    const hex = '#' + [c.r, c.g, c.b].map(v => Math.round(v*255).toString(16).padStart(2,'0')).join('');
+    return `<div class="info-fix">
+      <div class="fix-color-dot" style="background:${hex};opacity:${0.3 + viz.intensity*0.7}"></div>
+      <span>${f.name}</span>
+      <span style="opacity:.5">${Math.round(viz.intensity*100)}%</span>
+    </div>`;
+  }).join('') + (fixtures.length > 8 ? `<span>+${fixtures.length-8} more</span>` : '');
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+let ws = null;
+const wsUrl = (location.protocol==='https:'?'wss:':'ws:') + '//' + location.host + '/api/ws';
+
+function connectWS() {
+  ws = new WebSocket(wsUrl);
+  ws.onopen = () => {
+    document.getElementById('ws-dot').className = 'ws-dot';
+    document.getElementById('ws-label').textContent = 'Live';
+  };
+  ws.onclose = () => {
+    document.getElementById('ws-dot').className = 'ws-dot off';
+    document.getElementById('ws-label').textContent = 'Reconnecting…';
+    setTimeout(connectWS, 2000);
+  };
+  ws.onmessage = (e) => {
+    const { event, data } = JSON.parse(e.data);
+    if (event === 'init') {
+      syncFixtures(data.fixtures || []);
+    } else if (event === 'patch_updated') {
+      syncFixtures(data || []);
+    } else if (event === 'channel_update') {
+      const viz = fixtureVizMap.get(data.fixture_id);
+      if (viz) viz.setChannels({ [data.channel]: data.value });
+    } else if (event === 'dmx_update') {
+      // Map DMX to fixtures
+      for (const [id, viz] of fixtureVizMap) {
+        const f = viz.data;
+        if (f.universe !== data.universe) continue;
+        const dmx = data.data;
+        const ch = {};
+        for (let i = 0; i < (f.channels?.length || 0); i++) {
+          const dmxIdx = f.address - 1 + i;
+          if (dmxIdx < dmx.length) ch[f.channels[i]] = dmx[dmxIdx];
+        }
+        viz.setChannels(ch);
+      }
+    }
+  };
+}
+
+// Initial REST load
+async function loadInitial() {
+  try {
+    const r = await fetch('/api/patch');
+    const fixtures = await r.json();
+    syncFixtures(fixtures);
+  } catch(e) {}
+}
+
+// ── Controls ──────────────────────────────────────────────────────────────────
+let showBeams = true, showBloom = true, showShadows = false;
+
+window.toggleBeams = () => {
+  showBeams = !showBeams;
+  document.getElementById('btn-beams').classList.toggle('active', showBeams);
+  for (const v of fixtureVizMap.values()) {
+    v.beamGroup.visible = showBeams;
+  }
+};
+window.toggleBloom = () => {
+  showBloom = !showBloom;
+  document.getElementById('btn-bloom').classList.toggle('active', showBloom);
+  bloomPass.strength = showBloom ? 1.4 : 0;
+};
+window.toggleShadows = () => {
+  showShadows = !showShadows;
+  document.getElementById('btn-shadows').classList.toggle('active', showShadows);
+  renderer.shadowMap.enabled = showShadows;
+  for (const v of fixtureVizMap.values()) {
+    v.spotlight.castShadow = showShadows;
+  }
+};
+window.toggleGrid = () => {
+  gridHelper.visible = !gridHelper.visible;
+  document.getElementById('btn-grid').classList.toggle('active', gridHelper.visible);
+};
+window.resetCamera = () => {
+  camera.position.set(0, 8, 18);
+  controls.target.set(0, 2, 0);
+  controls.update();
+};
+
+// ── Animate haze particles ────────────────────────────────────────────────────
+let hazeTime = 0;
+function animateHaze(dt) {
+  hazeTime += dt;
+  const pos = hazeParticles.geometry.attributes.position.array;
+  for (let i = 0; i < pos.length; i += 3) {
+    pos[i+1] += dt * 0.04;
+    if (pos[i+1] > 12) pos[i+1] = 0;
+    pos[i] += Math.sin(hazeTime * 0.3 + i) * dt * 0.01;
+  }
+  hazeParticles.geometry.attributes.position.needsUpdate = true;
+}
+
+// ── Render loop ───────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  controls.update();
+  animateHaze(dt);
+
+  for (const viz of fixtureVizMap.values()) {
+    viz.update(dt);
+  }
+
+  composer.render();
+}
+
+// ── Resize ─────────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = W() / H();
+  camera.updateProjectionMatrix();
+  renderer.setSize(W(), H());
+  composer.setSize(W(), H());
+});
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+document.getElementById('loading').style.display = 'none';
+connectWS();
+loadInitial();
+animate();
+
+// Demo: add some default fixtures if none exist after 2s
+setTimeout(async () => {
+  const r = await fetch('/api/patch');
+  const fixtures = await r.json();
+  if (!fixtures.length) {
+    // Add 6 demo moving heads
+    const defs = [
+      { def: 'Generic::Moving Head Spot', base: 1 },
+      { def: 'Generic::Moving Head Wash', base: 9 },
+    ];
+    for (let i = 0; i < 3; i++) {
+      for (const { def, base } of defs) {
+        await fetch('/api/patch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            definition_id: def,
+            name: `${def.split('::')[1]} ${i+1}`,
+            universe: 1,
+            address: base + i * 11,
+            mode: def.includes('Spot') ? '8ch' : '11ch',
+            group: 'Truss',
+          }),
+        });
+      }
+    }
+    const r2 = await fetch('/api/patch');
+    syncFixtures(await r2.json());
+  }
+}, 2000);
+</script>
+</body>
+</html>

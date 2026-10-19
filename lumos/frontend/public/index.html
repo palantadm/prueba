@@ -507,6 +507,7 @@
       <div class="tab" onclick="showPage('dmx')" id="tab-dmx">DMX</div>
       <div class="tab" onclick="showPage('morph')" id="tab-morph">Morph</div>
       <div class="tab" onclick="showPage('osc')" id="tab-osc">OSC</div>
+      <div class="tab" onclick="open3D()" id="tab-3d">3D View ↗</div>
     </div>
     <div class="topbar-right">
       <div class="status-dot off" id="ws-dot" title="WebSocket"></div>
@@ -1277,6 +1278,11 @@
   async function removeOscFeedback(host, port) {
     await api('POST', '/osc/feedback/remove', { host, port });
     loadOSCStatus();
+  }
+
+  // ── 3D Visualizer ──────────────────────────────────────────────────────────
+  function open3D() {
+    window.open('/visualizer.html', '_blank', 'width=1280,height=800');
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────

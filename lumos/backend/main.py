@@ -230,10 +230,11 @@ def create_app() -> FastAPI:
 
     # Serve frontend
     frontend_dir = BASE_DIR / "frontend"
+    public_dir = frontend_dir / "public"
     if (frontend_dir / "dist").exists():
         app.mount("/", StaticFiles(directory=str(frontend_dir / "dist"), html=True), name="static")
-    elif (frontend_dir / "public").exists():
-        app.mount("/", StaticFiles(directory=str(frontend_dir / "public"), html=True), name="static")
+    elif public_dir.exists():
+        app.mount("/", StaticFiles(directory=str(public_dir), html=True), name="static")
 
     return app
 
