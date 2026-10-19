@@ -96,10 +96,9 @@ class LumosEngine(QObject):
 
     # universe_id, full 512-byte snapshot
     dmx_updated = Signal(int, bytes)
-    # grand master changed (0.0 – 1.0)
     grand_master_changed = Signal(float)
-    # blackout toggled
     blackout_changed = Signal(bool)
+    scene_saved = Signal(str)  # scene name
 
     TICK_MS = 23  # ~44 Hz
 
@@ -107,7 +106,8 @@ class LumosEngine(QObject):
         super().__init__(parent)
 
         self.universes: dict[int, Universe] = {}
-        self._gm: float = 1.0          # grand master 0.0–1.0
+        self.scenes: dict[str, bytearray] = {}
+        self._gm: float = 1.0
         self._blackout: bool = False
         self._artnet = ArtNetOutput()
 
@@ -165,6 +165,23 @@ class LumosEngine(QObject):
     def zero_universe(self, uid: int) -> None:
         if uid in self.universes:
             self.universes[uid].zero()
+
+    # ------------------------------------------------------------------
+    # Scenes
+    # ------------------------------------------------------------------
+
+    def save_scene(self, name: str, universe: int) -> None:
+        if universe in self.universes:
+            self.scenes[name] = bytearray(self.universes[universe].data)
+            self.scene_saved.emit(name)
+
+    def recall_scene(self, name: str, universe: int) -> None:
+        if name in self.scenes and universe in self.universes:
+            self.universes[universe].set_all(self.scenes[name])
+            self.universes[universe]._dirty = True
+
+    def delete_scene(self, name: str) -> None:
+        self.scenes.pop(name, None)
 
     # ------------------------------------------------------------------
     # Grand master / blackout
