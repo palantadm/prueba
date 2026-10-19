@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "lumos"
+version = "0.2.0"
+description = "Theatrical lighting control system"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+    "aiofiles>=23.2.1",
+    "pydantic>=2.0.0",
+    "mido>=1.3.0",
+    "pyserial>=3.5",
+]
+
+[project.optional-dependencies]
+# Real hardware MIDI I/O (OS-level MIDI stack required)
+midi = ["python-rtmidi>=1.5.0"]
+
+# SMPTE LTC audio timecode capture
+ltc = ["sounddevice>=0.4.6"]
+
+# Fallback audio backend
+ltc-pyaudio = ["pyaudio>=0.2.14"]
+
+# Faster LTC signal processing
+numpy = ["numpy>=1.26"]
+
+# Everything
+all = [
+    "python-rtmidi>=1.5.0",
+    "sounddevice>=0.4.6",
+    "numpy>=1.26",
+]
+
+[project.scripts]
+lumos = "lumos.run:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["backend*"]
