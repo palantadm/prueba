@@ -15,6 +15,7 @@ from PySide6.QtGui import QColor
 
 from app.engine import LumosEngine
 from app.ui import theme as T
+from fixtures.model import FixtureDef, FixtureMode
 
 _FX_COLOR = {
     "Moving Head": T.C_POSITION,
@@ -235,10 +236,27 @@ class PatchPanel(QWidget):
         root.addWidget(self._table, 1)
 
     def _add(self) -> None:
-        dlg = AddFixtureDialog(self.engine, self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:
-            for fx in dlg.get_fixtures():
-                self._add_fx(fx)
+        from app.ui.panels.fixture_library_panel import FixtureLibraryPanel
+        dlg = FixtureLibraryPanel(self)
+        dlg.fixtures_to_add.connect(self._on_library_add)
+        dlg.exec()
+
+    def _on_library_add(self, entries: list) -> None:
+        for fx_def, mode_name, univ, addr in entries:
+            mode = fx_def.mode_by_name(mode_name) or fx_def.default_mode
+            ch_names = list(mode.channels)
+            pf = PatchedFixture(
+                name=f"{fx_def.manufacturer} {fx_def.model}",
+                fx_type=fx_def.fixture_type,
+                manufacturer=fx_def.manufacturer,
+                universe=univ,
+                address=addr,
+                channels=mode.channel_count,
+                ch_names=ch_names,
+            )
+            pf._fixture_def = fx_def
+            pf._mode_name   = mode_name
+            self._add_fx(pf)
 
     def _add_fx(self, fx: PatchedFixture) -> None:
         for ex in self.fixtures:
