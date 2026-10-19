@@ -8,1296 +8,1394 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-0: #0a0a0f;
-      --bg-1: #111118;
-      --bg-2: #181820;
-      --bg-3: #20202c;
-      --bg-4: #2a2a38;
-      --border: #2e2e40;
-      --border-hi: #4a4a68;
-      --text-0: #e8e8f0;
-      --text-1: #a8a8c0;
-      --text-2: #6868a0;
-      --accent: #7c6fcd;
-      --accent-hi: #9d8ff0;
-      --accent-lo: #3d3870;
-      --green: #4caf78;
-      --red: #e05555;
-      --amber: #f0a030;
-      --cyan: #40b8d0;
-      --active: #7c6fcd;
-      --radius: 6px;
-      --radius-lg: 10px;
-      --font: 'Inter', system-ui, sans-serif;
-      --mono: 'JetBrains Mono', monospace;
+      --bg-0:#0a0a0f;--bg-1:#111118;--bg-2:#181820;--bg-3:#20202c;--bg-4:#2a2a38;
+      --border:#2e2e40;--border-hi:#4a4a68;
+      --text-0:#e8e8f0;--text-1:#a8a8c0;--text-2:#6868a0;
+      --accent:#7c6fcd;--accent-hi:#9d8ff0;--accent-lo:#3d3870;
+      --green:#4caf78;--red:#e05555;--amber:#f0a030;--cyan:#40b8d0;
+      --radius:6px;--radius-lg:10px;
+      --font:'Inter',system-ui,sans-serif;--mono:'JetBrains Mono',monospace;
     }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:var(--font);background:var(--bg-0);color:var(--text-0);height:100vh;overflow:hidden;display:flex;flex-direction:column;font-size:13px}
 
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /* ── Top Bar ── */
+    #topbar{height:50px;background:var(--bg-1);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 12px;gap:12px;flex-shrink:0;z-index:100}
+    .logo{font-size:17px;font-weight:700;color:var(--accent-hi);letter-spacing:-.5px;white-space:nowrap}
+    .logo span{color:var(--text-2);font-weight:400;font-size:10px;margin-left:5px}
+    .tab-bar{display:flex;gap:2px;flex:1;overflow-x:auto}
+    .tab{padding:5px 12px;border-radius:var(--radius);cursor:pointer;color:var(--text-1);font-size:12px;font-weight:500;transition:all .15s;user-select:none;border:1px solid transparent;white-space:nowrap}
+    .tab:hover{background:var(--bg-3);color:var(--text-0)}
+    .tab.active{background:var(--accent-lo);color:var(--accent-hi);border-color:var(--accent)}
+    .topbar-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+    .status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green)}
+    .status-dot.off{background:var(--border);box-shadow:none}
+    .small-label{font-size:11px;color:var(--text-2)}
 
-    body {
-      font-family: var(--font);
-      background: var(--bg-0);
-      color: var(--text-0);
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      font-size: 13px;
-    }
+    /* Grand master */
+    .gm-wrap{display:flex;align-items:center;gap:6px;background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px}
+    .gm-label{font-size:10px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+    #gm-slider{-webkit-appearance:none;width:80px;height:3px;background:var(--bg-4);border-radius:2px;outline:none;cursor:pointer}
+    #gm-slider::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--amber);cursor:pointer}
+    #gm-val{font-family:var(--mono);font-size:11px;color:var(--amber);min-width:28px}
 
-    /* ── Top Bar ──────────────────────────────────────────────────────────── */
-    #topbar {
-      height: 46px;
-      background: var(--bg-1);
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      padding: 0 16px;
-      gap: 16px;
-      flex-shrink: 0;
-      z-index: 100;
-    }
-    .logo {
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--accent-hi);
-      letter-spacing: -0.5px;
-    }
-    .logo span { color: var(--text-2); font-weight: 400; font-size: 11px; margin-left: 6px; }
-    .tab-bar { display: flex; gap: 2px; flex: 1; }
-    .tab {
-      padding: 6px 14px;
-      border-radius: var(--radius);
-      cursor: pointer;
-      color: var(--text-1);
-      font-size: 12px;
-      font-weight: 500;
-      transition: all .15s;
-      user-select: none;
-      border: 1px solid transparent;
-    }
-    .tab:hover { background: var(--bg-3); color: var(--text-0); }
-    .tab.active { background: var(--accent-lo); color: var(--accent-hi); border-color: var(--accent); }
-    .status-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-    }
-    .status-dot.warn { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
-    .status-dot.off { background: var(--border); box-shadow: none; }
-    .topbar-right { display: flex; align-items: center; gap: 10px; }
-    .small-label { font-size: 11px; color: var(--text-2); }
+    /* Blackout */
+    #bo-btn{padding:5px 10px;border-radius:var(--radius);border:1.5px solid var(--border-hi);background:var(--bg-3);color:var(--text-1);cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.5px;transition:all .15s}
+    #bo-btn:hover{border-color:var(--red);color:var(--red)}
+    #bo-btn.active{background:var(--red);border-color:var(--red);color:#fff;box-shadow:0 0 10px var(--red)}
 
-    /* ── Layout ───────────────────────────────────────────────────────────── */
-    #main { flex: 1; display: flex; overflow: hidden; }
+    /* ── Layout ── */
+    #main{flex:1;display:flex;overflow:hidden}
+    .panel{background:var(--bg-1);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+    .panel-header{padding:9px 12px 7px;border-bottom:1px solid var(--border);font-size:11px;font-weight:600;color:var(--text-2);letter-spacing:.8px;text-transform:uppercase;display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .panel-header .actions{margin-left:auto;display:flex;gap:4px}
+    .panel-body{flex:1;overflow-y:auto;padding:8px}
 
-    .panel {
-      background: var(--bg-1);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .panel-header {
-      padding: 10px 14px 8px;
-      border-bottom: 1px solid var(--border);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-2);
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .panel-header .actions { margin-left: auto; display: flex; gap: 4px; }
-    .panel-body { flex: 1; overflow-y: auto; padding: 8px; }
+    /* ── Buttons ── */
+    .btn{padding:5px 12px;border-radius:var(--radius);border:1px solid var(--border-hi);background:var(--bg-3);color:var(--text-0);cursor:pointer;font-size:12px;font-family:var(--font);font-weight:500;transition:all .15s;white-space:nowrap}
+    .btn:hover{background:var(--bg-4);border-color:var(--accent)}
+    .btn.primary{background:var(--accent-lo);border-color:var(--accent);color:var(--accent-hi)}
+    .btn.primary:hover{background:var(--accent);color:#fff}
+    .btn.danger{border-color:var(--red);color:var(--red)}
+    .btn.danger:hover{background:rgba(224,85,85,.15)}
+    .btn.sm{padding:3px 8px;font-size:11px}
+    .btn.icon{padding:4px 8px;font-size:14px}
 
-    /* ── Buttons ──────────────────────────────────────────────────────────── */
-    .btn {
-      padding: 5px 12px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border-hi);
-      background: var(--bg-3);
-      color: var(--text-0);
-      cursor: pointer;
-      font-size: 12px;
-      font-family: var(--font);
-      font-weight: 500;
-      transition: all .15s;
-      white-space: nowrap;
-    }
-    .btn:hover { background: var(--bg-4); border-color: var(--accent); }
-    .btn.primary { background: var(--accent-lo); border-color: var(--accent); color: var(--accent-hi); }
-    .btn.primary:hover { background: var(--accent); color: #fff; }
-    .btn.danger { border-color: var(--red); color: var(--red); }
-    .btn.danger:hover { background: rgba(224,85,85,.15); }
-    .btn.icon { padding: 4px 8px; font-size: 14px; }
-    .btn.sm { padding: 3px 8px; font-size: 11px; }
+    /* ── Pages ── */
+    .page{display:none;flex:1;overflow:hidden}
+    .page.active{display:flex}
 
-    /* ── Tab pages ────────────────────────────────────────────────────────── */
-    .page { display: none; flex: 1; overflow: hidden; }
-    .page.active { display: flex; }
+    /* ══ PATCH ══ */
+    #page-patch{flex-direction:row}
+    #patch-list{width:300px;min-width:240px}
+    #patch-detail{flex:1}
+    #library-panel{width:280px;min-width:220px;border-left:1px solid var(--border);border-right:none}
+    .fixture-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--radius);cursor:pointer;transition:background .1s;border:1px solid transparent}
+    .fixture-row:hover{background:var(--bg-2)}
+    .fixture-row.selected{background:var(--bg-3);border-color:var(--accent-lo)}
+    .fixture-row.selected .fix-name{color:var(--accent-hi)}
+    .fix-addr{font-family:var(--mono);font-size:11px;color:var(--text-2);min-width:54px}
+    .fix-name{font-weight:500;flex:1;font-size:12px}
+    .fix-model{font-size:11px;color:var(--text-2)}
+    .fix-sel-check{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--border-hi);background:transparent;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:transparent}
+    .fix-sel-check.checked{background:var(--accent);border-color:var(--accent);color:#fff}
+    #ch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:8px;padding:8px}
+    .ch-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+    .ch-name{font-size:11px;color:var(--text-1);font-weight:500}
+    .ch-group-tag{font-size:10px;padding:1px 5px;border-radius:3px;align-self:flex-start}
+    .ch-group-intensity{background:rgba(240,160,48,.15);color:var(--amber)}
+    .ch-group-color{background:rgba(76,175,120,.15);color:var(--green)}
+    .ch-group-pan,.ch-group-tilt{background:rgba(64,184,208,.15);color:var(--cyan)}
+    .ch-group-shutter{background:rgba(224,85,85,.15);color:var(--red)}
+    .ch-group-other{background:var(--bg-4);color:var(--text-2)}
+    .ch-value-display{font-family:var(--mono);font-size:18px;font-weight:600;text-align:right;color:var(--text-0)}
+    .ch-slider{-webkit-appearance:none;width:100%;height:4px;background:var(--bg-4);border-radius:2px;outline:none;cursor:pointer}
+    .ch-slider::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:var(--accent-hi);cursor:pointer}
+    .ch-percent{font-size:10px;color:var(--text-2);text-align:right}
+    .cap-hint{font-size:10px;color:var(--cyan);padding:2px 0;min-height:14px}
 
-    /* ══ PATCH PAGE ══════════════════════════════════════════════════════════ */
-    #page-patch {
-      flex-direction: row;
-    }
-    #patch-list { width: 320px; min-width: 260px; }
-    #patch-detail { flex: 1; }
-    #library-panel { width: 300px; min-width: 240px; border-left: 1px solid var(--border); border-right: none; }
+    /* ══ CUES ══ */
+    #page-cues{flex-direction:row}
+    #cuelist-panel{width:260px;min-width:200px}
+    #cue-editor{flex:1}
+    .cue-list-item{padding:7px 10px;border-radius:var(--radius);cursor:pointer;display:flex;align-items:center;gap:8px;border:1px solid transparent}
+    .cue-list-item:hover{background:var(--bg-2)}
+    .cue-list-item.selected{background:var(--bg-3);border-color:var(--accent-lo)}
+    .cl-name{font-weight:500;flex:1;font-size:12px}
+    .cl-count{font-size:11px;color:var(--text-2)}
+    .cue-row{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:var(--radius);cursor:pointer;border-left:3px solid transparent}
+    .cue-row:hover{background:var(--bg-2)}
+    .cue-row.current{border-left-color:var(--accent-hi);background:var(--bg-3)}
+    .cue-num{font-family:var(--mono);font-size:11px;color:var(--text-2);min-width:28px}
+    .cue-name{flex:1;font-weight:500;font-size:12px}
+    .cue-fade{font-size:11px;color:var(--text-2);font-family:var(--mono)}
+    .go-btn{width:100%;padding:14px;font-size:16px;font-weight:700;background:var(--accent);border:none;border-radius:var(--radius-lg);color:#fff;cursor:pointer;letter-spacing:1px;transition:all .15s;margin-top:8px}
+    .go-btn:hover{background:var(--accent-hi);transform:translateY(-1px)}
+    .go-btn:active{transform:translateY(0)}
 
-    .fixture-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 10px;
-      border-radius: var(--radius);
-      cursor: pointer;
-      transition: background .1s;
-      border: 1px solid transparent;
-    }
-    .fixture-row:hover { background: var(--bg-2); }
-    .fixture-row.selected { background: var(--bg-3); border-color: var(--accent-lo); }
-    .fixture-row.selected .fix-name { color: var(--accent-hi); }
-    .fix-addr {
-      font-family: var(--mono);
-      font-size: 11px;
-      color: var(--text-2);
-      min-width: 56px;
-    }
-    .fix-name { font-weight: 500; flex: 1; }
-    .fix-model { font-size: 11px; color: var(--text-2); }
-    .fix-group-badge {
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 3px;
-      background: var(--bg-4);
-      color: var(--text-1);
-    }
-    .fix-sel-check {
-      width: 14px; height: 14px;
-      border-radius: 3px;
-      border: 1.5px solid var(--border-hi);
-      background: transparent;
-      cursor: pointer;
-      flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 9px;
-      color: transparent;
-    }
-    .fix-sel-check.checked { background: var(--accent); border-color: var(--accent); color: #fff; }
+    /* ══ EFFECTS ══ */
+    #page-effects{flex-direction:row}
+    #effects-list{width:280px;min-width:220px}
+    #effect-editor{flex:1}
+    .eff-row{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--radius);cursor:pointer;border:1px solid transparent;margin-bottom:2px}
+    .eff-row:hover{background:var(--bg-2)}
+    .eff-row.selected{background:var(--bg-3);border-color:var(--accent-lo)}
+    .eff-enabled{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .eff-name{flex:1;font-size:12px;font-weight:500}
+    .eff-wave{font-size:11px;color:var(--text-2);font-family:var(--mono)}
+    .eff-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin:8px}
+    .eff-card h3{font-size:13px;font-weight:600;margin-bottom:12px}
+    .eff-param-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+    .eff-param{display:flex;flex-direction:column;gap:4px}
+    .eff-param label{font-size:11px;color:var(--text-2)}
+    .eff-param input[type=range]{-webkit-appearance:none;width:100%;height:3px;background:var(--bg-4);border-radius:2px;outline:none;cursor:pointer}
+    .eff-param input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--cyan);cursor:pointer}
+    .eff-param select{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;color:var(--text-0);font-family:var(--font);font-size:12px;outline:none}
+    .eff-param-val{font-family:var(--mono);font-size:11px;color:var(--accent-hi);text-align:right}
+    .waveform-btn-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px}
+    .wave-btn{padding:4px 10px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg-3);color:var(--text-1);cursor:pointer;font-size:11px;font-family:var(--mono);transition:all .1s}
+    .wave-btn:hover{border-color:var(--cyan);color:var(--cyan)}
+    .wave-btn.active{background:rgba(64,184,208,.2);border-color:var(--cyan);color:var(--cyan)}
 
-    /* ── Fixture detail / channel editor ─────────────────────────────────── */
-    #ch-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 8px;
-      padding: 8px;
-    }
-    .ch-card {
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 10px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .ch-name { font-size: 11px; color: var(--text-1); font-weight: 500; }
-    .ch-group-tag {
-      font-size: 10px;
-      padding: 1px 5px;
-      border-radius: 3px;
-      align-self: flex-start;
-    }
-    .ch-group-intensity { background: rgba(240,160,48,.15); color: var(--amber); }
-    .ch-group-color { background: rgba(76,175,120,.15); color: var(--green); }
-    .ch-group-pan, .ch-group-tilt { background: rgba(64,184,208,.15); color: var(--cyan); }
-    .ch-group-shutter { background: rgba(224,85,85,.15); color: var(--red); }
-    .ch-group-other { background: var(--bg-4); color: var(--text-2); }
-    .ch-value-display {
-      font-family: var(--mono);
-      font-size: 18px;
-      font-weight: 600;
-      text-align: right;
-      color: var(--text-0);
-    }
-    .ch-slider {
-      -webkit-appearance: none;
-      width: 100%;
-      height: 4px;
-      background: var(--bg-4);
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
-    }
-    .ch-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px; height: 14px;
-      border-radius: 50%;
-      background: var(--accent-hi);
-      cursor: pointer;
-    }
-    .ch-percent { font-size: 10px; color: var(--text-2); text-align: right; }
+    /* ══ GROUPS ══ */
+    #page-groups{flex-direction:row}
+    #groups-list{width:260px;min-width:200px}
+    #groups-submasters{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:12px}
+    .group-card{background:var(--bg-2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px}
+    .group-card-header{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+    .group-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .group-card-name{font-weight:600;flex:1}
+    .group-fixture-count{font-size:11px;color:var(--text-2)}
+    .sm-slider-wrap{display:flex;align-items:center;gap:10px}
+    .sm-slider{-webkit-appearance:none;flex:1;height:6px;background:var(--bg-4);border-radius:3px;outline:none;cursor:pointer}
+    .sm-slider::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent-hi);cursor:pointer}
+    .sm-val{font-family:var(--mono);font-size:12px;min-width:36px;text-align:right;color:var(--accent-hi)}
+    .flash-btn{padding:5px 10px;border:1.5px solid var(--accent);border-radius:var(--radius);background:transparent;color:var(--accent-hi);cursor:pointer;font-size:11px;font-weight:700;user-select:none}
+    .flash-btn:active{background:var(--accent);color:#fff}
 
-    /* ── Capability hint ─────────────────────────────────────────────────── */
-    .cap-hint {
-      font-size: 10px;
-      color: var(--cyan);
-      padding: 2px 0;
-      min-height: 14px;
-    }
+    /* Grand master full section */
+    .gm-section{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;margin-bottom:8px}
+    .gm-section h3{font-size:12px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+    .gm-full-wrap{display:flex;align-items:center;gap:12px}
+    .gm-full-slider{-webkit-appearance:none;flex:1;height:8px;background:var(--bg-4);border-radius:4px;outline:none;cursor:pointer}
+    .gm-full-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--amber);cursor:pointer;box-shadow:0 0 8px rgba(240,160,48,.4)}
+    .gm-full-val{font-family:var(--mono);font-size:14px;color:var(--amber);min-width:40px;text-align:right}
+    .bo-full-btn{padding:10px 20px;border-radius:var(--radius-lg);border:2px solid var(--red);background:transparent;color:var(--red);cursor:pointer;font-size:13px;font-weight:700;letter-spacing:.5px;transition:all .15s}
+    .bo-full-btn.active{background:var(--red);color:#fff;box-shadow:0 0 16px rgba(224,85,85,.4)}
 
-    /* ══ CUE PAGE ════════════════════════════════════════════════════════════ */
-    #page-cues { flex-direction: row; }
-    #cuelist-panel { width: 280px; min-width: 220px; }
-    #cue-editor { flex: 1; }
+    /* ══ MORPH ══ */
+    #page-morph{flex-direction:row}
+    #morph-source{width:280px}
+    #morph-target{width:300px}
+    #morph-preview{flex:1}
+    .mapping-row{display:flex;align-items:center;gap:8px;padding:5px 10px;border-radius:var(--radius)}
+    .mapping-row:hover{background:var(--bg-2)}
+    .map-src{flex:1;font-size:12px}.map-arrow{color:var(--text-2);font-size:12px}.map-tgt{flex:1;font-size:12px}
+    .map-conf{font-size:10px;padding:2px 5px;border-radius:3px;font-family:var(--mono);min-width:36px;text-align:center}
+    .conf-high{background:rgba(76,175,120,.2);color:var(--green)}.conf-med{background:rgba(240,160,48,.2);color:var(--amber)}.conf-low{background:rgba(224,85,85,.2);color:var(--red)}
+    .coverage-bar{height:6px;background:var(--bg-4);border-radius:3px;overflow:hidden;margin:4px 0}
+    .coverage-fill{height:100%;background:var(--green);border-radius:3px;transition:width .3s}
+    .warning-box{background:rgba(240,160,48,.1);border:1px solid rgba(240,160,48,.3);border-radius:var(--radius);padding:8px 12px;font-size:12px;color:var(--amber);margin:8px}
 
-    .cue-list-item {
-      padding: 8px 10px;
-      border-radius: var(--radius);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      border: 1px solid transparent;
-    }
-    .cue-list-item:hover { background: var(--bg-2); }
-    .cue-list-item.selected { background: var(--bg-3); border-color: var(--accent-lo); }
-    .cl-name { font-weight: 500; flex: 1; }
-    .cl-count { font-size: 11px; color: var(--text-2); }
+    /* ══ OSC ══ */
+    #page-osc{flex-direction:column;padding:20px;overflow-y:auto;gap:16px}
+    .osc-section{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;max-width:700px}
+    .osc-section h3{font-size:13px;font-weight:600;margin-bottom:12px}
+    .osc-path{font-family:var(--mono);font-size:12px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+    .osc-path .path{color:var(--cyan);flex:1}.osc-path .args-hint{color:var(--text-2);font-size:11px}
+    .form-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+    .form-row label{font-size:12px;color:var(--text-1);min-width:80px}
+    .form-row input{flex:1;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:5px 10px;color:var(--text-0);font-family:var(--mono);font-size:12px;outline:none}
+    .form-row input:focus{border-color:var(--accent)}
+    .feedback-list{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+    .feedback-item{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg-3);border-radius:var(--radius);font-family:var(--mono);font-size:12px}
+    .feedback-item .fbi-addr{flex:1;color:var(--cyan)}
 
-    .cue-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 10px;
-      border-radius: var(--radius);
-      cursor: pointer;
-      border-left: 3px solid transparent;
-    }
-    .cue-row:hover { background: var(--bg-2); }
-    .cue-row.current { border-left-color: var(--accent-hi); background: var(--bg-3); }
-    .cue-num { font-family: var(--mono); font-size: 11px; color: var(--text-2); min-width: 28px; }
-    .cue-name { flex: 1; font-weight: 500; }
-    .cue-fade { font-size: 11px; color: var(--text-2); font-family: var(--mono); }
-    .cue-count { font-size: 11px; color: var(--text-2); }
+    /* ══ PROTOCOLS ══ */
+    #page-protocols{flex-direction:column;overflow-y:auto;padding:16px;gap:16px}
+    .proto-section{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;max-width:800px}
+    .proto-section h3{font-size:12px;font-weight:600;color:var(--text-0);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+    .node-row{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:var(--radius);background:var(--bg-2);margin-bottom:4px}
+    .node-ip{font-family:var(--mono);font-size:12px;color:var(--cyan);min-width:110px}
+    .node-name{flex:1;font-size:12px}
+    .node-ports{font-size:11px;color:var(--text-2)}
 
-    .go-btn {
-      width: 100%;
-      padding: 14px;
-      font-size: 16px;
-      font-weight: 700;
-      background: var(--accent);
-      border: none;
-      border-radius: var(--radius-lg);
-      color: #fff;
-      cursor: pointer;
-      letter-spacing: 1px;
-      transition: all .15s;
-      margin-top: 8px;
-    }
-    .go-btn:hover { background: var(--accent-hi); transform: translateY(-1px); }
-    .go-btn:active { transform: translateY(0); }
+    /* ══ MIDI ══ */
+    #page-midi{flex-direction:column;overflow-y:auto;padding:16px;gap:16px}
+    .midi-section{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:14px;max-width:800px}
+    .midi-section h3{font-size:12px;font-weight:600;color:var(--text-0);margin-bottom:10px}
+    .binding-row{display:flex;align-items:center;gap:8px;padding:5px 10px;background:var(--bg-2);border-radius:var(--radius);margin-bottom:4px;font-size:12px}
+    .binding-type{font-family:var(--mono);color:var(--cyan);min-width:80px}
+    .binding-ch{color:var(--text-2);min-width:30px}
+    .binding-action{flex:1;color:var(--text-0)}
 
-    /* ══ MORPH PAGE ══════════════════════════════════════════════════════════ */
-    #page-morph { flex-direction: row; }
-    #morph-source { width: 300px; }
-    #morph-target { width: 320px; }
-    #morph-preview { flex: 1; }
+    /* ══ DMX ══ */
+    #page-dmx{flex-direction:column;overflow:hidden}
+    .dmx-universe-tabs{display:flex;gap:4px;padding:8px;border-bottom:1px solid var(--border);flex-shrink:0}
+    #dmx-grid{flex:1;overflow-y:auto;padding:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(46px,1fr));gap:3px;align-content:start}
+    .dmx-cell{border-radius:4px;padding:3px 4px;background:var(--bg-2);border:1px solid var(--border);text-align:center;cursor:pointer;transition:background .1s}
+    .dmx-cell:hover{border-color:var(--accent)}
+    .dmx-cell .dmx-ch{font-family:var(--mono);font-size:9px;color:var(--text-2)}
+    .dmx-cell .dmx-val{font-family:var(--mono);font-size:11px;font-weight:600}
 
-    .mapping-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 5px 10px;
-      border-radius: var(--radius);
-    }
-    .mapping-row:hover { background: var(--bg-2); }
-    .map-src { flex: 1; font-size: 12px; }
-    .map-arrow { color: var(--text-2); font-size: 12px; }
-    .map-tgt { flex: 1; font-size: 12px; }
-    .map-conf {
-      font-size: 10px;
-      padding: 2px 5px;
-      border-radius: 3px;
-      font-family: var(--mono);
-      min-width: 36px;
-      text-align: center;
-    }
-    .conf-high { background: rgba(76,175,120,.2); color: var(--green); }
-    .conf-med { background: rgba(240,160,48,.2); color: var(--amber); }
-    .conf-low { background: rgba(224,85,85,.2); color: var(--red); }
-    .unmapped-tag { font-size: 11px; color: var(--red); padding: 3px 0; }
-    .warning-box {
-      background: rgba(240,160,48,.1);
-      border: 1px solid rgba(240,160,48,.3);
-      border-radius: var(--radius);
-      padding: 8px 12px;
-      font-size: 12px;
-      color: var(--amber);
-      margin: 8px;
-    }
-    .coverage-bar {
-      height: 6px;
-      background: var(--bg-4);
-      border-radius: 3px;
-      overflow: hidden;
-      margin: 4px 0;
-    }
-    .coverage-fill {
-      height: 100%;
-      background: var(--green);
-      border-radius: 3px;
-      transition: width .3s;
-    }
+    /* ══ SHOW ══ */
+    #page-show{flex-direction:column;padding:20px;overflow-y:auto;gap:16px}
+    .show-section{background:var(--bg-1);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;max-width:600px}
+    .show-section h3{font-size:13px;font-weight:600;margin-bottom:12px}
 
-    /* ══ OSC PAGE ════════════════════════════════════════════════════════════ */
-    #page-osc {
-      flex-direction: column;
-      padding: 20px;
-      overflow-y: auto;
-      gap: 16px;
-    }
-    .osc-section {
-      background: var(--bg-1);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 16px;
-      max-width: 700px;
-    }
-    .osc-section h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text-0); }
-    .osc-path {
-      font-family: var(--mono);
-      font-size: 12px;
-      background: var(--bg-3);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 6px 10px;
-      margin-bottom: 4px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .osc-path .path { color: var(--cyan); flex: 1; }
-    .osc-path .args-hint { color: var(--text-2); font-size: 11px; }
-    .osc-path .desc { color: var(--text-1); font-size: 11px; }
-    .form-row {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    .form-row label { font-size: 12px; color: var(--text-1); min-width: 80px; }
-    .form-row input {
-      flex: 1;
-      background: var(--bg-3);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 5px 10px;
-      color: var(--text-0);
-      font-family: var(--mono);
-      font-size: 12px;
-      outline: none;
-    }
-    .form-row input:focus { border-color: var(--accent); }
-    .feedback-list { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
-    .feedback-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 5px 10px;
-      background: var(--bg-3);
-      border-radius: var(--radius);
-      font-family: var(--mono);
-      font-size: 12px;
-    }
-    .feedback-item .fbi-addr { flex: 1; color: var(--cyan); }
-
-    /* ── Universe DMX view ──────────────────────────────────────────────────── */
-    #page-dmx { flex-direction: column; overflow: hidden; }
-    .dmx-universe-tabs { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-    #dmx-grid {
-      flex: 1;
-      overflow-y: auto;
-      padding: 8px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
-      gap: 3px;
-      align-content: start;
-    }
-    .dmx-cell {
-      border-radius: 4px;
-      padding: 3px 4px;
-      background: var(--bg-2);
-      border: 1px solid var(--border);
-      text-align: center;
-      cursor: pointer;
-      transition: background .1s;
-    }
-    .dmx-cell:hover { border-color: var(--accent); }
-    .dmx-cell .dmx-ch { font-family: var(--mono); font-size: 9px; color: var(--text-2); }
-    .dmx-cell .dmx-val { font-family: var(--mono); font-size: 11px; font-weight: 600; }
-
-    /* ── Modals ───────────────────────────────────────────────────────────── */
-    .modal-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,.7);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 1000;
-      display: none;
-    }
-    .modal-overlay.open { display: flex; }
-    .modal {
-      background: var(--bg-2);
-      border: 1px solid var(--border-hi);
-      border-radius: var(--radius-lg);
-      padding: 20px;
-      width: 500px;
-      max-width: 95vw;
-      max-height: 85vh;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    .modal h2 { font-size: 15px; font-weight: 600; }
-    .modal-footer { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-
-    /* ── Search ───────────────────────────────────────────────────────────── */
-    .search-input {
-      width: 100%;
-      background: var(--bg-3);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 6px 10px;
-      color: var(--text-0);
-      font-family: var(--font);
-      font-size: 12px;
-      outline: none;
-      margin-bottom: 6px;
-    }
-    .search-input:focus { border-color: var(--accent); }
-
-    /* ── Scrollbar ────────────────────────────────────────────────────────── */
-    ::-webkit-scrollbar { width: 4px; height: 4px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 2px; }
-    ::-webkit-scrollbar-thumb:hover { background: var(--border-hi); }
-
-    /* ── Misc ─────────────────────────────────────────────────────────────── */
-    .empty-state {
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      height: 100%; color: var(--text-2); gap: 8px;
-      font-size: 13px;
-    }
-    .empty-state .icon { font-size: 32px; }
-    hr.divider { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+    /* ── Modals ── */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000}
+    .modal-overlay.hidden{display:none}
+    .modal{background:var(--bg-2);border:1px solid var(--border-hi);border-radius:var(--radius-lg);padding:24px;min-width:360px;max-width:500px}
+    .modal h2{font-size:15px;font-weight:700;margin-bottom:16px}
+    .field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}
+    .field label{font-size:12px;color:var(--text-1)}
+    .field input,.field select,.field textarea{background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;color:var(--text-0);font-family:var(--font);font-size:13px;outline:none;width:100%}
+    .field input:focus,.field select:focus{border-color:var(--accent)}
+    .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+    .section-sep{height:1px;background:var(--border);margin:8px 0}
+    .info-row{display:flex;gap:8px;align-items:center;padding:4px 0;font-size:12px}
+    .info-label{color:var(--text-2);min-width:120px}
+    .info-val{font-family:var(--mono);color:var(--text-0)}
   </style>
 </head>
 <body>
-  <!-- Top Bar -->
-  <div id="topbar">
-    <div class="logo">⚡ Lumos <span>v0.1</span></div>
-    <div class="tab-bar">
-      <div class="tab active" onclick="showPage('patch')" id="tab-patch">Patch</div>
-      <div class="tab" onclick="showPage('cues')" id="tab-cues">Cues</div>
-      <div class="tab" onclick="showPage('dmx')" id="tab-dmx">DMX</div>
-      <div class="tab" onclick="showPage('morph')" id="tab-morph">Morph</div>
-      <div class="tab" onclick="showPage('osc')" id="tab-osc">OSC</div>
-      <div class="tab" onclick="open3D()" id="tab-3d">3D View ↗</div>
+
+<!-- ── Top Bar ── -->
+<div id="topbar">
+  <div class="logo">Lumos <span>v0.2</span></div>
+  <div class="tab-bar">
+    <div class="tab active" data-page="patch">Patch</div>
+    <div class="tab" data-page="cues">Cues</div>
+    <div class="tab" data-page="effects">Effects</div>
+    <div class="tab" data-page="groups">Groups</div>
+    <div class="tab" data-page="morph">Morph</div>
+    <div class="tab" data-page="dmx">DMX</div>
+    <div class="tab" data-page="osc">OSC</div>
+    <div class="tab" data-page="midi">MIDI</div>
+    <div class="tab" data-page="protocols">Protocols</div>
+    <div class="tab" data-page="show">Show</div>
+    <div class="tab" onclick="window.open('/visualizer.html','_blank')">3D View ↗</div>
+  </div>
+  <div class="topbar-right">
+    <div class="gm-wrap">
+      <span class="gm-label">GM</span>
+      <input type="range" id="gm-slider" min="0" max="100" value="100">
+      <span id="gm-val">100%</span>
     </div>
-    <div class="topbar-right">
-      <div class="status-dot off" id="ws-dot" title="WebSocket"></div>
-      <span class="small-label" id="ws-label">Disconnected</span>
+    <button id="bo-btn">BLACKOUT</button>
+    <div class="status-dot off" id="ws-dot"></div>
+    <span class="small-label" id="ws-label">disconnected</span>
+  </div>
+</div>
+
+<div id="main">
+
+<!-- ══ PATCH PAGE ══ -->
+<div class="page active" id="page-patch">
+  <div class="panel" id="patch-list">
+    <div class="panel-header">
+      PATCH
+      <div class="actions">
+        <button class="btn sm primary" onclick="openModal('modal-add-fixture')">+ Fixture</button>
+      </div>
+    </div>
+    <div class="panel-body" id="fixture-list-body"></div>
+  </div>
+  <div class="panel" id="patch-detail">
+    <div class="panel-header" id="ch-panel-header">SELECT FIXTURE</div>
+    <div id="ch-grid"></div>
+  </div>
+  <div class="panel" id="library-panel">
+    <div class="panel-header">
+      LIBRARY
+      <div class="actions">
+        <input id="lib-search" type="text" placeholder="Search…" style="background:var(--bg-3);border:1px solid var(--border);border-radius:4px;padding:3px 8px;color:var(--text-0);font-size:11px;width:120px;outline:none">
+      </div>
+    </div>
+    <div class="panel-body" id="library-list-body"></div>
+  </div>
+</div>
+
+<!-- ══ CUES PAGE ══ -->
+<div class="page" id="page-cues">
+  <div class="panel" id="cuelist-panel">
+    <div class="panel-header">
+      CUE LISTS
+      <div class="actions">
+        <button class="btn sm primary" onclick="openModal('modal-new-cuelist')">+</button>
+      </div>
+    </div>
+    <div class="panel-body" id="cuelist-body"></div>
+  </div>
+  <div class="panel" id="cue-editor">
+    <div class="panel-header" id="cue-panel-header">SELECT CUE LIST</div>
+    <div class="panel-body">
+      <button class="go-btn" id="go-btn" onclick="cueGo()">▶ GO</button>
+      <div id="cue-list-body" style="margin-top:8px"></div>
     </div>
   </div>
+</div>
 
-  <!-- Main -->
-  <div id="main">
-
-    <!-- PATCH PAGE -->
-    <div class="page active" id="page-patch">
-      <div class="panel" id="patch-list">
-        <div class="panel-header">
-          Patch
-          <div class="actions">
-            <button class="btn sm primary" onclick="openAddFixture()">+ Add</button>
-          </div>
-        </div>
-        <div class="panel-body" id="patch-list-body"></div>
-      </div>
-      <div class="panel" id="patch-detail" style="border-right:none;">
-        <div class="panel-header" id="detail-header">Select a fixture</div>
-        <div id="ch-grid"></div>
-      </div>
-      <div class="panel" id="library-panel">
-        <div class="panel-header">Library</div>
-        <div class="panel-body">
-          <input class="search-input" id="lib-search" placeholder="Search fixtures…" oninput="filterLibrary()">
-          <div id="lib-list"></div>
-        </div>
+<!-- ══ EFFECTS PAGE ══ -->
+<div class="page" id="page-effects">
+  <div class="panel" id="effects-list">
+    <div class="panel-header">
+      EFFECTS
+      <div class="actions">
+        <button class="btn sm primary" onclick="openModal('modal-new-effect')">+</button>
       </div>
     </div>
-
-    <!-- CUES PAGE -->
-    <div class="page" id="page-cues">
-      <div class="panel" id="cuelist-panel">
-        <div class="panel-header">
-          Cue Lists
-          <div class="actions">
-            <button class="btn sm primary" onclick="createCueList()">+ New</button>
-          </div>
-        </div>
-        <div class="panel-body" id="cuelist-body"></div>
-      </div>
-      <div class="panel" id="cue-editor" style="border-right:none;">
-        <div class="panel-header" id="cue-editor-header">Select a cue list</div>
-        <div class="panel-body" id="cue-editor-body"></div>
-      </div>
-    </div>
-
-    <!-- DMX PAGE -->
-    <div class="page" id="page-dmx">
-      <div class="dmx-universe-tabs" id="dmx-tabs"></div>
-      <div id="dmx-grid"></div>
-    </div>
-
-    <!-- MORPH PAGE -->
-    <div class="page" id="page-morph">
-      <div class="panel" id="morph-source">
-        <div class="panel-header">
-          Source Fixtures
-          <div class="actions">
-            <span class="small-label" id="morph-sel-count">0 selected</span>
-          </div>
-        </div>
-        <div class="panel-body" id="morph-source-list"></div>
-      </div>
-      <div class="panel" id="morph-target">
-        <div class="panel-header">Target Fixture Type</div>
-        <div class="panel-body">
-          <input class="search-input" id="morph-lib-search" placeholder="Search target…" oninput="filterMorphLib()">
-          <div id="morph-lib-list"></div>
-        </div>
-      </div>
-      <div class="panel" id="morph-preview" style="border-right:none;">
-        <div class="panel-header">
-          Morph Preview
-          <div class="actions">
-            <button class="btn sm primary" id="morph-apply-btn" onclick="applyMorph()" disabled>Apply Morph</button>
-          </div>
-        </div>
-        <div class="panel-body" id="morph-preview-body">
-          <div class="empty-state"><div class="icon">🔀</div>Select source fixtures and a target type</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- OSC PAGE -->
-    <div class="page" id="page-osc">
-      <div class="osc-section">
-        <h3>OSC Server Status</h3>
-        <div id="osc-status-display">Loading…</div>
-      </div>
-      <div class="osc-section">
-        <h3>Feedback Targets (TouchOSC, Lemur, QLab…)</h3>
-        <div class="form-row">
-          <label>IP Address</label>
-          <input id="osc-fb-host" type="text" placeholder="192.168.1.100" value="">
-        </div>
-        <div class="form-row">
-          <label>Port</label>
-          <input id="osc-fb-port" type="number" placeholder="9000" value="9000">
-        </div>
-        <button class="btn primary" onclick="addOscFeedback()">Add Feedback Target</button>
-        <div class="feedback-list" id="feedback-list"></div>
-      </div>
-      <div class="osc-section">
-        <h3>OSC Address Reference</h3>
-        <div class="osc-path"><span class="path">/lumos/master/intensity</span><span class="args-hint">f 0.0–1.0</span><span class="desc">Master intensity</span></div>
-        <div class="osc-path"><span class="path">/lumos/dmx/&lt;universe&gt;/&lt;channel&gt;</span><span class="args-hint">i 0–255</span><span class="desc">Raw DMX channel</span></div>
-        <div class="osc-path"><span class="path">/lumos/fixture/&lt;id&gt;/&lt;channel&gt;</span><span class="args-hint">i 0–255</span><span class="desc">Fixture channel by name</span></div>
-        <div class="osc-path"><span class="path">/lumos/fixture/&lt;id&gt;/intensity</span><span class="args-hint">f 0.0–1.0</span><span class="desc">Fixture dimmer shorthand</span></div>
-        <div class="osc-path"><span class="path">/lumos/fixture/&lt;id&gt;/flash</span><span class="args-hint">i 0/1</span><span class="desc">Flash on/off</span></div>
-        <div class="osc-path"><span class="path">/lumos/cue/&lt;list_id&gt;/go</span><span class="args-hint">i 1</span><span class="desc">Advance cue list</span></div>
-        <div class="osc-path"><span class="path">/lumos/cue/&lt;list_id&gt;/&lt;index&gt;</span><span class="args-hint">i 1</span><span class="desc">Jump to cue by index</span></div>
-      </div>
-    </div>
-
+    <div class="panel-body" id="effects-list-body"></div>
   </div>
-
-  <!-- Modal: Add Fixture -->
-  <div class="modal-overlay" id="modal-add-fixture">
-    <div class="modal">
-      <h2>Add Fixture to Patch</h2>
-      <div>
-        <label style="font-size:12px;color:var(--text-1)">Fixture Type</label>
-        <select id="af-def" style="width:100%;margin-top:4px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-0);font-size:12px;outline:none;">
-          <option value="">Select…</option>
-        </select>
-      </div>
-      <div>
-        <label style="font-size:12px;color:var(--text-1)">Mode</label>
-        <select id="af-mode" style="width:100%;margin-top:4px;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;color:var(--text-0);font-size:12px;outline:none;"></select>
-      </div>
-      <div class="form-row"><label>Name</label><input id="af-name" type="text" placeholder="Fixture 1"></div>
-      <div class="form-row"><label>Universe</label><input id="af-universe" type="number" value="1" min="1"></div>
-      <div class="form-row"><label>Address</label><input id="af-address" type="number" value="1" min="1" max="512"></div>
-      <div class="form-row"><label>Group</label><input id="af-group" type="text" value="Default"></div>
-      <div id="af-conflict-warn" style="color:var(--red);font-size:12px;display:none;"></div>
-      <div class="modal-footer">
-        <button class="btn" onclick="closeModal('modal-add-fixture')">Cancel</button>
-        <button class="btn primary" onclick="confirmAddFixture()">Add Fixture</button>
-      </div>
+  <div class="panel" id="effect-editor">
+    <div class="panel-header" id="eff-panel-header">SELECT EFFECT</div>
+    <div class="panel-body" id="eff-editor-body">
+      <div style="color:var(--text-2);padding:16px;font-size:12px">Select or create an effect to edit it.</div>
     </div>
   </div>
+</div>
 
-  <script>
-  // ── State ────────────────────────────────────────────────────────────────
-  const state = {
-    fixtures: [],
-    library: [],
-    cueLists: [],
-    universes: [],
-    selectedFixture: null,
-    selectedCueList: null,
-    dmxData: {},      // uid -> Uint8Array(512)
-    currentDmxUniverse: 1,
-    morphSelected: new Set(),
-    morphTargetDef: null,
-    morphPreview: null,
+<!-- ══ GROUPS PAGE ══ -->
+<div class="page" id="page-groups">
+  <div class="panel" id="groups-list">
+    <div class="panel-header">
+      GROUPS
+      <div class="actions">
+        <button class="btn sm primary" onclick="openModal('modal-new-group')">+</button>
+      </div>
+    </div>
+    <div class="panel-body" id="groups-list-body"></div>
+  </div>
+  <div id="groups-submasters">
+    <div class="gm-section">
+      <h3>Master Controls</h3>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <div class="gm-full-wrap" style="flex:1;min-width:180px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:12px;color:var(--text-1);min-width:90px">Grand Master</span>
+          <input type="range" class="gm-full-slider" id="gm-full" min="0" max="100" value="100">
+          <span class="gm-full-val" id="gm-full-val">100%</span>
+        </div>
+        <button class="bo-full-btn" id="bo-full-btn" onclick="toggleBlackout()">BLACKOUT</button>
+      </div>
+    </div>
+    <div id="submasters-body"></div>
+  </div>
+</div>
+
+<!-- ══ MORPH PAGE ══ -->
+<div class="page" id="page-morph">
+  <div class="panel" id="morph-source">
+    <div class="panel-header">SOURCE FIXTURES</div>
+    <div class="panel-body" id="morph-source-body"></div>
+  </div>
+  <div class="panel" id="morph-target">
+    <div class="panel-header">TARGET TYPE</div>
+    <div class="panel-body" id="morph-target-body"></div>
+  </div>
+  <div class="panel" id="morph-preview">
+    <div class="panel-header">
+      PREVIEW
+      <div class="actions">
+        <button class="btn sm" onclick="previewMorph()">Preview</button>
+        <button class="btn sm primary" id="apply-morph-btn" onclick="applyMorph()" disabled>Apply</button>
+      </div>
+    </div>
+    <div class="panel-body" id="morph-preview-body"></div>
+  </div>
+</div>
+
+<!-- ══ DMX PAGE ══ -->
+<div class="page" id="page-dmx">
+  <div class="dmx-universe-tabs" id="dmx-tabs"></div>
+  <div id="dmx-grid"></div>
+</div>
+
+<!-- ══ OSC PAGE ══ -->
+<div class="page" id="page-osc">
+  <div class="osc-section">
+    <h3>OSC Status</h3>
+    <div id="osc-status-body"><div style="color:var(--text-2);font-size:12px">Loading…</div></div>
+  </div>
+  <div class="osc-section">
+    <h3>Feedback Targets</h3>
+    <div class="form-row">
+      <label>Host</label>
+      <input type="text" id="osc-fb-host" placeholder="192.168.1.100" style="max-width:160px">
+    </div>
+    <div class="form-row">
+      <label>Port</label>
+      <input type="number" id="osc-fb-port" value="9000" style="max-width:80px">
+    </div>
+    <button class="btn sm primary" onclick="addOscFeedback()">Add Target</button>
+    <div class="feedback-list" id="osc-fb-list"></div>
+  </div>
+  <div class="osc-section">
+    <h3>Address Reference</h3>
+    <div class="osc-path"><span class="path">/lumos/master/intensity</span><span class="args-hint">f 0.0–1.0</span></div>
+    <div class="osc-path"><span class="path">/lumos/blackout</span><span class="args-hint">i 0|1</span></div>
+    <div class="osc-path"><span class="path">/lumos/fixture/{id}/{channel}</span><span class="args-hint">f 0.0–1.0</span></div>
+    <div class="osc-path"><span class="path">/lumos/dmx/{universe}/{channel}</span><span class="args-hint">i 0–255</span></div>
+    <div class="osc-path"><span class="path">/lumos/cue/{list_id}/go</span><span class="args-hint">no args</span></div>
+    <div class="osc-path"><span class="path">/lumos/effect/{id}/speed</span><span class="args-hint">f Hz</span></div>
+  </div>
+</div>
+
+<!-- ══ MIDI PAGE ══ -->
+<div class="page" id="page-midi">
+  <div class="midi-section">
+    <h3>MIDI Ports</h3>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <select id="midi-in-sel" style="background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:5px 8px;color:var(--text-0);flex:1;min-width:160px;font-size:12px;outline:none">
+        <option>No input ports</option>
+      </select>
+      <button class="btn sm primary" onclick="openMidiInput()">Open Input</button>
+      <select id="midi-out-sel" style="background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:5px 8px;color:var(--text-0);flex:1;min-width:160px;font-size:12px;outline:none">
+        <option>No output ports</option>
+      </select>
+      <button class="btn sm primary" onclick="openMidiOutput()">Open Output</button>
+      <button class="btn sm" onclick="loadMidiPorts()">↻ Refresh</button>
+    </div>
+    <div id="midi-status" style="font-size:11px;color:var(--text-2)"></div>
+  </div>
+  <div class="midi-section">
+    <h3>Bindings <button class="btn sm primary" style="margin-left:8px" onclick="openModal('modal-new-binding')">+ Add</button></h3>
+    <div id="midi-bindings-body"></div>
+  </div>
+</div>
+
+<!-- ══ PROTOCOLS PAGE ══ -->
+<div class="page" id="page-protocols">
+  <div class="proto-section">
+    <h3>Art-Net Nodes <button class="btn sm" style="margin-left:8px" onclick="pollArtNet()">↻ Poll</button></h3>
+    <div id="artnet-nodes-body"><div style="color:var(--text-2);font-size:12px;padding:4px 0">No nodes discovered.</div></div>
+  </div>
+  <div class="proto-section">
+    <h3>sACN Sources</h3>
+    <div id="sacn-sources-body"><div style="color:var(--text-2);font-size:12px;padding:4px 0">No sources.</div></div>
+  </div>
+  <div class="proto-section">
+    <h3>Serial/USB DMX Ports <button class="btn sm" style="margin-left:8px" onclick="refreshSerialPorts()">↻ Scan</button></h3>
+    <div id="serial-ports-body"><div style="color:var(--text-2);font-size:12px;padding:4px 0">Click Scan to detect ports.</div></div>
+  </div>
+  <div class="proto-section">
+    <h3>Universe Outputs</h3>
+    <div id="universe-outputs-body"></div>
+    <button class="btn sm primary" style="margin-top:8px" onclick="openModal('modal-add-output')">+ Add Output</button>
+  </div>
+</div>
+
+<!-- ══ SHOW PAGE ══ -->
+<div class="page" id="page-show">
+  <div class="show-section">
+    <h3>Save / Load</h3>
+    <div class="field">
+      <label>Show File Path</label>
+      <input type="text" id="show-path" value="shows/my-show.json" placeholder="shows/my-show.json">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn primary" onclick="saveShow()">Save Show</button>
+      <button class="btn" onclick="loadShow()">Load Show</button>
+    </div>
+    <div id="show-msg" style="margin-top:8px;font-size:12px;color:var(--green)"></div>
+  </div>
+  <div class="show-section">
+    <h3>Current Show State</h3>
+    <div id="show-stats-body"></div>
+  </div>
+</div>
+
+</div><!-- #main -->
+
+<!-- ══ MODALS ══ -->
+
+<!-- Add Fixture -->
+<div class="modal-overlay hidden" id="modal-add-fixture">
+  <div class="modal">
+    <h2>Add Fixture</h2>
+    <div class="field"><label>Name</label><input type="text" id="af-name" placeholder="My Fixture"></div>
+    <div class="field"><label>Definition</label><select id="af-def" style="width:100%"></select></div>
+    <div class="field"><label>Universe</label><input type="number" id="af-uni" value="1" min="1" max="99"></div>
+    <div class="field"><label>Address (1-512)</label><input type="number" id="af-addr" value="1" min="1" max="512"></div>
+    <div class="field"><label>Mode</label><select id="af-mode" style="width:100%"></select></div>
+    <div class="field"><label>Group</label><input type="text" id="af-group" value="Default"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-add-fixture')">Cancel</button>
+      <button class="btn primary" onclick="addFixture()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Cue List -->
+<div class="modal-overlay hidden" id="modal-new-cuelist">
+  <div class="modal">
+    <h2>New Cue List</h2>
+    <div class="field"><label>Name</label><input type="text" id="ncl-name" placeholder="Act 1"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-new-cuelist')">Cancel</button>
+      <button class="btn primary" onclick="createCueList()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Effect -->
+<div class="modal-overlay hidden" id="modal-new-effect">
+  <div class="modal">
+    <h2>New Effect</h2>
+    <div class="field"><label>Name</label><input type="text" id="ne-name" placeholder="Pan Sweep"></div>
+    <div class="field"><label>Waveform</label>
+      <select id="ne-wave" style="width:100%">
+        <option value="sine">Sine</option><option value="cosine">Cosine</option>
+        <option value="square">Square</option><option value="triangle">Triangle</option>
+        <option value="sawtooth">Sawtooth</option><option value="reverse_saw">Reverse Saw</option>
+        <option value="random">Random (S&H)</option><option value="random_smooth">Random Smooth</option>
+        <option value="pulse">Pulse</option><option value="step_sequence">Step Sequence</option>
+      </select>
+    </div>
+    <div class="field"><label>Fixtures (IDs, comma-sep)</label><input type="text" id="ne-fixtures" placeholder="fix_0001,fix_0002"></div>
+    <div class="field"><label>Channels (comma-sep)</label><input type="text" id="ne-channels" placeholder="Dimmer"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-new-effect')">Cancel</button>
+      <button class="btn primary" onclick="createEffect()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- New Group -->
+<div class="modal-overlay hidden" id="modal-new-group">
+  <div class="modal">
+    <h2>New Group</h2>
+    <div class="field"><label>Name</label><input type="text" id="ng-name" placeholder="Front Wash"></div>
+    <div class="field"><label>Color</label><input type="color" id="ng-color" value="#4488ff"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-new-group')">Cancel</button>
+      <button class="btn primary" onclick="createGroup()">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- New MIDI Binding -->
+<div class="modal-overlay hidden" id="modal-new-binding">
+  <div class="modal">
+    <h2>Add MIDI Binding</h2>
+    <div class="field"><label>Type</label>
+      <select id="mb-type" style="width:100%">
+        <option value="note_on">Note On</option><option value="note_off">Note Off</option>
+        <option value="control_change">Control Change</option><option value="program_change">Program Change</option>
+      </select>
+    </div>
+    <div class="field"><label>Channel (0=any)</label><input type="number" id="mb-ch" value="0" min="0" max="16"></div>
+    <div class="field"><label>Number (-1=any)</label><input type="number" id="mb-num" value="-1" min="-1" max="127"></div>
+    <div class="field"><label>Action</label>
+      <select id="mb-action" style="width:100%">
+        <option value="cue_go">cue_go</option><option value="set_channel">set_channel</option>
+        <option value="submaster">submaster</option><option value="flash">flash</option>
+      </select>
+    </div>
+    <div class="field"><label>Target</label><input type="text" id="mb-target" placeholder="cue_list_id or fixture_id/channel"></div>
+    <div class="field"><label>Scale</label><input type="number" id="mb-scale" value="1.0" step="0.1"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-new-binding')">Cancel</button>
+      <button class="btn primary" onclick="addMidiBinding()">Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Universe Output -->
+<div class="modal-overlay hidden" id="modal-add-output">
+  <div class="modal">
+    <h2>Add Universe Output</h2>
+    <div class="field"><label>Universe ID</label><input type="number" id="ao-uni" value="1" min="1"></div>
+    <div class="field"><label>Type</label>
+      <select id="ao-type" style="width:100%" onchange="updateOutputForm()">
+        <option value="artnet">Art-Net</option><option value="sacn">sACN</option>
+        <option value="kinet">KiNET</option><option value="serial">Serial DMX</option>
+      </select>
+    </div>
+    <div id="ao-artnet-fields">
+      <div class="field"><label>IP</label><input type="text" id="ao-artnet-ip" value="255.255.255.255"></div>
+      <div class="field"><label>Universe (0-15)</label><input type="number" id="ao-artnet-univ" value="0" min="0" max="15"></div>
+    </div>
+    <div id="ao-sacn-fields" style="display:none">
+      <div class="field"><label>Universe (1-63999)</label><input type="number" id="ao-sacn-univ" value="1" min="1" max="63999"></div>
+      <div class="field"><label>Dest IP (blank=multicast)</label><input type="text" id="ao-sacn-ip" placeholder="leave blank for multicast"></div>
+      <div class="field"><label>Priority</label><input type="number" id="ao-sacn-prio" value="100" min="0" max="200"></div>
+    </div>
+    <div id="ao-kinet-fields" style="display:none">
+      <div class="field"><label>IP</label><input type="text" id="ao-kinet-ip" value="192.168.1.100"></div>
+      <div class="field"><label>Port</label><input type="number" id="ao-kinet-port" value="1" min="1"></div>
+      <div class="field"><label>Version</label>
+        <select id="ao-kinet-ver" style="width:100%"><option value="2">v2 (DMXOUT)</option><option value="1">v1 (PortOut)</option></select>
+      </div>
+    </div>
+    <div id="ao-serial-fields" style="display:none">
+      <div class="field"><label>Port</label><input type="text" id="ao-serial-port" placeholder="/dev/ttyUSB0"></div>
+      <div class="field"><label>Mode</label>
+        <select id="ao-serial-mode" style="width:100%"><option value="auto">Auto-detect</option><option value="enttec_pro">Enttec Pro</option><option value="enttec_open">Enttec Open</option></select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeModal('modal-add-output')">Cancel</button>
+      <button class="btn primary" onclick="addUniverseOutput()">Add</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+const API = '/api';
+let ws = null, wsConnected = false;
+let fixtures = [], cuelists = [], selectedFixture = null;
+let selectedCueList = null;
+let selectedEffectId = null;
+let dmxData = {}, activeDmxUniverse = 1;
+let libraryDefs = [], morphSourceIds = new Set(), morphTarget = null, morphPreviewData = null;
+let groupsData = {grand_master:1, blackout:false, groups:[], submasters:{}};
+let effectsData = [];
+let blackoutActive = false, grandMaster = 1.0;
+
+// ── WebSocket ──
+function connectWS() {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/api/ws`);
+  ws.onopen = () => {
+    wsConnected = true;
+    document.getElementById('ws-dot').className = 'status-dot';
+    document.getElementById('ws-label').textContent = 'connected';
   };
-
-  let ws = null;
-  const API = window.location.protocol + '//' + window.location.host + '/api';
-
-  // ── WebSocket ────────────────────────────────────────────────────────────
-  function connectWS() {
-    const wsUrl = (window.location.protocol === 'https:' ? 'wss:' : 'ws:')
-      + '//' + window.location.host + '/api/ws';
-    ws = new WebSocket(wsUrl);
-    ws.onopen = () => {
-      document.getElementById('ws-dot').className = 'status-dot';
-      document.getElementById('ws-label').textContent = 'Connected';
-    };
-    ws.onclose = () => {
-      document.getElementById('ws-dot').className = 'status-dot off';
-      document.getElementById('ws-label').textContent = 'Disconnected';
-      setTimeout(connectWS, 2000);
-    };
-    ws.onmessage = (e) => {
-      const msg = JSON.parse(e.data);
-      handleWSEvent(msg.event, msg.data);
-    };
+  ws.onclose = () => {
+    wsConnected = false;
+    document.getElementById('ws-dot').className = 'status-dot off';
+    document.getElementById('ws-label').textContent = 'disconnected';
+    setTimeout(connectWS, 2000);
+  };
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    handleWS(msg);
+  };
+}
+function wsSend(action, data) {
+  if (ws && wsConnected) ws.send(JSON.stringify({action, data}));
+}
+function handleWS(msg) {
+  const {event, data} = msg;
+  if (event === 'init') {
+    fixtures = data.fixtures || [];
+    cuelists = data.cue_lists || [];
+    effectsData = data.effects || [];
+    groupsData = data.groups || {grand_master:1, blackout:false, groups:[], submasters:{}};
+    renderFixtureList(); renderCueLists();
+    renderEffectsList(); renderGroupsList(); renderSubmasters();
+    renderMorphSource(); loadLibrary(); loadMorphTarget();
+    initDmxTabs(data.universes || []);
+  } else if (event === 'patch_updated') {
+    fixtures = data; renderFixtureList(); renderMorphSource();
+  } else if (event === 'dmx_update') {
+    const u = data.universe; const d = data.data;
+    if (!dmxData[u]) dmxData[u] = new Array(512).fill(0);
+    d.forEach((v, i) => dmxData[u][i] = v);
+    if (u === activeDmxUniverse) renderDmxGrid();
+  } else if (event === 'channel_update') {
+    const el = document.querySelector(`[data-fxid="${data.fixture_id}"][data-ch="${data.channel}"]`);
+    if (el) { el.value = data.value; el.previousSibling && (el.previousSibling.textContent = data.value); }
+  } else if (event === 'effect_created' || event === 'effect_updated') {
+    const idx = effectsData.findIndex(e => e.id === data.id);
+    if (idx >= 0) effectsData[idx] = data; else effectsData.push(data);
+    renderEffectsList();
+    if (selectedEffectId === data.id) renderEffectEditor(data);
+  } else if (event === 'effect_deleted') {
+    effectsData = effectsData.filter(e => e.id !== data.id);
+    renderEffectsList();
+  } else if (event === 'groups_updated') {
+    groupsData = data; renderGroupsList(); renderSubmasters();
+  } else if (event === 'grand_master') {
+    grandMaster = data.value;
+    document.getElementById('gm-slider').value = Math.round(grandMaster * 100);
+    document.getElementById('gm-val').textContent = Math.round(grandMaster * 100) + '%';
+    document.getElementById('gm-full').value = Math.round(grandMaster * 100);
+    document.getElementById('gm-full-val').textContent = Math.round(grandMaster * 100) + '%';
+  } else if (event === 'blackout') {
+    blackoutActive = data.active;
+    document.getElementById('bo-btn').className = blackoutActive ? 'active' : '';
+    const fb = document.getElementById('bo-full-btn');
+    if (fb) fb.className = 'bo-full-btn' + (blackoutActive ? ' active' : '');
   }
+}
 
-  function handleWSEvent(event, data) {
-    if (event === 'init') {
-      state.universes = data.universes;
-      state.fixtures = data.fixtures;
-      state.cueLists = data.cue_lists;
-      renderAll();
-    } else if (event === 'patch_updated') {
-      state.fixtures = data;
-      renderPatch();
-      renderMorphSource();
-    } else if (event === 'dmx_update') {
-      if (!state.dmxData[data.universe]) {
-        state.dmxData[data.universe] = new Uint8Array(512);
-      }
-      for (let i = 0; i < data.data.length; i++) {
-        state.dmxData[data.universe][i] = data.data[i];
-      }
-      if (data.universe === state.currentDmxUniverse) renderDMXGrid();
-    } else if (event === 'channel_update') {
-      // Update slider if visible
-      const slider = document.querySelector(`[data-fixture="${data.fixture_id}"][data-channel="${data.channel}"]`);
-      if (slider) updateSliderDisplay(slider, data.value);
-    } else if (event === 'cue_go') {
-      renderCueEditor();
-    }
-  }
-
-  function wsSend(action, data) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ action, data }));
-    }
-  }
-
-  // ── API helpers ───────────────────────────────────────────────────────────
-  async function api(method, path, body) {
-    const opts = { method, headers: { 'Content-Type': 'application/json' } };
-    if (body) opts.body = JSON.stringify(body);
-    const r = await fetch(API + path, opts);
-    if (!r.ok) throw new Error(await r.text());
-    return r.json();
-  }
-
-  // ── Navigation ────────────────────────────────────────────────────────────
-  function showPage(name) {
+// ── Tabs ──
+document.querySelectorAll('.tab[data-page]').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    const page = t.dataset.page;
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.getElementById('page-' + name).classList.add('active');
-    document.getElementById('tab-' + name).classList.add('active');
-    if (name === 'osc') loadOSCStatus();
-    if (name === 'dmx') renderDMXTabs();
-    if (name === 'morph') { renderMorphSource(); renderMorphLib(); }
-  }
+    document.getElementById('page-' + page).classList.add('active');
+    if (page === 'osc') loadOscStatus();
+    if (page === 'midi') loadMidiPorts();
+    if (page === 'protocols') loadProtocolsPage();
+    if (page === 'show') loadShowStats();
+  });
+});
 
-  // ── Render All ────────────────────────────────────────────────────────────
-  async function renderAll() {
-    await loadLibrary();
-    renderPatch();
-    renderCueLists();
-    renderDMXTabs();
-    renderMorphLib();
-    renderMorphSource();
-  }
+// ── Modals ──
+function openModal(id) {
+  if (id === 'modal-add-fixture') populateLibrarySelect();
+  document.getElementById(id).classList.remove('hidden');
+}
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) closeModal(o.id); });
+});
 
-  async function loadLibrary() {
-    state.library = await api('GET', '/library');
-    renderLibrary();
-    populateAddFixtureModal();
-  }
+// ── Grand Master ──
+document.getElementById('gm-slider').addEventListener('input', e => {
+  const v = parseInt(e.target.value) / 100;
+  document.getElementById('gm-val').textContent = e.target.value + '%';
+  document.getElementById('gm-full').value = e.target.value;
+  document.getElementById('gm-full-val').textContent = e.target.value + '%';
+  wsSend('set_grand_master', {value: v});
+  fetch(`${API}/grandmaster?value=${v}`, {method:'POST'});
+});
+document.getElementById('gm-full').addEventListener('input', e => {
+  const v = parseInt(e.target.value) / 100;
+  document.getElementById('gm-val').textContent = e.target.value + '%';
+  document.getElementById('gm-full-val').textContent = e.target.value + '%';
+  document.getElementById('gm-slider').value = e.target.value;
+  wsSend('set_grand_master', {value: v});
+  fetch(`${API}/grandmaster?value=${v}`, {method:'POST'});
+});
 
-  // ── PATCH ─────────────────────────────────────────────────────────────────
-  function renderPatch() {
-    const body = document.getElementById('patch-list-body');
-    if (!state.fixtures.length) {
-      body.innerHTML = '<div class="empty-state"><div class="icon">💡</div>No fixtures patched</div>';
-      return;
-    }
-    const groups = {};
-    for (const f of state.fixtures) {
-      if (!groups[f.group]) groups[f.group] = [];
-      groups[f.group].push(f);
-    }
-    let html = '';
-    for (const [group, fixtures] of Object.entries(groups)) {
-      html += `<div style="font-size:10px;color:var(--text-2);padding:6px 10px 2px;font-weight:600;letter-spacing:.6px;text-transform:uppercase">${group}</div>`;
-      for (const f of fixtures) {
-        const isSelected = state.selectedFixture?.id === f.id;
-        html += `<div class="fixture-row ${isSelected ? 'selected' : ''}" onclick="selectFixture('${f.id}')">
-          <span class="fix-addr">U${f.universe}/${f.address}</span>
-          <span class="fix-name">${f.name}</span>
-          <span class="fix-model">${f.definition_id.split('::')[1] || ''}</span>
-          <button class="btn icon danger" onclick="event.stopPropagation();removeFixture('${f.id}')" title="Remove">✕</button>
-        </div>`;
-      }
-    }
-    body.innerHTML = html;
-  }
+// ── Blackout ──
+document.getElementById('bo-btn').addEventListener('click', toggleBlackout);
+function toggleBlackout() {
+  blackoutActive = !blackoutActive;
+  document.getElementById('bo-btn').className = blackoutActive ? 'active' : '';
+  const fb = document.getElementById('bo-full-btn');
+  if (fb) fb.className = 'bo-full-btn' + (blackoutActive ? ' active' : '');
+  wsSend('blackout', {active: blackoutActive});
+  fetch(`${API}/blackout?active=${blackoutActive}`, {method:'POST'});
+}
 
-  function selectFixture(id) {
-    state.selectedFixture = state.fixtures.find(f => f.id === id);
-    renderPatch();
-    renderChannelEditor();
-  }
-
-  function renderChannelEditor() {
-    const f = state.selectedFixture;
-    const grid = document.getElementById('ch-grid');
-    const header = document.getElementById('detail-header');
-    if (!f) {
-      header.textContent = 'Select a fixture';
-      grid.innerHTML = '';
-      return;
-    }
-    header.innerHTML = `${f.name} <span style="color:var(--text-2);font-weight:400;font-size:11px">${f.definition_id} · ${f.mode} · U${f.universe}@${f.address}</span>`;
-
-    const fdef = state.library.find(d => d.id === f.definition_id);
-    if (!fdef) { grid.innerHTML = ''; return; }
-
-    let html = '';
-    for (const chName of f.channels) {
-      const group = fdef.channels?.[chName]?.group || 'other';
-      const groupClass = 'ch-group-' + (group.toLowerCase().replace(/_/g, '-').split('-')[0]);
-      html += `<div class="ch-card">
-        <div style="display:flex;align-items:center;gap:6px">
-          <span class="ch-name">${chName}</span>
-          <span class="ch-group-tag ${groupClass}">${group}</span>
-        </div>
-        <div class="ch-value-display" id="val-${f.id}-${chName}">0</div>
-        <input type="range" min="0" max="255" value="0" class="ch-slider"
-          data-fixture="${f.id}" data-channel="${chName}"
-          oninput="onSliderInput(this)">
-        <div style="display:flex;justify-content:space-between">
-          <span class="cap-hint" id="cap-${f.id}-${chName}"></span>
-          <span class="ch-percent" id="pct-${f.id}-${chName}">0%</span>
-        </div>
-      </div>`;
-    }
-    grid.innerHTML = html;
-  }
-
-  function onSliderInput(el) {
-    const val = parseInt(el.value);
-    updateSliderDisplay(el, val);
-    wsSend('set_channel', {
-      fixture_id: el.dataset.fixture,
-      channel: el.dataset.channel,
-      value: val,
-    });
-  }
-
-  function updateSliderDisplay(el, val) {
-    el.value = val;
-    const fid = el.dataset.fixture;
-    const ch = el.dataset.channel;
-    const valEl = document.getElementById(`val-${fid}-${ch}`);
-    const pctEl = document.getElementById(`pct-${fid}-${ch}`);
-    if (valEl) valEl.textContent = val;
-    if (pctEl) pctEl.textContent = Math.round(val/255*100) + '%';
-    // Capability hint
-    const capEl = document.getElementById(`cap-${fid}-${ch}`);
-    if (capEl) {
-      const f = state.fixtures.find(x => x.id === fid);
-      const fdef = f && state.library.find(d => d.id === f.definition_id);
-      const caps = fdef?.channels?.[ch]?.capabilities || [];
-      const cap = caps.find(c => val >= c.min && val <= c.max);
-      capEl.textContent = cap ? cap.name : '';
-    }
-  }
-
-  async function removeFixture(id) {
-    if (!confirm('Remove this fixture from patch?')) return;
-    await api('DELETE', `/patch/${id}`);
-    if (state.selectedFixture?.id === id) {
-      state.selectedFixture = null;
-      document.getElementById('ch-grid').innerHTML = '';
-    }
-  }
-
-  // ── Library ───────────────────────────────────────────────────────────────
-  function renderLibrary(filtered) {
-    const list = document.getElementById('lib-list');
-    const items = filtered || state.library;
-    if (!items.length) {
-      list.innerHTML = '<div style="color:var(--text-2);font-size:12px;padding:8px">No fixtures found</div>';
-      return;
-    }
-    let html = '';
-    let mfr = null;
-    for (const f of items) {
-      if (f.manufacturer !== mfr) {
-        mfr = f.manufacturer;
-        html += `<div style="font-size:10px;color:var(--text-2);padding:5px 8px 2px;font-weight:600;text-transform:uppercase;letter-spacing:.6px">${mfr}</div>`;
-      }
-      html += `<div style="padding:5px 8px;border-radius:var(--radius);cursor:pointer;display:flex;align-items:center;gap:6px"
-        onmouseenter="this.style.background='var(--bg-3)'"
-        onmouseleave="this.style.background=''">
-        <span style="flex:1;font-size:12px">${f.model}</span>
-        <span style="font-size:10px;color:var(--text-2)">${f.type}</span>
-        <span style="font-size:10px;color:var(--text-2)">${f.modes?.[0]?.channels || '?'}ch</span>
-      </div>`;
-    }
-    list.innerHTML = html;
-  }
-
-  function filterLibrary() {
-    const q = document.getElementById('lib-search').value.toLowerCase();
-    if (!q) { renderLibrary(); return; }
-    const filtered = state.library.filter(f =>
-      f.manufacturer.toLowerCase().includes(q) ||
-      f.model.toLowerCase().includes(q) ||
-      f.type.toLowerCase().includes(q)
-    );
-    renderLibrary(filtered);
-  }
-
-  // ── Add Fixture Modal ──────────────────────────────────────────────────────
-  function populateAddFixtureModal() {
-    const sel = document.getElementById('af-def');
-    sel.innerHTML = '<option value="">Select…</option>';
-    let mfr = null;
-    let group = null;
-    for (const f of state.library) {
-      if (f.manufacturer !== mfr) {
-        if (group) sel.appendChild(group);
-        mfr = f.manufacturer;
-        group = document.createElement('optgroup');
-        group.label = mfr;
-      }
-      const opt = document.createElement('option');
-      opt.value = f.id;
-      opt.textContent = f.model;
-      opt._modes = f.modes;
-      group.appendChild(opt);
-    }
-    if (group) sel.appendChild(group);
-    sel.onchange = () => updateModeSelect(sel);
-  }
-
-  function updateModeSelect(sel) {
-    const modeSel = document.getElementById('af-mode');
-    const selectedOpt = sel.options[sel.selectedIndex];
-    const modes = selectedOpt._modes || [];
-    modeSel.innerHTML = modes.map(m => `<option value="${m.name}">${m.name} (${m.channels}ch)</option>`).join('');
-  }
-
-  function openAddFixture() {
-    document.getElementById('modal-add-fixture').classList.add('open');
-  }
-
-  function closeModal(id) {
-    document.getElementById(id).classList.remove('open');
-  }
-
-  async function confirmAddFixture() {
-    const defId = document.getElementById('af-def').value;
-    const mode = document.getElementById('af-mode').value;
-    const name = document.getElementById('af-name').value || 'Fixture';
-    const universe = parseInt(document.getElementById('af-universe').value);
-    const address = parseInt(document.getElementById('af-address').value);
-    const group = document.getElementById('af-group').value || 'Default';
-    if (!defId) return;
-    try {
-      await api('POST', '/patch', { definition_id: defId, name, universe, address, mode, group });
-      closeModal('modal-add-fixture');
-    } catch (e) {
-      document.getElementById('af-conflict-warn').textContent = e.message;
-      document.getElementById('af-conflict-warn').style.display = 'block';
-    }
-  }
-
-  // ── CUES ──────────────────────────────────────────────────────────────────
-  function renderCueLists() {
-    const body = document.getElementById('cuelist-body');
-    if (!state.cueLists.length) {
-      body.innerHTML = '<div class="empty-state"><div class="icon">🎭</div>No cue lists</div>';
-      return;
-    }
-    let html = '';
-    for (const cl of state.cueLists) {
-      const isSelected = state.selectedCueList?.id === cl.id;
-      html += `<div class="cue-list-item ${isSelected ? 'selected' : ''}" onclick="selectCueList('${cl.id}')">
-        <span class="cl-name">${cl.name}</span>
-        <span class="cl-count">${cl.cues.length} cues</span>
-      </div>`;
-    }
-    body.innerHTML = html;
-  }
-
-  function selectCueList(id) {
-    state.selectedCueList = state.cueLists.find(c => c.id === id);
-    renderCueLists();
-    renderCueEditor();
-  }
-
-  function renderCueEditor() {
-    const cl = state.selectedCueList;
-    const body = document.getElementById('cue-editor-body');
-    const header = document.getElementById('cue-editor-header');
-    if (!cl) {
-      header.textContent = 'Select a cue list';
-      body.innerHTML = '';
-      return;
-    }
-    header.innerHTML = `${cl.name} <span style="color:var(--text-2);font-size:11px">${cl.cues.length} cues</span>`;
-
-    // Refresh from server
-    const serverCl = state.cueLists.find(x => x.id === cl.id);
-    const currentIdx = serverCl?.current_index ?? -1;
-
-    let html = `<button class="go-btn" onclick="goCue('${cl.id}')">▶ GO</button>`;
-    html += `<div style="margin-top:12px">`;
-    if (!cl.cues.length) {
-      html += '<div style="color:var(--text-2);font-size:12px;text-align:center;padding:20px">No cues — add fixtures and record cues</div>';
-    }
-    for (let i = 0; i < cl.cues.length; i++) {
-      const cue = cl.cues[i];
-      const isCurrent = i === currentIdx;
-      html += `<div class="cue-row ${isCurrent ? 'current' : ''}" onclick="goToCue('${cl.id}', ${i})">
-        <span class="cue-num">${i + 1}</span>
-        <span class="cue-name">${cue.name}</span>
-        <span class="cue-fade">${cue.fade_in > 0 ? cue.fade_in.toFixed(1) + 's' : '—'}</span>
-        <span class="cue-count">${cue.values?.length || 0} ch</span>
-      </div>`;
-    }
-    html += '</div>';
-    html += `<div style="padding:8px;margin-top:8px;border-top:1px solid var(--border);display:flex;gap:6px">
-      <button class="btn sm" onclick="recordCue('${cl.id}')">⬤ Record Cue</button>
-    </div>`;
-    body.innerHTML = html;
-  }
-
-  async function createCueList() {
-    const name = prompt('Cue list name:', 'Main List');
-    if (!name) return;
-    const cl = await api('POST', '/cuelists', { name });
-    state.cueLists.push(cl);
-    renderCueLists();
-    selectCueList(cl.id);
-  }
-
-  async function goCue(clId) {
-    await api('POST', `/cuelists/${clId}/go`);
-    const cl = state.cueLists.find(x => x.id === clId);
-    if (cl && cl.current_index < cl.cues.length - 1) {
-      cl.current_index++;
-    }
-    renderCueEditor();
-  }
-
-  async function goToCue(clId, index) {
-    await api('POST', `/cuelists/${clId}/go/${index}`);
-    const cl = state.cueLists.find(x => x.id === clId);
-    if (cl) cl.current_index = index;
-    renderCueEditor();
-  }
-
-  async function recordCue(clId) {
-    const name = prompt('Cue name:', `Cue ${(state.cueLists.find(x=>x.id===clId)?.cues.length||0)+1}`);
-    if (!name) return;
-    const fadeIn = parseFloat(prompt('Fade in (seconds):', '0') || '0');
-    const cue = await api('POST', `/cuelists/${clId}/cues`, { name, fade_in: fadeIn });
-    // Record current slider values
-    const sliders = document.querySelectorAll('.ch-slider');
-    for (const s of sliders) {
-      const val = parseInt(s.value);
-      if (val > 0) {
-        try {
-          await api('POST', `/cuelists/${clId}/cues/${cue.id}/values`, {
-            fixture_id: s.dataset.fixture,
-            channel: s.dataset.channel,
-            value: val,
-          });
-        } catch (e) {}
-      }
-    }
-    const cl = state.cueLists.find(x => x.id === clId);
-    if (cl) { cl.cues.push(cue); renderCueEditor(); }
-  }
-
-  // ── DMX ───────────────────────────────────────────────────────────────────
-  function renderDMXTabs() {
-    const tabs = document.getElementById('dmx-tabs');
-    tabs.innerHTML = state.universes.map(u =>
-      `<button class="btn ${u.id === state.currentDmxUniverse ? 'primary' : ''}" onclick="selectDMXUniverse(${u.id})">${u.name || 'U'+u.id}</button>`
-    ).join('');
-    renderDMXGrid();
-  }
-
-  function selectDMXUniverse(uid) {
-    state.currentDmxUniverse = uid;
-    renderDMXTabs();
-  }
-
-  function renderDMXGrid() {
-    const grid = document.getElementById('dmx-grid');
-    const data = state.dmxData[state.currentDmxUniverse] || new Uint8Array(512);
-    let html = '';
-    for (let i = 0; i < 512; i++) {
-      const val = data[i];
-      const intensity = val / 255;
-      const bg = `rgba(124,111,205,${intensity * 0.6})`;
-      const color = intensity > 0.5 ? 'var(--text-0)' : 'var(--text-1)';
-      html += `<div class="dmx-cell" style="background:${bg}" title="Channel ${i+1}: ${val}">
-        <div class="dmx-ch">${i+1}</div>
-        <div class="dmx-val" style="color:${color}">${val}</div>
-      </div>`;
-    }
-    grid.innerHTML = html;
-  }
-
-  // ── MORPH ─────────────────────────────────────────────────────────────────
-  function renderMorphSource() {
-    const list = document.getElementById('morph-source-list');
-    let html = '';
-    for (const f of state.fixtures) {
-      const isSelected = state.morphSelected.has(f.id);
-      html += `<div class="fixture-row" onclick="toggleMorphSelect('${f.id}')">
-        <div class="fix-sel-check ${isSelected ? 'checked' : ''}" id="mchk-${f.id}">${isSelected ? '✓' : ''}</div>
-        <span class="fix-addr">U${f.universe}/${f.address}</span>
-        <span class="fix-name">${f.name}</span>
-        <span class="fix-model">${f.definition_id.split('::')[1] || ''}</span>
-      </div>`;
-    }
-    list.innerHTML = html || '<div class="empty-state" style="height:auto;padding:20px"><div class="icon">💡</div>No fixtures patched</div>';
-    document.getElementById('morph-sel-count').textContent = state.morphSelected.size + ' selected';
-  }
-
-  function toggleMorphSelect(id) {
-    if (state.morphSelected.has(id)) {
-      state.morphSelected.delete(id);
-    } else {
-      state.morphSelected.add(id);
-    }
-    renderMorphSource();
-    updateMorphPreview();
-  }
-
-  function renderMorphLib(filtered) {
-    const list = document.getElementById('morph-lib-list');
-    const items = filtered || state.library;
-    let html = '';
-    let mfr = null;
-    for (const f of items) {
-      if (f.manufacturer !== mfr) {
-        mfr = f.manufacturer;
-        html += `<div style="font-size:10px;color:var(--text-2);padding:5px 8px 2px;font-weight:600;text-transform:uppercase;letter-spacing:.6px">${mfr}</div>`;
-      }
-      const isSel = state.morphTargetDef?.id === f.id;
-      html += `<div class="fixture-row ${isSel ? 'selected' : ''}" onclick="selectMorphTarget('${f.id}')">
-        <span style="flex:1;font-size:12px">${f.model}</span>
-        <span style="font-size:10px;color:var(--text-2)">${f.type}</span>
-      </div>`;
-    }
-    list.innerHTML = html || '<div style="color:var(--text-2);font-size:12px;padding:8px">No fixtures</div>';
-  }
-
-  function filterMorphLib() {
-    const q = document.getElementById('morph-lib-search').value.toLowerCase();
-    if (!q) { renderMorphLib(); return; }
-    renderMorphLib(state.library.filter(f =>
-      f.manufacturer.toLowerCase().includes(q) ||
-      f.model.toLowerCase().includes(q)
-    ));
-  }
-
-  function selectMorphTarget(id) {
-    state.morphTargetDef = state.library.find(f => f.id === id);
-    renderMorphLib();
-    updateMorphPreview();
-  }
-
-  async function updateMorphPreview() {
-    const body = document.getElementById('morph-preview-body');
-    const applyBtn = document.getElementById('morph-apply-btn');
-    if (!state.morphSelected.size || !state.morphTargetDef) {
-      body.innerHTML = '<div class="empty-state"><div class="icon">🔀</div>Select source fixtures and a target type</div>';
-      applyBtn.disabled = true;
-      state.morphPreview = null;
-      return;
-    }
-    try {
-      const preview = await api('POST', '/morph/preview', {
-        source_fixture_ids: Array.from(state.morphSelected),
-        target_definition_id: state.morphTargetDef.id,
-        target_mode: '',
+// ── Fixture List ──
+function renderFixtureList() {
+  const body = document.getElementById('fixture-list-body');
+  body.innerHTML = '';
+  const grouped = {};
+  fixtures.forEach(f => { (grouped[f.group||'Default'] ||= []).push(f); });
+  for (const [grpName, fxs] of Object.entries(grouped)) {
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'font-size:10px;color:var(--text-2);text-transform:uppercase;letter-spacing:.6px;padding:8px 10px 4px;font-weight:600';
+    hdr.textContent = grpName;
+    body.appendChild(hdr);
+    fxs.forEach(f => {
+      const row = document.createElement('div');
+      row.className = 'fixture-row' + (selectedFixture?.id === f.id ? ' selected' : '');
+      row.innerHTML = `<div class="fix-sel-check${morphSourceIds.has(f.id)?' checked':''}" onclick="toggleMorphSrc('${f.id}',this)">✓</div>
+        <div class="fix-addr">U${f.universe}@${f.address}</div>
+        <div class="fix-name">${f.name}</div>
+        <div class="fix-model">${f.definition_id?.split('::')[1]||''}</div>
+        <button class="btn icon danger" title="Remove" onclick="removeFixture('${f.id}')">✕</button>`;
+      row.addEventListener('click', ev => {
+        if (ev.target.classList.contains('fix-sel-check') || ev.target.classList.contains('btn')) return;
+        selectedFixture = f; renderFixtureList(); loadChannels(f.id);
       });
-      state.morphPreview = preview;
-      applyBtn.disabled = false;
-      renderMorphPreview(preview);
-    } catch (e) {
-      body.innerHTML = `<div style="color:var(--red);padding:12px">${e.message}</div>`;
-    }
-  }
-
-  function renderMorphPreview(preview) {
-    const body = document.getElementById('morph-preview-body');
-    const coverage = Math.round(preview.coverage * 100);
-    let html = '';
-
-    // Header stats
-    html += `<div style="padding:12px;border-bottom:1px solid var(--border)">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-        <span style="font-size:13px;font-weight:600">${preview.source_fixture_ids.length} fixture${preview.source_fixture_ids.length>1?'s':''} → ${state.morphTargetDef.model}</span>
-        <span style="font-size:12px;color:var(--text-2)">Mode: ${preview.target_mode || 'default'}</span>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:11px;color:var(--text-2)">Channel coverage:</span>
-        <div class="coverage-bar" style="flex:1"><div class="coverage-fill" style="width:${coverage}%;background:${coverage>80?'var(--green)':coverage>50?'var(--amber)':'var(--red)'}"></div></div>
-        <span style="font-size:12px;font-family:var(--mono);color:${coverage>80?'var(--green)':coverage>50?'var(--amber)':'var(--red)'}">${coverage}%</span>
-      </div>
-    </div>`;
-
-    // Warnings
-    for (const w of preview.warnings) {
-      html += `<div class="warning-box">⚠ ${w}</div>`;
-    }
-
-    // Mappings
-    html += `<div style="padding:8px;font-size:11px;color:var(--text-2);font-weight:600;padding-top:12px">CHANNEL MAPPINGS (${preview.channel_mappings.length})</div>`;
-    for (const m of preview.channel_mappings) {
-      const conf = Math.round(m.confidence * 100);
-      const confClass = conf >= 80 ? 'conf-high' : conf >= 50 ? 'conf-med' : 'conf-low';
-      html += `<div class="mapping-row">
-        <span class="map-src">${m.source}</span>
-        <span class="map-arrow">→</span>
-        <span class="map-tgt">${m.target}</span>
-        <span class="map-conf ${confClass}">${conf}%</span>
-      </div>`;
-    }
-
-    if (preview.unmapped_source.length) {
-      html += `<div style="padding:8px;font-size:11px;color:var(--text-2);font-weight:600;padding-top:12px">UNMAPPED SOURCE CHANNELS</div>`;
-      for (const ch of preview.unmapped_source) {
-        html += `<div class="unmapped-tag" style="padding:3px 12px">✕ ${ch}</div>`;
-      }
-    }
-
-    body.innerHTML = html;
-  }
-
-  async function applyMorph() {
-    if (!state.morphPreview) return;
-    const srcNames = Array.from(state.morphSelected)
-      .map(id => state.fixtures.find(f => f.id === id)?.name)
-      .filter(Boolean).join(', ');
-    if (!confirm(`Apply morph?\n\n${srcNames}\n→ ${state.morphTargetDef.model}\n\nThis will update all cue data. This cannot be undone.`)) return;
-    const result = await api('POST', '/morph/apply', {
-      source_fixture_ids: Array.from(state.morphSelected),
-      target_definition_id: state.morphTargetDef.id,
-      target_mode: state.morphPreview.target_mode,
+      body.appendChild(row);
     });
-    alert(`Morph applied!\n${result.new_ids.length} fixtures replaced\n${result.cue_updates} cue entries updated\n${result.mappings_applied} channel mappings applied`);
-    state.morphSelected.clear();
-    state.morphPreview = null;
-    document.getElementById('morph-preview-body').innerHTML = '<div class="empty-state"><div class="icon">✅</div>Morph applied successfully</div>';
   }
+}
 
-  // ── OSC ────────────────────────────────────────────────────────────────────
-  async function loadOSCStatus() {
-    const status = await api('GET', '/osc/status');
-    const el = document.getElementById('osc-status-display');
-    el.innerHTML = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-      <div class="status-dot ${status.running ? '' : 'off'}"></div>
-      <span>${status.running ? `Listening on UDP :${status.port}` : 'Not running'}</span>
-    </div>`;
-    const list = document.getElementById('feedback-list');
-    list.innerHTML = (status.feedback_targets || []).map(([h, p]) =>
-      `<div class="feedback-item">
-        <span class="fbi-addr">${h}:${p}</span>
-        <button class="btn sm danger" onclick="removeOscFeedback('${h}', ${p})">Remove</button>
-      </div>`
-    ).join('') || '<div style="color:var(--text-2);font-size:12px">No feedback targets</div>';
-  }
+async function loadChannels(fxId) {
+  const f = fixtures.find(x => x.id === fxId);
+  if (!f) return;
+  document.getElementById('ch-panel-header').textContent = f.name;
+  const def = await fetch(`${API}/library/${encodeURIComponent(f.definition_id.split('::')[0])}/${encodeURIComponent(f.definition_id.split('::')[1])}`).then(r => r.json()).catch(() => null);
+  const grid = document.getElementById('ch-grid');
+  grid.innerHTML = '';
+  if (!def) return;
+  const mode = def.modes.find(m => m.name === f.mode) || def.modes[0];
+  if (!mode) return;
+  mode.channels.forEach(chName => {
+    const chDef = def.channels[chName];
+    if (!chDef) return;
+    const grp = chDef.group || 'other';
+    const caps = chDef.capabilities || [];
+    const card = document.createElement('div');
+    card.className = 'ch-card';
+    card.innerHTML = `
+      <div class="ch-name">${chName}</div>
+      <div class="ch-group-tag ch-group-${grp.toLowerCase().replace(/[^a-z]/g,'')}">${grp}</div>
+      <div class="ch-value-display" id="val-${fxId}-${chName}">0</div>
+      <input type="range" class="ch-slider" min="0" max="255" value="0" data-fxid="${fxId}" data-ch="${chName}" oninput="onSlider(this)">
+      <div class="ch-percent" id="pct-${fxId}-${chName}">0%</div>
+      <div class="cap-hint" id="cap-${fxId}-${chName}"></div>`;
+    grid.appendChild(card);
+    const slider = card.querySelector('.ch-slider');
+    slider.addEventListener('input', () => updateCapHint(chName, fxId, parseInt(slider.value), caps));
+  });
+}
 
-  async function addOscFeedback() {
-    const host = document.getElementById('osc-fb-host').value;
-    const port = parseInt(document.getElementById('osc-fb-port').value);
-    if (!host || !port) return;
-    await api('POST', '/osc/feedback/add', { host, port });
-    loadOSCStatus();
-  }
+function onSlider(el) {
+  const v = parseInt(el.value), fxId = el.dataset.fxid, ch = el.dataset.ch;
+  const vEl = document.getElementById(`val-${fxId}-${ch}`);
+  const pEl = document.getElementById(`pct-${fxId}-${ch}`);
+  if (vEl) vEl.textContent = v;
+  if (pEl) pEl.textContent = Math.round(v/255*100) + '%';
+  wsSend('set_channel', {fixture_id: fxId, channel: ch, value: v});
+}
 
-  async function removeOscFeedback(host, port) {
-    await api('POST', '/osc/feedback/remove', { host, port });
-    loadOSCStatus();
-  }
+function updateCapHint(chName, fxId, val, caps) {
+  const el = document.getElementById(`cap-${fxId}-${chName}`);
+  if (!el) return;
+  const cap = caps.find(c => val >= c.min && val <= c.max);
+  el.textContent = cap ? cap.name : '';
+}
 
-  // ── 3D Visualizer ──────────────────────────────────────────────────────────
-  function open3D() {
-    window.open('/visualizer.html', '_blank', 'width=1280,height=800');
-  }
+function toggleMorphSrc(id, el) {
+  if (morphSourceIds.has(id)) { morphSourceIds.delete(id); el.classList.remove('checked'); }
+  else { morphSourceIds.add(id); el.classList.add('checked'); }
+  renderMorphSource();
+}
 
-  // ── Init ──────────────────────────────────────────────────────────────────
-  connectWS();
-  // Initial REST load (WS init event will also populate)
-  (async () => {
-    try {
-      state.fixtures = await api('GET', '/patch');
-      state.cueLists = await api('GET', '/cuelists');
-      state.universes = await api('GET', '/universes');
-      await renderAll();
-    } catch (e) {
-      console.error('Init error:', e);
+async function removeFixture(id) {
+  await fetch(`${API}/patch/${id}`, {method:'DELETE'});
+}
+
+// ── Library ──
+async function loadLibrary() {
+  const data = await fetch(`${API}/library`).then(r => r.json()).catch(() => ({}));
+  libraryDefs = [];
+  for (const [mfr, models] of Object.entries(data)) {
+    for (const [mdl, def] of Object.entries(models)) {
+      libraryDefs.push({id: `${mfr}::${mdl}`, manufacturer: mfr, model: mdl, type: def.type});
     }
-  })();
-  </script>
+  }
+  renderLibraryList();
+}
+
+function renderLibraryList(q = '') {
+  const body = document.getElementById('library-list-body');
+  body.innerHTML = '';
+  const filtered = q ? libraryDefs.filter(d => (d.manufacturer + ' ' + d.model).toLowerCase().includes(q.toLowerCase())) : libraryDefs;
+  const grouped = {};
+  filtered.forEach(d => { (grouped[d.manufacturer] ||= []).push(d); });
+  for (const [mfr, defs] of Object.entries(grouped)) {
+    const hdr = document.createElement('div');
+    hdr.style.cssText = 'font-size:10px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px;padding:8px 10px 4px;font-weight:600';
+    hdr.textContent = mfr;
+    body.appendChild(hdr);
+    defs.forEach(d => {
+      const row = document.createElement('div');
+      row.style.cssText = 'padding:5px 10px;cursor:pointer;border-radius:4px;font-size:12px';
+      row.innerHTML = `<span style="font-weight:500">${d.model}</span> <span style="font-size:11px;color:var(--text-2)">${d.type}</span>`;
+      row.onmouseenter = () => row.style.background = 'var(--bg-2)';
+      row.onmouseleave = () => row.style.background = '';
+      row.onclick = () => {
+        document.getElementById('af-def').value = d.id;
+        document.getElementById('af-name').value = d.model;
+        openModal('modal-add-fixture');
+        populateLibrarySelect(d.id);
+      };
+      body.appendChild(row);
+    });
+  }
+}
+
+document.getElementById('lib-search').addEventListener('input', e => renderLibraryList(e.target.value));
+
+function populateLibrarySelect(selectId) {
+  const sel = document.getElementById('af-def');
+  sel.innerHTML = libraryDefs.map(d => `<option value="${d.id}"${d.id===selectId?' selected':''}>${d.manufacturer} :: ${d.model}</option>`).join('');
+  updateModeSelect();
+  sel.onchange = updateModeSelect;
+}
+
+async function updateModeSelect() {
+  const defId = document.getElementById('af-def').value;
+  if (!defId) return;
+  const [mfr, mdl] = defId.split('::');
+  const def = await fetch(`${API}/library/${encodeURIComponent(mfr)}/${encodeURIComponent(mdl)}`).then(r => r.json()).catch(() => null);
+  const sel = document.getElementById('af-mode');
+  if (def && def.modes) sel.innerHTML = def.modes.map(m => `<option value="${m.name}">${m.name} (${m.channels.length}ch)</option>`).join('');
+}
+
+async function addFixture() {
+  const body = {
+    definition_id: document.getElementById('af-def').value,
+    name: document.getElementById('af-name').value || 'Fixture',
+    universe: parseInt(document.getElementById('af-uni').value),
+    address: parseInt(document.getElementById('af-addr').value),
+    mode: document.getElementById('af-mode').value,
+    group: document.getElementById('af-group').value || 'Default',
+  };
+  await fetch(`${API}/patch`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  closeModal('modal-add-fixture');
+}
+
+// ── Cue Lists ──
+function renderCueLists() {
+  const body = document.getElementById('cuelist-body');
+  body.innerHTML = cuelists.map(cl => `
+    <div class="cue-list-item${selectedCueList?.id===cl.id?' selected':''}" onclick="selectCueList('${cl.id}')">
+      <span class="cl-name">${cl.name}</span>
+      <span class="cl-count">${cl.cues?.length||0} cues</span>
+    </div>`).join('');
+}
+
+function selectCueList(id) {
+  selectedCueList = cuelists.find(c => c.id === id);
+  renderCueLists();
+  renderCues();
+}
+
+function renderCues() {
+  if (!selectedCueList) return;
+  document.getElementById('cue-panel-header').textContent = selectedCueList.name;
+  const body = document.getElementById('cue-list-body');
+  body.innerHTML = (selectedCueList.cues || []).map((cue, i) => `
+    <div class="cue-row${i===selectedCueList.current_index?' current':''}" onclick="goToCue('${selectedCueList.id}',${i})">
+      <span class="cue-num">${i+1}</span>
+      <span class="cue-name">${cue.name}</span>
+      <span class="cue-fade">${cue.fade_in}s</span>
+    </div>`).join('');
+}
+
+async function createCueList() {
+  const name = document.getElementById('ncl-name').value || 'New List';
+  const res = await fetch(`${API}/cuelists`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})}).then(r => r.json());
+  cuelists.push({...res, cues:[]});
+  renderCueLists(); closeModal('modal-new-cuelist');
+}
+
+function cueGo() {
+  if (!selectedCueList) return;
+  wsSend('cue_go', {cue_list_id: selectedCueList.id});
+  if (selectedCueList.current_index === undefined) selectedCueList.current_index = 0;
+  else selectedCueList.current_index = (selectedCueList.current_index + 1) % (selectedCueList.cues?.length || 1);
+  renderCues();
+}
+
+async function goToCue(clId, idx) {
+  await fetch(`${API}/cuelists/${clId}/go/${idx}`, {method:'POST'});
+  if (selectedCueList) { selectedCueList.current_index = idx; renderCues(); }
+}
+
+// ── Effects ──
+function renderEffectsList() {
+  const body = document.getElementById('effects-list-body');
+  body.innerHTML = effectsData.map(e => `
+    <div class="eff-row${e.id===selectedEffectId?' selected':''}" onclick="selectEffect('${e.id}')">
+      <div class="eff-enabled" style="background:${e.enabled?'var(--green)':'var(--border)'}"></div>
+      <span class="eff-name">${e.name}</span>
+      <span class="eff-wave">${e.waveform}</span>
+      <button class="btn icon danger" title="Delete" onclick="deleteEffect('${e.id}')">✕</button>
+    </div>`).join('');
+}
+
+function selectEffect(id) {
+  selectedEffectId = id;
+  renderEffectsList();
+  const e = effectsData.find(x => x.id === id);
+  if (e) renderEffectEditor(e);
+}
+
+function renderEffectEditor(e) {
+  document.getElementById('eff-panel-header').textContent = e.name;
+  const WAVES = ['sine','cosine','square','triangle','sawtooth','reverse_saw','random','random_smooth','pulse','step_sequence'];
+  document.getElementById('eff-editor-body').innerHTML = `
+    <div class="eff-card">
+      <h3>${e.name}</h3>
+      <div class="waveform-btn-row">
+        ${WAVES.map(w => `<button class="wave-btn${e.waveform===w?' active':''}" onclick="setEffWave('${e.id}','${w}')">${w}</button>`).join('')}
+      </div>
+      <div class="eff-param-grid">
+        <div class="eff-param">
+          <label>Speed (Hz)</label>
+          <input type="range" min="0.01" max="20" step="0.01" value="${e.speed}" oninput="updateEff('${e.id}','speed',this.value,this.nextSibling)">
+          <span class="eff-param-val">${e.speed.toFixed(2)}</span>
+        </div>
+        <div class="eff-param">
+          <label>Amplitude (0-255)</label>
+          <input type="range" min="0" max="255" value="${e.amplitude}" oninput="updateEff('${e.id}','amplitude',parseInt(this.value),this.nextSibling)">
+          <span class="eff-param-val">${e.amplitude}</span>
+        </div>
+        <div class="eff-param">
+          <label>Center (0-255)</label>
+          <input type="range" min="0" max="255" value="${e.center}" oninput="updateEff('${e.id}','center',parseInt(this.value),this.nextSibling)">
+          <span class="eff-param-val">${e.center}</span>
+        </div>
+        <div class="eff-param">
+          <label>Width (duty cycle)</label>
+          <input type="range" min="0" max="1" step="0.01" value="${e.width}" oninput="updateEff('${e.id}','width',parseFloat(this.value),this.nextSibling)">
+          <span class="eff-param-val">${e.width.toFixed(2)}</span>
+        </div>
+        <div class="eff-param">
+          <label>Phase Spread</label>
+          <input type="range" min="0" max="1" step="0.01" value="${e.phase_spread}" oninput="updateEff('${e.id}','phase_spread',parseFloat(this.value),this.nextSibling)">
+          <span class="eff-param-val">${e.phase_spread.toFixed(2)}</span>
+        </div>
+        <div class="eff-param">
+          <label>BPM Mult.</label>
+          <input type="range" min="0.1" max="8" step="0.1" value="${e.bpm_multiplier}" oninput="updateEff('${e.id}','bpm_multiplier',parseFloat(this.value),this.nextSibling)">
+          <span class="eff-param-val">${e.bpm_multiplier.toFixed(1)}</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="font-size:12px;color:var(--text-1)">BPM Sync</label>
+        <input type="checkbox" ${e.bpm_sync?'checked':''} onchange="updateEff('${e.id}','bpm_sync',this.checked,null)">
+        <label style="font-size:12px;color:var(--text-1);margin-left:8px">One-shot</label>
+        <input type="checkbox" ${e.one_shot?'checked':''} onchange="updateEff('${e.id}','one_shot',this.checked,null)">
+        <label style="font-size:12px;color:var(--text-1);margin-left:8px">Enabled</label>
+        <input type="checkbox" ${e.enabled?'checked':''} onchange="updateEff('${e.id}','enabled',this.checked,null)">
+      </div>
+      <div style="font-size:11px;color:var(--text-2);margin-top:10px">
+        Channels: ${(e.channels||[]).map(c=>`${c.fixture_id}/${c.channel}`).join(', ')||'—'}
+      </div>
+    </div>`;
+}
+
+function setEffWave(id, wave) {
+  updateEffPatch(id, {waveform: wave});
+  const e = effectsData.find(x => x.id === id);
+  if (e) { e.waveform = wave; renderEffectEditor(e); }
+}
+
+function updateEff(id, key, val, valEl) {
+  if (valEl) valEl.textContent = typeof val === 'number' ? (Number.isInteger(val) ? val : val.toFixed(2)) : val;
+  clearTimeout(updateEff._t);
+  updateEff._t = setTimeout(() => updateEffPatch(id, {[key]: val}), 100);
+}
+
+async function updateEffPatch(id, body) {
+  const res = await fetch(`${API}/effects/${id}`, {method:'PATCH', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}).then(r => r.json()).catch(() => null);
+  if (res) { const idx = effectsData.findIndex(e => e.id === id); if (idx >= 0) effectsData[idx] = res; }
+}
+
+async function createEffect() {
+  const name = document.getElementById('ne-name').value || 'Effect';
+  const wave = document.getElementById('ne-wave').value;
+  const fxStr = document.getElementById('ne-fixtures').value;
+  const chStr = document.getElementById('ne-channels').value;
+  const fixture_ids = fxStr ? fxStr.split(',').map(s => s.trim()) : [];
+  const channels = chStr ? chStr.split(',').map(s => s.trim()) : [];
+  await fetch(`${API}/effects`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, waveform:wave, fixture_ids, channels})});
+  closeModal('modal-new-effect');
+}
+
+async function deleteEffect(id) {
+  await fetch(`${API}/effects/${id}`, {method:'DELETE'});
+}
+
+// ── Groups ──
+function renderGroupsList() {
+  if (!groupsData.groups) return;
+  const body = document.getElementById('groups-list-body');
+  body.innerHTML = groupsData.groups.map(g => `
+    <div class="cue-list-item" style="border-left:3px solid ${g.color}">
+      <span class="cl-name">${g.name}</span>
+      <span class="cl-count">${(g.fixture_ids||[]).length} fx</span>
+      <button class="btn icon danger" onclick="deleteGroup('${g.id}')">✕</button>
+    </div>`).join('');
+}
+
+function renderSubmasters() {
+  if (!groupsData.groups) return;
+  const body = document.getElementById('submasters-body');
+  body.innerHTML = groupsData.groups.map(g => {
+    const sm = groupsData.submasters?.[g.id] || {level:1};
+    const pct = Math.round((sm.level||1) * 100);
+    return `
+    <div class="group-card">
+      <div class="group-card-header">
+        <div class="group-dot" style="background:${g.color}"></div>
+        <span class="group-card-name">${g.name}</span>
+        <span class="group-fixture-count">${(g.fixture_ids||[]).length} fixtures</span>
+      </div>
+      <div class="sm-slider-wrap">
+        <input type="range" class="sm-slider" min="0" max="100" value="${pct}"
+          oninput="setSubmaster('${g.id}',this.value/100,this.nextSibling)">
+        <span class="sm-val">${pct}%</span>
+        <button class="flash-btn" onmousedown="flashOn('${g.id}')" onmouseup="flashOff('${g.id}')" ontouchstart="flashOn('${g.id}')" ontouchend="flashOff('${g.id}')">FLASH</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function setSubmaster(groupId, level, valEl) {
+  if (valEl) valEl.textContent = Math.round(level*100) + '%';
+  wsSend('set_submaster', {group_id: groupId, level});
+  await fetch(`${API}/groups/${groupId}/submaster?level=${level}`, {method:'POST'});
+}
+
+function flashOn(gid) { fetch(`${API}/groups/${gid}/flash?active=true`, {method:'POST'}); }
+function flashOff(gid) { fetch(`${API}/groups/${gid}/flash?active=false`, {method:'POST'}); }
+
+async function createGroup() {
+  const name = document.getElementById('ng-name').value || 'Group';
+  const color = document.getElementById('ng-color').value;
+  await fetch(`${API}/groups`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, color})});
+  closeModal('modal-new-group');
+}
+
+async function deleteGroup(id) {
+  await fetch(`${API}/groups/${id}`, {method:'DELETE'});
+}
+
+// ── DMX Grid ──
+function initDmxTabs(universeList) {
+  const tabs = document.getElementById('dmx-tabs');
+  tabs.innerHTML = universeList.map(u => `<button class="btn sm${u.id===activeDmxUniverse?' primary':''}" onclick="switchDmxUniverse(${u.id})">${u.name||'U'+u.id}</button>`).join('');
+}
+
+function switchDmxUniverse(uid) {
+  activeDmxUniverse = uid;
+  document.querySelectorAll('#dmx-tabs .btn').forEach((b, i) => b.classList.toggle('primary', i === [...document.querySelectorAll('#dmx-tabs .btn')].indexOf(b) && true));
+  renderDmxGrid();
+}
+
+function renderDmxGrid() {
+  const grid = document.getElementById('dmx-grid');
+  const data = dmxData[activeDmxUniverse] || new Array(512).fill(0);
+  if (grid.children.length !== 512) {
+    grid.innerHTML = '';
+    for (let i = 0; i < 512; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'dmx-cell';
+      cell.innerHTML = `<div class="dmx-ch">${i+1}</div><div class="dmx-val">0</div>`;
+      grid.appendChild(cell);
+    }
+  }
+  const cells = grid.children;
+  for (let i = 0; i < 512; i++) {
+    const v = data[i] || 0;
+    const bright = Math.round(v / 255 * 100);
+    cells[i].style.background = v > 0 ? `rgba(124,111,205,${v/255*0.5+0.05})` : '';
+    cells[i].querySelector('.dmx-val').textContent = v;
+    cells[i].querySelector('.dmx-val').style.color = v > 0 ? `hsl(${220+v/255*40},70%,${50+bright/4}%)` : 'var(--text-2)';
+  }
+}
+
+// ── Morph ──
+function renderMorphSource() {
+  const body = document.getElementById('morph-source-body');
+  body.innerHTML = fixtures.map(f => {
+    const sel = morphSourceIds.has(f.id);
+    return `<div class="fixture-row${sel?' selected':''}" onclick="toggleMorphSource('${f.id}',this)">
+      <div class="fix-addr">U${f.universe}@${f.address}</div>
+      <div class="fix-name">${f.name}</div>
+      <div class="fix-model">${f.definition_id?.split('::')[1]||''}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleMorphSource(id, el) {
+  if (morphSourceIds.has(id)) morphSourceIds.delete(id); else morphSourceIds.add(id);
+  el.classList.toggle('selected');
+}
+
+function loadMorphTarget() {
+  const body = document.getElementById('morph-target-body');
+  body.innerHTML = '<div class="field"><label>Target Definition</label><select id="morph-target-sel" style="width:100%;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;color:var(--text-0);font-size:12px;outline:none">' +
+    libraryDefs.map(d => `<option value="${d.id}">${d.manufacturer} :: ${d.model}</option>`).join('') +
+    '</select></div><div class="field"><label>Mode</label><select id="morph-mode-sel" style="width:100%;background:var(--bg-3);border:1px solid var(--border);border-radius:var(--radius);padding:6px 8px;color:var(--text-0);font-size:12px;outline:none"></select></div>';
+  const sel = document.getElementById('morph-target-sel');
+  if (sel) { sel.onchange = updateMorphModes; updateMorphModes(); }
+}
+
+async function updateMorphModes() {
+  const defId = document.getElementById('morph-target-sel')?.value;
+  if (!defId) return;
+  const [mfr, mdl] = defId.split('::');
+  const def = await fetch(`${API}/library/${encodeURIComponent(mfr)}/${encodeURIComponent(mdl)}`).then(r => r.json()).catch(() => null);
+  const sel = document.getElementById('morph-mode-sel');
+  if (sel && def) sel.innerHTML = def.modes.map(m => `<option value="${m.name}">${m.name}</option>`).join('');
+}
+
+async function previewMorph() {
+  const targetDef = document.getElementById('morph-target-sel')?.value;
+  const targetMode = document.getElementById('morph-mode-sel')?.value || '';
+  if (!targetDef || morphSourceIds.size === 0) return;
+  const res = await fetch(`${API}/morph/preview`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({source_fixture_ids:[...morphSourceIds], target_definition_id:targetDef, target_mode:targetMode})}).then(r => r.json()).catch(() => null);
+  if (!res) return;
+  morphPreviewData = res;
+  document.getElementById('apply-morph-btn').disabled = false;
+  const body = document.getElementById('morph-preview-body');
+  const cov = Math.round((res.coverage||0) * 100);
+  body.innerHTML = `
+    <div style="padding:8px 10px">
+      <div style="font-size:12px;color:var(--text-1);margin-bottom:4px">Coverage</div>
+      <div class="coverage-bar"><div class="coverage-fill" style="width:${cov}%"></div></div>
+      <div style="font-size:11px;color:var(--text-2)">${cov}%</div>
+    </div>
+    ${res.warnings?.length ? `<div class="warning-box">${res.warnings.join('<br>')}</div>` : ''}
+    <div style="padding:4px 8px;font-size:11px;color:var(--text-2);text-transform:uppercase;letter-spacing:.5px">Channel Mappings</div>
+    ${res.channel_mappings.map(m => {
+      const c = m.confidence >= .9 ? 'high' : m.confidence >= .6 ? 'med' : 'low';
+      return `<div class="mapping-row"><span class="map-src">${m.source}</span><span class="map-arrow">→</span><span class="map-tgt">${m.target}</span><span class="map-conf conf-${c}">${Math.round(m.confidence*100)}%</span></div>`;
+    }).join('')}
+    ${res.unmapped_source?.length ? `<div class="unmapped-tag" style="padding:4px 10px">Unmapped source: ${res.unmapped_source.join(', ')}</div>` : ''}`;
+}
+
+async function applyMorph() {
+  if (!morphPreviewData) return;
+  await fetch(`${API}/morph/apply`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({source_fixture_ids:[...morphSourceIds], target_definition_id:document.getElementById('morph-target-sel').value, target_mode:document.getElementById('morph-mode-sel').value||''})});
+  morphSourceIds.clear(); morphPreviewData = null;
+  document.getElementById('apply-morph-btn').disabled = true;
+  document.getElementById('morph-preview-body').innerHTML = '<div style="padding:16px;font-size:12px;color:var(--green)">Morph applied.</div>';
+}
+
+// ── OSC ──
+async function loadOscStatus() {
+  const data = await fetch(`${API}/osc/status`).then(r => r.json()).catch(() => ({}));
+  const body = document.getElementById('osc-status-body');
+  body.innerHTML = `
+    <div class="info-row"><span class="info-label">Running</span><span class="info-val" style="color:${data.running?'var(--green)':'var(--red)'}">${data.running?'Yes':'No'}</span></div>
+    <div class="info-row"><span class="info-label">Host:Port</span><span class="info-val">${data.host||'—'}:${data.port||'—'}</span></div>`;
+  const list = document.getElementById('osc-fb-list');
+  list.innerHTML = (data.feedback_targets||[]).map(t => `
+    <div class="feedback-item">
+      <span class="fbi-addr">${t[0]}:${t[1]}</span>
+      <button class="btn sm danger" onclick="removeOscFeedback('${t[0]}',${t[1]})">Remove</button>
+    </div>`).join('');
+}
+async function addOscFeedback() {
+  const host = document.getElementById('osc-fb-host').value;
+  const port = parseInt(document.getElementById('osc-fb-port').value);
+  await fetch(`${API}/osc/feedback/add`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({host,port})});
+  loadOscStatus();
+}
+async function removeOscFeedback(host, port) {
+  await fetch(`${API}/osc/feedback/remove`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({host,port})});
+  loadOscStatus();
+}
+
+// ── MIDI ──
+async function loadMidiPorts() {
+  const data = await fetch(`${API}/midi/ports`).then(r => r.json()).catch(() => ({in:[],out:[]}));
+  const inSel = document.getElementById('midi-in-sel');
+  const outSel = document.getElementById('midi-out-sel');
+  inSel.innerHTML = (data.in||[]).map(p => `<option>${p}</option>`).join('') || '<option>No input ports</option>';
+  outSel.innerHTML = (data.out||[]).map(p => `<option>${p}</option>`).join('') || '<option>No output ports</option>';
+  loadMidiBindings();
+}
+async function openMidiInput() {
+  const port = document.getElementById('midi-in-sel').value;
+  const res = await fetch(`${API}/midi/open_input?port_name=${encodeURIComponent(port)}`, {method:'POST'}).then(r => r.json());
+  document.getElementById('midi-status').textContent = res.ok ? `Opened input: ${port}` : 'Failed to open input.';
+}
+async function openMidiOutput() {
+  const port = document.getElementById('midi-out-sel').value;
+  const res = await fetch(`${API}/midi/open_output?port_name=${encodeURIComponent(port)}`, {method:'POST'}).then(r => r.json());
+  document.getElementById('midi-status').textContent = res.ok ? `Opened output: ${port}` : 'Failed to open output.';
+}
+async function loadMidiBindings() {
+  const data = await fetch(`${API}/midi/bindings`).then(r => r.json()).catch(() => []);
+  const body = document.getElementById('midi-bindings-body');
+  body.innerHTML = data.length ? data.map((b,i) => `
+    <div class="binding-row">
+      <span class="binding-type">${b.midi_type}</span>
+      <span class="binding-ch">ch${b.midi_channel}</span>
+      <span style="font-family:var(--mono);font-size:11px;color:var(--text-2);min-width:30px">#${b.number}</span>
+      <span class="binding-action">${b.action} → ${b.target}</span>
+      <button class="btn sm danger" onclick="removeMidiBinding(${i})">✕</button>
+    </div>`).join('') : '<div style="font-size:12px;color:var(--text-2);padding:4px 0">No bindings.</div>';
+}
+async function addMidiBinding() {
+  const body = {
+    midi_type: document.getElementById('mb-type').value,
+    midi_channel: parseInt(document.getElementById('mb-ch').value),
+    number: parseInt(document.getElementById('mb-num').value),
+    action: document.getElementById('mb-action').value,
+    target: document.getElementById('mb-target').value,
+    scale: parseFloat(document.getElementById('mb-scale').value),
+  };
+  await fetch(`${API}/midi/bindings`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  closeModal('modal-new-binding'); loadMidiBindings();
+}
+async function removeMidiBinding(idx) {
+  await fetch(`${API}/midi/bindings/${idx}`, {method:'DELETE'}); loadMidiBindings();
+}
+
+// ── Protocols ──
+async function loadProtocolsPage() {
+  pollArtNet(); refreshSerialPorts();
+  const sacnData = await fetch(`${API}/protocols/sacn/sources`).then(r => r.json()).catch(() => []);
+  const srcBody = document.getElementById('sacn-sources-body');
+  srcBody.innerHTML = sacnData.length ? sacnData.map(s => `<div class="node-row"><span class="node-ip">${s.cid?.slice(0,8)||'?'}</span><span class="node-name">${s.name}</span><span class="node-ports">U${s.universe} P${s.priority}</span></div>`).join('') : '<div style="color:var(--text-2);font-size:12px;padding:4px 0">No sources.</div>';
+  renderUniverseOutputs();
+}
+async function pollArtNet() {
+  await fetch(`${API}/protocols/artnet/poll`, {method:'POST'}).catch(() => {});
+  setTimeout(async () => {
+    const nodes = await fetch(`${API}/protocols/artnet/nodes`).then(r => r.json()).catch(() => []);
+    const body = document.getElementById('artnet-nodes-body');
+    body.innerHTML = nodes.length ? nodes.map(n => `<div class="node-row"><span class="node-ip">${n.ip}</span><span class="node-name">${n.short_name||n.long_name||'—'}</span><span class="node-ports">${n.num_ports||0} ports</span></div>`).join('') : '<div style="color:var(--text-2);font-size:12px;padding:4px 0">No nodes discovered.</div>';
+  }, 1200);
+}
+async function refreshSerialPorts() {
+  const ports = await fetch(`${API}/protocols/serial/ports`).then(r => r.json()).catch(() => []);
+  const body = document.getElementById('serial-ports-body');
+  body.innerHTML = ports.length ? ports.map(p => `<div class="node-row"><span class="node-ip">${p.port}</span><span class="node-name">${p.description||'—'}</span><span class="node-ports" style="color:${p.likely_dmx?'var(--green)':'var(--text-2)'}">${p.likely_dmx?'DMX device':''}</span><button class="btn sm" onclick="openSerial('${p.port}')">Open</button></div>`).join('') : '<div style="color:var(--text-2);font-size:12px;padding:4px 0">No ports found.</div>';
+}
+async function openSerial(port) {
+  const res = await fetch(`${API}/protocols/serial/open?port=${encodeURIComponent(port)}`, {method:'POST'}).then(r => r.json());
+  alert(res.ok ? `Opened ${port}` : `Failed to open ${port}`);
+}
+function renderUniverseOutputs() {
+  fetch(`${API}/universes`).then(r => r.json()).then(data => {
+    const body = document.getElementById('universe-outputs-body');
+    body.innerHTML = data.map(u => `
+      <div style="margin-bottom:8px">
+        <div style="font-size:12px;font-weight:600;margin-bottom:4px">Universe ${u.id}: ${u.name}</div>
+        ${(u.outputs||[]).map((o,i) => `
+          <div class="node-row">
+            <span class="node-ip">${o.type?.toUpperCase()}</span>
+            <span class="node-name">${o.artnet_ip||o.sacn_universe||o.kinet_ip||o.serial_port||''}</span>
+            <button class="btn sm danger" onclick="removeOutput(${u.id},${i})">✕</button>
+          </div>`).join('')}
+        ${!u.outputs?.length ? '<div style="font-size:11px;color:var(--text-2);padding:2px 0">No outputs configured</div>' : ''}
+      </div>`).join('');
+  });
+}
+async function removeOutput(uid, idx) {
+  await fetch(`${API}/universes/${uid}/outputs/${idx}`, {method:'DELETE'});
+  renderUniverseOutputs();
+}
+function updateOutputForm() {
+  const t = document.getElementById('ao-type').value;
+  ['artnet','sacn','kinet','serial'].forEach(x => {
+    document.getElementById(`ao-${x}-fields`).style.display = t===x ? '' : 'none';
+  });
+}
+async function addUniverseOutput() {
+  const uid = parseInt(document.getElementById('ao-uni').value);
+  const type = document.getElementById('ao-type').value;
+  const body = {type};
+  if (type === 'artnet') {
+    body.artnet_ip = document.getElementById('ao-artnet-ip').value;
+    body.artnet_universe = parseInt(document.getElementById('ao-artnet-univ').value);
+  } else if (type === 'sacn') {
+    body.sacn_universe = parseInt(document.getElementById('ao-sacn-univ').value);
+    body.sacn_dest_ip = document.getElementById('ao-sacn-ip').value || null;
+    body.sacn_priority = parseInt(document.getElementById('ao-sacn-prio').value);
+  } else if (type === 'kinet') {
+    body.kinet_ip = document.getElementById('ao-kinet-ip').value;
+    body.kinet_port = parseInt(document.getElementById('ao-kinet-port').value);
+    body.kinet_version = parseInt(document.getElementById('ao-kinet-ver').value);
+  } else if (type === 'serial') {
+    body.serial_port = document.getElementById('ao-serial-port').value;
+    body.serial_mode = document.getElementById('ao-serial-mode').value;
+  }
+  await fetch(`${API}/universes/${uid}/outputs`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+  closeModal('modal-add-output'); renderUniverseOutputs();
+}
+
+// ── Show ──
+async function saveShow() {
+  const path = document.getElementById('show-path').value;
+  const res = await fetch(`${API}/show/save`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path})}).then(r => r.json()).catch(() => ({ok:false}));
+  document.getElementById('show-msg').textContent = res.ok ? `Saved to ${path}` : 'Save failed!';
+  document.getElementById('show-msg').style.color = res.ok ? 'var(--green)' : 'var(--red)';
+}
+async function loadShow() {
+  const path = document.getElementById('show-path').value;
+  const res = await fetch(`${API}/show/load`, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({path})}).then(r => r.json()).catch(() => ({ok:false}));
+  document.getElementById('show-msg').textContent = res.ok ? `Loaded ${path}` : 'Load failed!';
+  document.getElementById('show-msg').style.color = res.ok ? 'var(--green)' : 'var(--red)';
+}
+async function loadShowStats() {
+  const data = await fetch(`${API}/show`).then(r => r.json()).catch(() => ({}));
+  const body = document.getElementById('show-stats-body');
+  body.innerHTML = `
+    <div class="info-row"><span class="info-label">Version</span><span class="info-val">${data.version||'—'}</span></div>
+    <div class="info-row"><span class="info-label">Saved at</span><span class="info-val">${data.saved_at||'—'}</span></div>
+    <div class="info-row"><span class="info-label">Universes</span><span class="info-val">${(data.universes||[]).length}</span></div>
+    <div class="info-row"><span class="info-label">Fixtures</span><span class="info-val">${(data.patch||[]).length}</span></div>
+    <div class="info-row"><span class="info-label">Cue Lists</span><span class="info-val">${(data.cue_lists||[]).length}</span></div>
+    <div class="info-row"><span class="info-label">Effects</span><span class="info-val">${(data.effects||[]).length}</span></div>`;
+}
+
+// ── Init ──
+connectWS();
+</script>
 </body>
 </html>
