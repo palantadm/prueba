@@ -1,6 +1,7 @@
 // Editor state for the virtual console: local draft of Show.vconsole with undo/redo and debounced save.
 import { signal, computed, effect } from "@preact/signals";
 import { send, show } from "../store";
+import { t } from "../i18n";
 import type { VcPage, VcWidget } from "../types";
 import { clone, findFree, newPage, newWidget, nextPageId, nextWidgetId } from "./model";
 import type { VcKind } from "../types";
@@ -68,7 +69,7 @@ export function redo() {
 
 export function ensureFirstPage() {
   if (draft.value.length === 0) {
-    edit((ps) => { ps.push(newPage(1, "Page 1")); });
+    edit((ps) => { ps.push(newPage(1, t("Page {n}", { n: 1 }))); });
     pageId.value = 1;
   }
 }

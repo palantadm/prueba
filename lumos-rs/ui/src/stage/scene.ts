@@ -1,4 +1,5 @@
 // three.js scene manager for the 3D previsualiser / stage editor.
+import { t } from "../i18n";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
@@ -107,7 +108,7 @@ export class StageScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.info.autoReset = false;
-    this.renderer.debug.onShaderError = (_gl, _p, _vs, _fs) => { this.raise(2, "shader compile error"); };
+    this.renderer.debug.onShaderError = (_gl, _p, _vs, _fs) => { this.raise(2, t("shader compile error")); };
     try {
       const gl = this.renderer.getContext();
       const ext = gl.getExtension("WEBGL_debug_renderer_info");
@@ -501,7 +502,7 @@ export class StageScene {
   private raise(level: number, why: string) {
     if (level <= this.degrade) return;
     this.degrade = level;
-    this.warn = level >= 2 ? `safe mode: ${why} — post-processing & volumetric beams off` : `reduced quality: ${why}`;
+    this.warn = level >= 2 ? t("safe mode: {why} — post-processing & volumetric beams off", { why }) : t("reduced quality: {why}", { why });
     console.warn("[stage]", this.warn);
     this.qActive = null;
   }
@@ -598,7 +599,7 @@ export class StageScene {
       if (this.software) this.renderer.getContext().finish();
     } catch (e) {
       console.error("[stage] render failed", e);
-      this.raise(this.degrade + 1, "render error");
+      this.raise(this.degrade + 1, t("render error"));
       try { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); } catch { /* nothing left to try */ }
     }
 

@@ -3,6 +3,7 @@
 // Bringing NDI / Resolume / OBS / Watchout output in: browsers cannot receive NDI directly, so open the
 // NDI Monitor (or the Resolume/OBS output window) and use "Screen capture" — the captured window
 // becomes a live texture. MJPEG/HTTP-video URLs and HLS (Safari) also work.
+import { t } from "../i18n";
 import * as THREE from "three";
 import { signal } from "@preact/signals";
 import type { MediaSource } from "../types";
@@ -18,11 +19,11 @@ export function hasStream(kind: "webcam" | "screen") {
 export async function startCapture(kind: "webcam" | "screen"): Promise<void> {
   stopCapture(kind);
   const md = navigator.mediaDevices;
-  if (!md) throw new Error("Media capture needs a secure context (https or localhost)");
+  if (!md) throw new Error(t("Media capture needs a secure context (https or localhost)"));
   const s = kind === "webcam"
     ? await md.getUserMedia({ video: { width: 1280, height: 720 }, audio: false })
     : await md.getDisplayMedia({ video: true, audio: false });
-  s.getVideoTracks().forEach((t) => t.addEventListener("ended", () => { stopCapture(kind); }));
+  s.getVideoTracks().forEach((tr) => tr.addEventListener("ended", () => { stopCapture(kind); }));
   streams.set(kind, s);
   streamVersion.value++;
 }
@@ -36,7 +37,7 @@ export async function uploadMedia(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
   const r = await fetch("/api/media", { method: "POST", body: fd });
-  if (!r.ok) throw new Error(`Upload failed (${r.status})`);
+  if (!r.ok) throw new Error(t("Upload failed ({status})", { status: r.status }));
   const j = (await r.json()) as { url: string };
   return j.url;
 }
@@ -60,10 +61,10 @@ function testPattern(): THREE.CanvasTexture {
   bars.forEach((col, i) => { g.fillStyle = col; g.fillRect(i * w, 0, w + 1, c.height * 0.72); });
   g.fillStyle = "#101010"; g.fillRect(0, c.height * 0.72, c.width, c.height * 0.28);
   g.fillStyle = "#e0e0e0"; g.font = "bold 28px sans-serif"; g.textAlign = "center";
-  g.fillText("NO SIGNAL", c.width / 2, c.height * 0.9);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  g.fillText(t("NO SIGNAL"), c.width / 2, c.height * 0.9);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 const VIDEO_RE = /\.(mp4|webm|ogv|mov|m3u8)(\?|#|$)/i;

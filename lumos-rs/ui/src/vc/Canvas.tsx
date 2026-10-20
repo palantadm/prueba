@@ -3,7 +3,8 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { VcWidget } from "../types";
 import { draft, edit, editMode, page, patchWidget, sel } from "./editor";
 import { WidgetBody } from "./Widgets";
-import { kindInfo } from "./model";
+import { kindLabel } from "./model";
+import { t } from "../i18n";
 
 type Geo = { x: number; y: number; w: number; h: number };
 type Gesture =
@@ -116,17 +117,17 @@ export function Canvas() {
           return (
             <div key={w.id} class={`vc-w k-${w.kind} ${selected ? "sel" : ""} ${g && ((g.kind === "move" && g.ids.includes(w.id)) || (g.kind === "resize" && g.id === w.id)) ? "dragging" : ""}`}
               style={{ left: gm.x * cell, top: gm.y * cell, width: gm.w * cell, height: gm.h * cell, "--wc": w.color } as never}
-              title={editing ? `${kindInfo(w.kind).label}: ${w.label}` : undefined}
+              title={editing ? `${kindLabel(w.kind)}: ${w.label}` : undefined}
               onPointerDown={(e) => startMove(e, w)}>
               <div class="vc-w-in"><WidgetBody w={w} interactive={!editing} px={{ w: gm.w * cell, h: gm.h * cell }} /></div>
               {editing && w.kind !== "frame" && <div class="vc-shield" />}
               {editing && w.kind === "frame" && <div class="vc-frame-grab" />}
-              {single === w.id && <div class="vc-handle" onPointerDown={(e) => startResize(e, w)} aria-label="Resize" />}
+              {single === w.id && <div class="vc-handle" onPointerDown={(e) => startResize(e, w)} aria-label={t("Resize")} />}
             </div>
           );
         })}
         {bandRect && <div class="vc-band" style={{ left: bandRect.x, top: bandRect.y, width: bandRect.w, height: bandRect.h }} />}
-        {editing && pg.widgets.length === 0 && <div class="vc-empty">Add widgets from the palette on the left, or use “Auto-build from executors”.</div>}
+        {editing && pg.widgets.length === 0 && <div class="vc-empty">{t("Add widgets from the palette on the left, or use “Auto-build from executors”.")}</div>}
       </div>
     </div>
   );

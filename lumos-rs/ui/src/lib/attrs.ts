@@ -1,6 +1,7 @@
 // Attribute metadata + profile/fixture helpers shared by Live / Desk / Cues.
 import type { ChannelDef, Fixture, FixtureProfile, Mode } from "../types";
 import { dmx, library, show } from "../store";
+import { t } from "../i18n";
 
 export type AttrGroup = "intensity" | "position" | "color" | "beam" | "control";
 
@@ -40,7 +41,7 @@ export const GROUP_COLOR: Record<AttrGroup, string> = {
   control: "var(--attr-control)",
 };
 export const attrColor = (a: string) => GROUP_COLOR[ATTR_META[a]?.group ?? "control"];
-export const attrLabel = (a: string) => ATTR_META[a]?.label ?? a;
+export const attrLabel = (a: string) => (ATTR_META[a] ? t(ATTR_META[a].label) : a);
 export const attrHome = (a: string) => (a === "pan" || a === "tilt" ? 0.5 : 0);
 
 // ── lookups (cached by identity of the source arrays) ─────────────

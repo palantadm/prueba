@@ -1,6 +1,7 @@
 // Feedback presets for common controllers and the "auto-build from executors" generator.
 import type { FeedbackTarget, Show, VcPage, VcWidget } from "../types";
 import { newPage, newWidget } from "./model";
+import { t } from "../i18n";
 
 export type FbPreset = {
   id: string; label: string; hint: string;
@@ -38,20 +39,20 @@ export const FB_PRESETS: FbPreset[] = [
 
 /** Page mirroring executor page 1: faders (level), GO / FLASH buttons, cue list widgets. */
 export function autoBuildFromExecutors(show: Show, startId: number, pageId: number): { page: VcPage; nextId: number } {
-  const pg = newPage(pageId, "Executors", 16, 10);
+  const pg = newPage(pageId, t("Executors"), 16, 10);
   let id = startId;
   const execs = show.executors.filter((e) => e.page === 0 && e.kind.type !== "empty").sort((a, b) => a.slot - b.slot);
   const add = (w: VcWidget) => pg.widgets.push(w);
   let col = 0;
   for (const e of execs) {
-    const label = e.label || `Exec ${e.slot + 1}`;
+    const label = e.label || t("Exec {n}", { n: e.slot + 1 });
     if (e.kind.type === "cuelist") {
       const f = newWidget("slider", id++, col, 0); f.label = label; f.h = 6; f.w = 2; f.action = { type: "exec", exec: e.id, op: "level" }; f.color = "#f5a524"; add(f);
-      const go = newWidget("button", id++, col, 6); go.label = "GO"; go.w = 2; go.h = 2; go.action = { type: "exec", exec: e.id, op: "go" }; go.color = "#35c46a"; add(go);
-      const fl = newWidget("button", id++, col, 8); fl.label = "FLASH"; fl.w = 2; fl.h = 2; fl.mode = "momentary"; fl.action = { type: "exec", exec: e.id, op: "flash" }; fl.color = "#3cc4e8"; add(fl);
+      const go = newWidget("button", id++, col, 6); go.label = t("GO"); go.w = 2; go.h = 2; go.action = { type: "exec", exec: e.id, op: "go" }; go.color = "#35c46a"; add(go);
+      const fl = newWidget("button", id++, col, 8); fl.label = t("FLASH"); fl.w = 2; fl.h = 2; fl.mode = "momentary"; fl.action = { type: "exec", exec: e.id, op: "flash" }; fl.color = "#3cc4e8"; add(fl);
     } else if (e.kind.type === "group") {
       const f = newWidget("slider", id++, col, 0); f.label = label; f.h = 6; f.w = 2; f.action = { type: "exec", exec: e.id, op: "level" }; f.color = "#f2d98d"; add(f);
-      const fl = newWidget("button", id++, col, 6); fl.label = "FLASH"; fl.w = 2; fl.h = 2; fl.mode = "momentary"; fl.action = { type: "exec", exec: e.id, op: "flash" }; add(fl);
+      const fl = newWidget("button", id++, col, 6); fl.label = t("FLASH"); fl.w = 2; fl.h = 2; fl.mode = "momentary"; fl.action = { type: "exec", exec: e.id, op: "flash" }; add(fl);
     } else if (e.kind.type === "effect") {
       const b = newWidget("button", id++, col, 6); b.label = label; b.w = 2; b.h = 2; b.mode = "toggle"; b.action = { type: "exec", exec: e.id, op: "toggle" }; b.color = "#b38cff"; add(b);
     } else if (e.kind.type === "master") {
@@ -61,8 +62,8 @@ export function autoBuildFromExecutors(show: Show, startId: number, pageId: numb
     if (col + 2 > pg.cols) break;
   }
   if (!pg.widgets.length) {
-    const gm = newWidget("slider", id++, 0, 0); gm.label = "Grand master"; gm.h = 6; gm.action = { type: "grand_master" }; add(gm);
-    const bo = newWidget("button", id++, 1, 0); bo.label = "BLACKOUT"; bo.mode = "toggle"; bo.action = { type: "blackout" }; bo.color = "#e5484d"; add(bo);
+    const gm = newWidget("slider", id++, 0, 0); gm.label = t("Grand master"); gm.h = 6; gm.action = { type: "grand_master" }; add(gm);
+    const bo = newWidget("button", id++, 1, 0); bo.label = t("BLACKOUT"); bo.mode = "toggle"; bo.action = { type: "blackout" }; bo.color = "#e5484d"; add(bo);
   }
   // one cue list widget per cuelist, to the right
   let cy = 0;

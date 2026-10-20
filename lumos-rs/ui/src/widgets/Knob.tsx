@@ -1,4 +1,5 @@
 import { useRef, useState } from "preact/hooks";
+import { t } from "../i18n";
 
 export type KnobProps = {
   value: number;
@@ -68,7 +69,7 @@ export function Knob(p: KnobProps) {
       <div class="lv-knob-val mono">{p.format ? p.format(v) : `${Math.round(v * 100)}`}</div>
       <div class="lv-knob-label">
         <span>{p.label}</span>
-        {p.held && p.onRelease && <button class="lv-x" title="Release" aria-label={`Release ${p.label}`} onClick={p.onRelease}>✕</button>}
+        {p.held && p.onRelease && <button class="lv-x" title={t("Release")} aria-label={t("Release {label}", { label: p.label })} onClick={p.onRelease}>✕</button>}
       </div>
     </div>
   );

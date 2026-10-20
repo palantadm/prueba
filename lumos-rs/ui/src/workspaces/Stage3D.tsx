@@ -2,6 +2,7 @@ import { effect } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import "../styles/stage.css";
 import { fire, library, selection, send, show, toast } from "../store";
+import { t, tp } from "../i18n";
 import { releaseDmx, requestDmx } from "../lib/dmxsub";
 import { StageScene } from "../stage/scene";
 import { LeftPanel, RightPanel, Toolbar, deleteObject, duplicateObject, leftOpen, rightOpen } from "../stage/panels";
@@ -28,12 +29,12 @@ export function Stage3D() {
           selection.value = [];
         }
       },
-      onTransform(t, pos, rot, scale, final) {
+      onTransform(tr, pos, rot, scale, final) {
         const delay = final ? 0 : 300;
-        if (t.type === "fixture") {
-          editFixture(t.id, (f) => { f.pos = pos; f.rot = rot; }, delay);
+        if (tr.type === "fixture") {
+          editFixture(tr.id, (f) => { f.pos = pos; f.rot = rot; }, delay);
         } else {
-          editObject(t.id, (o) => {
+          editObject(tr.id, (o) => {
             o.pos = pos; o.rot = rot;
             if (final && gizmoMode.value === "scale" && scale.some((s) => Math.abs(s - 1) > 1e-4)) {
               o.size = [o.size[0] * scale[0], o.size[1] * scale[1], o.size[2] * scale[2]].map((v) => Math.round(Math.max(0.02, v) * 1000) / 1000) as [number, number, number];
@@ -42,9 +43,9 @@ export function Stage3D() {
         }
       },
       onAim(results) {
-        if (!results.length) { toast("Select at least one moving head to aim", "info"); return; }
+        if (!results.length) { toast(t("Select at least one moving head to aim"), "info"); return; }
         for (const r of results) fire({ type: "prog_set", fixtures: [r.id], attrs: { pan: r.pan, tilt: r.tilt } });
-        toast(`Aimed ${results.length} fixture${results.length > 1 ? "s" : ""}`, "ok", 1500);
+        toast(tp(results.length, "Aimed {n} fixture", "Aimed {n} fixtures"), "ok", 1500);
       },
     });
     (window as unknown as { __stage?: StageScene }).__stage = scene;
@@ -97,8 +98,8 @@ export function Stage3D() {
       <div class="st-view">
         <div class="st-canvas" ref={host} />
         <Toolbar onFullscreen={fullscreen} />
-        {aimTool.value && <div class="st-banner">AIM — click the stage to point the selected moving heads · Esc to cancel</div>}
-        {!show.value && <div class="st-banner">Waiting for the engine…</div>}
+        {aimTool.value && <div class="st-banner">{t("AIM — click the stage to point the selected moving heads · Esc to cancel")}</div>}
+        {!show.value && <div class="st-banner">{t("Waiting for the engine…")}</div>}
       </div>
       {edit && rightOpen.value && <RightPanel />}
     </div>

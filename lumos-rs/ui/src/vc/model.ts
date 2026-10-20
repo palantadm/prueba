@@ -1,6 +1,13 @@
 // Virtual console helpers: defaults, descriptions, validation. Pure functions, no UI.
 import type { FeedbackTarget, MidiKind, Show, Source, VcAction, VcInput, VcKind, VcMode, VcOp, VcPage, VcWidget } from "../types";
 import { ATTR_META } from "../lib/attrs";
+import { t } from "../i18n";
+import { es } from "../i18n/es";
+
+/** Localised attribute name (falls back to the raw id). */
+export const attrLabel = (k: string): string => t(ATTR_META[k]?.label ?? k);
+/** Localised widget-kind name. */
+export const kindLabel = (k: VcKind): string => t(KINDS.find((x) => x.kind === k)?.label ?? k);
 
 export const KINDS: { kind: VcKind; label: string; icon: string; w: number; h: number }[] = [
   { kind: "button", label: "Button", icon: "▣", w: 2, h: 2 },
@@ -28,7 +35,7 @@ export function newWidget(kind: VcKind, id: number, x = 0, y = 0): VcWidget {
   const k = kindInfo(kind);
   const cont = isContinuous(kind);
   return {
-    id, kind, label: kind === "label" ? "Label" : kind === "frame" ? "Group" : kind === "button" ? "Button" : cont ? (kind === "speed_dial" ? "Speed" : "Level") : k.label,
+    id, kind, label: kind === "label" ? t("Label") : kind === "frame" ? t("Group") : kind === "button" ? t("Button") : cont ? (kind === "speed_dial" ? t("Speed") : t("Level")) : t(k.label),
     x, y, w: k.w, h: k.h, color: kind === "frame" || kind === "label" ? "#8a93a0" : "#3cc4e8",
     action: kind === "xy_pad" ? { type: "xy", group: 0, x_attr: "pan", y_attr: "tilt" } : { type: "none" },
     mode: kind === "button" ? "trigger" : "momentary",
@@ -58,32 +65,36 @@ export function findFree(page: VcPage, w: number, h: number): { x: number; y: nu
 const MIDI_KIND: Record<MidiKind, string> = { note: "Note", cc: "CC", program: "Program" };
 export function describeSource(s: Source): string {
   if (s.type === "osc") return `OSC ${s.address}`;
-  return `MIDI ${MIDI_KIND[s.kind]} #${s.number} · ch ${s.channel ?? "any"}${s.port ? ` · ${s.port}` : ""}`;
+  return t("MIDI {kind} #{n} · ch {ch}", { kind: t(MIDI_KIND[s.kind]), n: s.number, ch: s.channel ?? t("any") }) + (s.port ? ` · ${s.port}` : "");
 }
 export function describeFeedback(f: FeedbackTarget): string {
   if (f.type === "osc") return `OSC ${f.host}:${f.port} ${f.address}`;
-  return `MIDI ${MIDI_KIND[f.kind]} #${f.number} · ch ${f.channel}${f.scale ? " · scaled" : ` · on ${f.on} / off ${f.off}`}${f.port ? ` · ${f.port}` : ""}`;
+  return t("MIDI {kind} #{n} · ch {ch}", { kind: t(MIDI_KIND[f.kind]), n: f.number, ch: f.channel })
+    + (f.scale ? ` · ${t("scaled")}` : ` · ${t("on {on} / off {off}", { on: f.on, off: f.off })}`) + (f.port ? ` · ${f.port}` : "");
 }
 
+const opLabel = (o: VcOp): string => t(OPS.find((x) => x.value === o)?.label ?? o);
 export function describeAction(a: VcAction, show: Show | null): string {
   const nm = (list: { id: number; name: string }[] | undefined, id: number) => list?.find((x) => x.id === id)?.name ?? `#${id}`;
   switch (a.type) {
     case "none": return "—";
     case "exec": {
       const e = show?.executors.find((x) => x.id === a.exec);
-      return `Executor ${e ? e.label || `${e.page + 1}.${e.slot + 1}` : `#${a.exec}`} · ${a.op}`;
+      return t("Executor {name} · {op}", { name: e ? e.label || `${e.page + 1}.${e.slot + 1}` : `#${a.exec}`, op: opLabel(a.op) });
     }
-    case "cuelist": return `Cuelist ${nm(show?.cuelists, a.cuelist)} · ${a.op}`;
-    case "grand_master": return "Grand master";
-    case "blackout": return "Blackout";
+    case "cuelist": return t("Cuelist {name} · {op}", { name: nm(show?.cuelists, a.cuelist), op: opLabel(a.op) });
+    case "grand_master": return t("Grand master");
+    case "blackout": return t("Blackout");
     case "dmx": return `DMX ${a.universe}/${a.channel}`;
-    case "fixture_attr": return `${ATTR_META[a.attr]?.label ?? a.attr} of ${a.fixtures.length} fixture(s)`;
-    case "group_attr": return `${ATTR_META[a.attr]?.label ?? a.attr} of ${nm(show?.groups, a.group)}`;
-    case "effect_toggle": return `Effect ${nm(show?.effects, a.effect)}`;
-    case "effect_rate": return `Rate of ${nm(show?.effects, a.effect)}`;
-    case "palette_apply": return `Palette ${nm(show?.palettes, a.palette)}`;
-    case "prog_clear": return "Clear programmer";
-    case "page": return `Page ${show?.vconsole.find((p) => p.id === a.page)?.name ?? `#${a.page}`}`;
+    case "fixture_attr": return a.fixtures.length === 1
+      ? t("{attr} of {n} fixture", { attr: attrLabel(a.attr), n: 1 })
+      : t("{attr} of {n} fixtures", { attr: attrLabel(a.attr), n: a.fixtures.length });
+    case "group_attr": return t("{attr} of {name}", { attr: attrLabel(a.attr), name: nm(show?.groups, a.group) });
+    case "effect_toggle": return t("Effect {name}", { name: nm(show?.effects, a.effect) });
+    case "effect_rate": return t("Rate of {name}", { name: nm(show?.effects, a.effect) });
+    case "palette_apply": return t("Palette {name}", { name: nm(show?.palettes, a.palette) });
+    case "prog_clear": return t("Clear programmer");
+    case "page": return t("Page {name}", { name: show?.vconsole.find((p) => p.id === a.page)?.name ?? `#${a.page}` });
     case "xy": return `${nm(show?.groups, a.group)} ${a.x_attr}/${a.y_attr}`;
   }
 }
@@ -138,21 +149,22 @@ export function defaultInput(source: Source): VcInput { return { source, invert:
 
 export function clone<T>(x: T): T { return structuredClone(x); }
 
-const DEFAULT_LABELS = new Set(["", "Button", "Level", "Speed", "Slider", "Knob", "XY pad", "Cue list", "Speed dial", "Clock"]);
+const DEFAULT_LABEL_KEYS = ["Button", "Level", "Speed", "Slider", "Knob", "XY pad", "Cue list", "Speed dial", "Clock"];
+const DEFAULT_LABELS = new Set(["", ...DEFAULT_LABEL_KEYS, ...DEFAULT_LABEL_KEYS.map((k) => es[k]).filter(Boolean)]);
 /** Short human label for an action, used to name widgets that still carry a default label. */
 export function autoLabel(a: VcAction, show: Show | null): string | null {
   const nm = (list: { id: number; name: string }[] | undefined, id: number) => list?.find((x) => x.id === id)?.name;
-  const op = (o: VcOp) => ({ go: "GO", back: "BACK", flash: "FLASH", toggle: "", release: "RELEASE", level: "" }[o]);
+  const op = (o: VcOp) => ({ go: t("GO"), back: t("BACK"), flash: t("FLASH"), toggle: "", release: t("RELEASE"), level: "" }[o]);
   switch (a.type) {
-    case "exec": { const e = show?.executors.find((x) => x.id === a.exec); const n = e ? e.label || `Exec ${e.slot + 1}` : null; return n ? `${op(a.op)} ${n}`.trim() : null; }
+    case "exec": { const e = show?.executors.find((x) => x.id === a.exec); const n = e ? e.label || t("Exec {n}", { n: e.slot + 1 }) : null; return n ? `${op(a.op)} ${n}`.trim() : null; }
     case "cuelist": { const n = nm(show?.cuelists, a.cuelist); return n ? `${op(a.op)} ${n}`.trim() : null; }
-    case "grand_master": return "Grand master";
-    case "blackout": return "BLACKOUT";
-    case "group_attr": { const g = nm(show?.groups, a.group); return g ? `${g} ${ATTR_META[a.attr]?.label ?? a.attr}` : null; }
-    case "fixture_attr": return ATTR_META[a.attr]?.label ?? a.attr;
+    case "grand_master": return t("Grand master");
+    case "blackout": return t("BLACKOUT");
+    case "group_attr": { const g = nm(show?.groups, a.group); return g ? `${g} ${attrLabel(a.attr)}` : null; }
+    case "fixture_attr": return attrLabel(a.attr);
     case "effect_toggle": case "effect_rate": return nm(show?.effects, a.effect) ?? null;
     case "palette_apply": return nm(show?.palettes, a.palette) ?? null;
-    case "prog_clear": return "CLEAR";
+    case "prog_clear": return t("CLEAR");
     case "page": return show?.vconsole.find((p) => p.id === a.page)?.name ?? null;
     case "xy": return nm(show?.groups, a.group) ?? null;
     case "dmx": return `DMX ${a.universe}/${a.channel}`;

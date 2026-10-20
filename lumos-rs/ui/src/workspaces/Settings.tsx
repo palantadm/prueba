@@ -4,6 +4,7 @@ import { MidiPage } from "./settings/Midi";
 import { BindingsPage } from "./settings/Bindings";
 import { ArtNetInPage, OscPage } from "./settings/Inputs";
 import { GeneralPage, NetworkPage, TimecodePage } from "./settings/Misc";
+import { t } from "../i18n";
 
 const cats = [
   { id: "universes", icon: "⎍", label: "Universes & outputs", c: UniversesPage },
@@ -22,11 +23,11 @@ export function Settings() {
   const C = cur.c;
   return (
     <div class="row" style={{ height: "100%", alignItems: "stretch", gap: 0 }}>
-      <nav class="side" aria-label="Settings categories">
+      <nav class="side" aria-label={t("Settings categories")}>
         {cats.map((c) => (
-          <button key={c.id} class={`side-item ${c.id === cur.id ? "active" : ""}`} aria-current={c.id === cur.id} title={c.label}
+          <button key={c.id} class={`side-item ${c.id === cur.id ? "active" : ""}`} aria-current={c.id === cur.id} title={t(c.label)}
             onClick={() => { cat.value = c.id; localStorage.setItem("settings.cat", c.id); }}>
-            <span aria-hidden="true">{c.icon}</span><span class="lbl">{c.label}</span>
+            <span aria-hidden="true">{c.icon}</span><span class="lbl">{t(c.label)}</span>
           </button>
         ))}
       </nav>

@@ -6,6 +6,8 @@ import { DialogHost, Kbd, Modal, Toasts, confirmDialog, promptDialog } from "./u
 import { autoInitMidi } from "./midi";
 import { downloadShow, importShow } from "./lib/api";
 import { releaseDmx, requestDmx } from "./lib/dmxsub";
+import { t, tp } from "./i18n";
+import { tErr } from "./i18n/errors";
 
 export const current = signal(localStorage.getItem("ws") ?? "live");
 export function goto(id: string) {
@@ -36,38 +38,38 @@ function ShowMenu() {
   return (
     <div ref={ref} style={{ position: "relative" }}>
       <button class="btn tall" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <span class="dim">Show</span> <b style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</b> ▾
+        <span class="dim">{t("Show")}</span> <b style={{ maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis" }}>{name}</b> ▾
       </button>
       {open && (
         <div class="menu" role="menu">
           <button role="menuitem" onClick={run(async () => {
-            if (!(await confirmDialog("New show", "Discard the current show and start a new empty one?", { danger: true, ok: "New show" }))) return;
-            const n = await promptDialog("New show", "Name", "Untitled");
+            if (!(await confirmDialog(t("New show"), t("Discard the current show and start a new empty one?"), { danger: true, ok: t("New show") }))) return;
+            const n = await promptDialog(t("New show"), t("Name"), t("Untitled"));
             if (n) await send({ type: "show_new", name: n }).catch(() => {});
-          })}>New…</button>
-          <button role="menuitem" onClick={run(() => send({ type: "show_save", name: null }).then(() => toast("Show saved", "ok", 1500)).catch(() => {}))}>Save <span class="faint" style={{ float: "right" }}>Ctrl+S</span></button>
+          })}>{t("New…")}</button>
+          <button role="menuitem" onClick={run(() => send({ type: "show_save", name: null }).then(() => toast(t("Show saved"), "ok", 1500)).catch(() => {}))}>{t("Save")} <span class="faint" style={{ float: "right" }}>Ctrl+S</span></button>
           <button role="menuitem" onClick={run(async () => {
-            const n = await promptDialog("Save as", "Name", name);
-            if (n) await send({ type: "show_save", name: n }).then(() => toast(`Saved “${n}”`, "ok", 1500)).catch(() => {});
-          })}>Save as…</button>
+            const n = await promptDialog(t("Save as"), t("Name"), name);
+            if (n) await send({ type: "show_save", name: n }).then(() => toast(t("Saved “{n}”", { n }), "ok", 1500)).catch(() => {});
+          })}>{t("Save as…")}</button>
           <button role="menuitem" onClick={run(async () => {
-            const n = await promptDialog("Rename show", "Name", name);
+            const n = await promptDialog(t("Rename show"), t("Name"), name);
             if (n) await send({ type: "show_rename", name: n }).catch(() => {});
-          })}>Rename…</button>
+          })}>{t("Rename…")}</button>
           <hr />
-          <div class="menu-label">Load</div>
-          {shows.value.length === 0 && <div class="faint" style={{ padding: "6px 12px" }}>No saved shows</div>}
+          <div class="menu-label">{t("Load")}</div>
+          {shows.value.length === 0 && <div class="faint" style={{ padding: "6px 12px" }}>{t("No saved shows")}</div>}
           <div style={{ maxHeight: 220, overflow: "auto", display: "flex", flexDirection: "column" }}>
             {shows.value.map((s) => (
               <button key={s.name} role="menuitem" onClick={run(async () => {
-                if (await confirmDialog("Load show", `Load “${s.name}”? Unsaved changes in the current show are lost.`, { ok: "Load" }))
+                if (await confirmDialog(t("Load show"), t("Load “{name}”? Unsaved changes in the current show are lost.", { name: s.name }), { ok: t("Load") }))
                   await send({ type: "show_load", name: s.name }).catch(() => {});
               })}>{s.name}</button>
             ))}
           </div>
           <hr />
-          <button role="menuitem" onClick={run(() => downloadShow(name))}>Download JSON</button>
-          <button role="menuitem" onClick={() => file.current?.click()}>Import JSON…</button>
+          <button role="menuitem" onClick={run(() => downloadShow(name))}>{t("Download JSON")}</button>
+          <button role="menuitem" onClick={() => file.current?.click()}>{t("Import JSON…")}</button>
         </div>
       )}
       <input ref={file} type="file" accept=".json,application/json" hidden onChange={async (e) => {
@@ -75,7 +77,7 @@ function ShowMenu() {
         (e.target as HTMLInputElement).value = "";
         setOpen(false);
         if (!f) return;
-        try { await importShow(f); toast("Show imported", "ok"); } catch (err) { toast((err as Error).message, "err"); }
+        try { await importShow(f); toast(t("Show imported"), "ok"); } catch (err) { toast(tErr((err as Error).message), "err"); }
       }} />
     </div>
   );
@@ -84,9 +86,9 @@ function ShowMenu() {
 function GrandMaster() {
   const v = rt.value?.grand_master ?? 1;
   return (
-    <div class="gm" title="Grand master">
+    <div class="gm" title={t("Grand master")}>
       <span class="label">GM</span>
-      <input type="range" min={0} max={1000} value={Math.round(v * 1000)} aria-label="Grand master"
+      <input type="range" min={0} max={1000} value={Math.round(v * 1000)} aria-label={t("Grand master")}
         onInput={(e) => fire({ type: "grand_master", level: Number((e.target as HTMLInputElement).value) / 1000 })} />
       <span class="mono" style={{ width: 38, textAlign: "right" }}>{Math.round(v * 100)}%</span>
     </div>
@@ -116,14 +118,14 @@ function StatusBar() {
   return (
     <footer class="statusbar" role="status">
       {bars.map((b) => (
-        <span class="ubar" key={b.u} title={`Universe ${b.u}: peak ${b.max}`}>
+        <span class="ubar" key={b.u} title={t("Universe {u}: peak {max}", { u: b.u, max: b.max })}>
           <span class="mono">U{b.u}</span><span class="bar"><i style={{ width: `${(b.max / 255) * 100}%` }} /></span>
         </span>
       ))}
       <span class="sp" />
-      <span class={errs ? "chip err" : "chip"} style={{ height: 18 }}>{errs ? `${errs} output error${errs > 1 ? "s" : ""}` : `${oks} output${oks === 1 ? "" : "s"} OK`}</span>
-      <span title="Last input event" style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        IN: {last ?? <span class="faint">idle</span>}
+      <span class={errs ? "chip err" : "chip"} style={{ height: 18 }}>{errs ? tp(errs, "{n} output error", "{n} output errors") : tp(oks, "{n} output OK", "{n} outputs OK")}</span>
+      <span title={t("Last input event")} style={{ maxWidth: 260, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+        {t("IN:")} {last ?? <span class="faint">{t("idle")}</span>}
       </span>
     </footer>
   );
@@ -144,7 +146,7 @@ export function App() {
     const h = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); void send({ type: "blackout", on: !rt.value?.blackout }); return; }
-      if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); void send({ type: "show_save", name: null }).then(() => toast("Show saved", "ok", 1500)).catch(() => {}); return; }
+      if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); void send({ type: "show_save", name: null }).then(() => toast(t("Show saved"), "ok", 1500)).catch(() => {}); return; }
       if ((e.target as HTMLElement)?.matches?.("input,textarea,select")) return;
       if (e.key === "?") { setHelp((v) => !v); return; }
       if (mod || e.altKey) return;
@@ -160,10 +162,10 @@ export function App() {
   const tc = rt.value?.timecode;
   return (
     <div class="col" style={{ height: "100%", gap: 0 }}>
-      {!connected.value && <div class="banner" role="alert">Connection to the Lumos engine lost — reconnecting…</div>}
+      {!connected.value && <div class="banner" role="alert">{t("Connection to the Lumos engine lost — reconnecting…")}</div>}
       <header class="app-head">
         <b style={{ letterSpacing: ".2em", color: "var(--live)", whiteSpace: "nowrap" }}>⬡ LUMOS</b>
-        <nav class="app-tabs" role="tablist" aria-label="Workspaces">
+        <nav class="app-tabs" role="tablist" aria-label={t("Workspaces")}>
           {workspaces.map((w) => (
             <button key={w.id} role="tab" aria-selected={w.id === ws.id} class={`btn tall ghost ${w.id === ws.id ? "sel" : ""}`} onClick={() => goto(w.id)} title={`${w.label} (${w.key})`}>
               {w.label}
@@ -173,20 +175,20 @@ export function App() {
         <span class="sp" />
         <ShowMenu />
         <GrandMaster />
-        <span class="hdr-chip mono" title="Show timecode" style={{ color: tc?.running ? "var(--live)" : "var(--text-dim)" }}>{tc?.text ?? "00:00:00:00"}</span>
-        <span class="hdr-chip" title={connected.value ? `Engine running at ${rt.value?.fps.toFixed(1) ?? "?"} fps` : "Disconnected"}>
+        <span class="hdr-chip mono" title={t("Show timecode")} style={{ color: tc?.running ? "var(--live)" : "var(--text-dim)" }}>{tc?.text ?? "00:00:00:00"}</span>
+        <span class="hdr-chip" title={connected.value ? t("Engine running at {fps} fps", { fps: rt.value?.fps.toFixed(1) ?? "?" }) : t("Disconnected")}>
           <span class={`dot ${connected.value ? "ok" : "err"}`} />
-          <span class="mono">{connected.value ? `${rt.value?.fps.toFixed(0) ?? "–"} fps` : "offline"}</span>
+          <span class="mono">{connected.value ? t("{fps} fps", { fps: rt.value?.fps.toFixed(0) ?? "–" }) : t("offline")}</span>
         </span>
-        <button class={`btn tall ${bo ? "blink" : "danger"}`} aria-pressed={bo} onClick={() => send({ type: "blackout", on: !bo })} title="Blackout (Ctrl+B)">BLACKOUT</button>
-        <button class="btn tall ghost icon hide-mid" aria-label="Keyboard shortcuts" onClick={() => setHelp(true)}>?</button>
+        <button class={`btn tall ${bo ? "blink" : "danger"}`} aria-pressed={bo} onClick={() => send({ type: "blackout", on: !bo })} title={t("Blackout (Ctrl+B)")}>BLACKOUT</button>
+        <button class="btn tall ghost icon hide-mid" aria-label={t("Keyboard shortcuts")} onClick={() => setHelp(true)}>?</button>
       </header>
       <main class="grow" style={{ minHeight: 0, overflow: "hidden" }}><Cur /></main>
       <StatusBar />
       {help && (
-        <Modal title="Keyboard shortcuts" onClose={() => setHelp(false)}>
+        <Modal title={t("Keyboard shortcuts")} onClose={() => setHelp(false)}>
           <table class="tbl"><tbody>
-            {SHORTCUTS.map(([k, d]) => <tr key={k}><td><Kbd>{k}</Kbd></td><td>{d}</td></tr>)}
+            {SHORTCUTS.map(([k, d]) => <tr key={k}><td><Kbd>{k}</Kbd></td><td>{t(d)}</td></tr>)}
             {workspaces.map((w) => <tr key={w.id}><td><Kbd>{w.key}</Kbd></td><td>{w.label}</td></tr>)}
           </tbody></table>
         </Modal>

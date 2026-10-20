@@ -1,6 +1,7 @@
 // UI state + debounced edit/commit layer for the 3D workspace.
 import { signal } from "@preact/signals";
 import { send, show } from "../store";
+import { t } from "../i18n";
 import type { Fixture, Stage, StageObject } from "../types";
 
 function persisted<T>(key: string, init: T) {
@@ -119,14 +120,14 @@ const base = (kind: StageObject["kind"], name: string, pos: [number, number, num
 });
 
 export const TEMPLATES: Template[] = [
-  { label: "Truss line above stage", make: (s) => base("truss", "Truss", [0, s.size[2] - 0.3, 0], [s.size[0] * 0.9, 0.3, 0.3], "#9aa0a8") },
-  { label: "Truss 3 m", make: (s) => base("truss", "Truss", [0, Math.min(3, s.size[2]), 0], [3, 0.3, 0.3], "#9aa0a8") },
-  { label: "Platform", make: () => base("platform", "Platform", [0, 0.2, 0], [2, 0.4, 2], "#2a2d33") },
-  { label: "Wall", make: (s) => base("wall", "Wall", [0, 1.5, -s.size[1] / 2 + 0.2], [6, 3, 0.1], "#1d2026") },
-  { label: "Column", make: () => base("column", "Column", [2, 1.5, 0], [0.4, 3, 0.4], "#3a3d44") },
-  { label: "Curtain", make: (s) => base("curtain", "Curtain", [0, 2, -s.size[1] / 2 + 0.1], [6, 4, 0.2], "#5a0d14") },
-  { label: "Tree", make: () => base("tree", "Tree", [3, 1.25, -1], [1.6, 2.5, 1.6], "#2f6b34") },
-  { label: "Box", make: () => base("box", "Box", [0, 0.5, 0], [1, 1, 1], "#6b7280") },
-  { label: "LED screen 16:9", make: (s) => base("screen", "LED screen", [0, 2.2, -s.size[1] / 2 + 0.3], [4, 2.25, 0.1], "#111111", { screen_type: "led", media: { kind: "none", src: "", looped: true } }) },
-  { label: "Projection screen 16:9", make: (s) => base("screen", "Projection", [0, 2.4, -s.size[1] / 2 + 0.3], [5, 2.8, 0.05], "#e8e8e8", { screen_type: "projection", media: { kind: "none", src: "", looped: true } }) },
+  { label: "Truss line above stage", make: (s) => base("truss", t("Truss"), [0, s.size[2] - 0.3, 0], [s.size[0] * 0.9, 0.3, 0.3], "#9aa0a8") },
+  { label: "Truss 3 m", make: (s) => base("truss", t("Truss"), [0, Math.min(3, s.size[2]), 0], [3, 0.3, 0.3], "#9aa0a8") },
+  { label: "Platform", make: () => base("platform", t("Platform"), [0, 0.2, 0], [2, 0.4, 2], "#2a2d33") },
+  { label: "Wall", make: (s) => base("wall", t("Wall"), [0, 1.5, -s.size[1] / 2 + 0.2], [6, 3, 0.1], "#1d2026") },
+  { label: "Column", make: () => base("column", t("Column"), [2, 1.5, 0], [0.4, 3, 0.4], "#3a3d44") },
+  { label: "Curtain", make: (s) => base("curtain", t("Curtain"), [0, 2, -s.size[1] / 2 + 0.1], [6, 4, 0.2], "#5a0d14") },
+  { label: "Tree", make: () => base("tree", t("Tree"), [3, 1.25, -1], [1.6, 2.5, 1.6], "#2f6b34") },
+  { label: "Box", make: () => base("box", t("Box"), [0, 0.5, 0], [1, 1, 1], "#6b7280") },
+  { label: "LED screen 16:9", make: (s) => base("screen", t("LED screen"), [0, 2.2, -s.size[1] / 2 + 0.3], [4, 2.25, 0.1], "#111111", { screen_type: "led", media: { kind: "none", src: "", looped: true } }) },
+  { label: "Projection screen 16:9", make: (s) => base("screen", t("Projection"), [0, 2.4, -s.size[1] / 2 + 0.3], [5, 2.8, 0.05], "#e8e8e8", { screen_type: "projection", media: { kind: "none", src: "", looped: true } }) },
 ];

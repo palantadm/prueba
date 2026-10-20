@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { rt, selection, send, show, toast } from "../../store";
 import type { PaletteKind, RecordMode } from "../../types";
 import { Modal } from "../../ui";
+import { t } from "../../i18n";
 import { activeCuelist } from "../../lib/state";
 import { releaseAttrs, setAttrs } from "../../lib/program";
 
+const KIND_LABEL: Record<PaletteKind, string> = { intensity: "Intensity", position: "Position", color: "Color", beam: "Beam", all: "All" };
 const heldCount = () => Object.values(rt.value?.programmer ?? {}).filter((a) => a && Object.keys(a).length).length;
 
 export function ProgBar() {
@@ -37,15 +39,15 @@ export function ProgBar() {
   }, [hl, selection.value.join(",")]);
 
   return (
-    <div class="lv-progbar" role="toolbar" aria-label="Programmer">
-      <span class="label">Programmer</span>
-      <span class="chip warn" title="Fixtures holding programmer values">{heldCount()} held</span>
-      <button class="btn" onClick={() => releaseAttrs(selection.value.length ? selection.value : null, null)} title="Release the selection's programmer values">Clear sel</button>
-      <button class="btn danger" onClick={() => releaseAttrs(null, null)} title="Release everything (Ctrl+Backspace)">Release all</button>
+    <div class="lv-progbar" role="toolbar" aria-label={t("Programmer")}>
+      <span class="label">{t("Programmer")}</span>
+      <span class="chip warn" title={t("Fixtures holding programmer values")}>{t("{n} held", { n: heldCount() })}</span>
+      <button class="btn" onClick={() => releaseAttrs(selection.value.length ? selection.value : null, null)} title={t("Release the selection's programmer values")}>{t("Clear sel")}</button>
+      <button class="btn danger" onClick={() => releaseAttrs(null, null)} title={t("Release everything (Ctrl+Backspace)")}>{t("Release all")}</button>
       <span class="sp" />
-      <button class={`btn ${hl ? "on" : ""}`} aria-pressed={hl} disabled={!selection.value.length && !hl} onClick={() => setHl(!hl)} title="Full dimmer on selection, not recorded">☼ Highlight</button>
-      <button class="btn" disabled={!heldCount()} onClick={() => setRecPal(true)}>● Palette</button>
-      <button class="btn primary" disabled={!heldCount()} onClick={() => setRecCue(true)}>● Record cue</button>
+      <button class={`btn ${hl ? "on" : ""}`} aria-pressed={hl} disabled={!selection.value.length && !hl} onClick={() => setHl(!hl)} title={t("Full dimmer on selection, not recorded")}>{t("☼ Highlight")}</button>
+      <button class="btn" disabled={!heldCount()} onClick={() => setRecPal(true)}>{t("● Palette")}</button>
+      <button class="btn primary" disabled={!heldCount()} onClick={() => setRecCue(true)}>{t("● Record cue")}</button>
       {recCue && <RecordCue onClose={() => setRecCue(false)} />}
       {recPal && <RecordPalette onClose={() => setRecPal(false)} />}
     </div>
@@ -63,49 +65,49 @@ function RecordCue({ onClose }: { onClose: () => void }) {
 
   const createList = async () => {
     const id = Math.max(0, ...lists.map((l) => l.id)) + 1;
-    await send({ type: "cuelist_save", cuelist: { id, name: `Cuelist ${id}`, cues: [], looped: false, tracking: true, priority: 0 } });
+    await send({ type: "cuelist_save", cuelist: { id, name: t("Cuelist {n}", { n: id }), cues: [], looped: false, tracking: true, priority: 0 } });
     setList(id);
   };
   const go = async () => {
-    if (!list) return toast("Choose or create a cuelist", "err");
+    if (!list) return toast(t("Choose or create a cuelist"), "err");
     const n = number.trim() === "" ? null : parseFloat(number);
-    if (n !== null && !Number.isFinite(n)) return toast("Invalid cue number", "err");
+    if (n !== null && !Number.isFinite(n)) return toast(t("Invalid cue number"), "err");
     try {
       await send({ type: "prog_record_cue", cuelist: list, number: n, mode, label, release });
       activeCuelist.value = list;
-      toast(`Recorded cue ${n ?? "(next)"} in ${cl?.name ?? list}`, "ok");
+      toast(t("Recorded cue {n} in {name}", { n: n ?? t("(next)"), name: cl?.name ?? list }), "ok");
       onClose();
     } catch { /* toast shown */ }
   };
   return (
-    <Modal title="Record cue" onClose={onClose} footer={<>
-      <button class="btn" onClick={onClose}>Cancel</button>
-      <button class="btn primary" onClick={go}>Record</button>
+    <Modal title={t("Record cue")} onClose={onClose} footer={<>
+      <button class="btn" onClick={onClose}>{t("Cancel")}</button>
+      <button class="btn primary" onClick={go}>{t("Record")}</button>
     </>}>
       <div class="row">
-        <div class="field grow"><label>Cuelist</label>
+        <div class="field grow"><label>{t("Cuelist")}</label>
           <select class="input" value={list} onChange={(e) => setList(Number((e.target as HTMLSelectElement).value))}>
-            {lists.length === 0 && <option value={0}>— none —</option>}
-            {lists.map((l) => <option key={l.id} value={l.id}>{l.name} ({l.cues.length} cues)</option>)}
+            {lists.length === 0 && <option value={0}>{t("— none —")}</option>}
+            {lists.map((l) => <option key={l.id} value={l.id}>{t("{name} ({n} cues)", { name: l.name, n: l.cues.length })}</option>)}
           </select></div>
-        <button class="btn" style={{ alignSelf: "flex-end" }} onClick={createList}>+ New</button>
+        <button class="btn" style={{ alignSelf: "flex-end" }} onClick={createList}>{t("+ New")}</button>
       </div>
       <div class="row">
-        <div class="field grow"><label>Cue # (blank = next)</label>
+        <div class="field grow"><label>{t("Cue # (blank = next)")}</label>
           <input class="input num" placeholder={cl ? String(Math.floor(Math.max(0, ...cl.cues.map((c) => c.number))) + 1) : "1"}
             value={number} onInput={(e) => setNumber((e.target as HTMLInputElement).value)} /></div>
-        <div class="field grow"><label>Existing cue</label>
+        <div class="field grow"><label>{t("Existing cue")}</label>
           <select class="input" value="" onChange={(e) => setNumber((e.target as HTMLSelectElement).value)}>
             <option value="">—</option>
             {cl?.cues.map((c) => <option key={c.number} value={c.number}>{c.number} {c.label}</option>)}
           </select></div>
       </div>
-      <div class="field"><label>Label</label><input class="input" value={label} onInput={(e) => setLabel((e.target as HTMLInputElement).value)} /></div>
+      <div class="field"><label>{t("Label")}</label><input class="input" value={label} onInput={(e) => setLabel((e.target as HTMLInputElement).value)} /></div>
       <div class="row">
-        <button class={`btn ${mode === "merge" ? "sel" : ""}`} onClick={() => setMode("merge")}>Merge</button>
-        <button class={`btn ${mode === "replace" ? "sel" : ""}`} onClick={() => setMode("replace")}>Replace</button>
+        <button class={`btn ${mode === "merge" ? "sel" : ""}`} onClick={() => setMode("merge")}>{t("Merge")}</button>
+        <button class={`btn ${mode === "replace" ? "sel" : ""}`} onClick={() => setMode("replace")}>{t("Replace")}</button>
         <span class="sp" />
-        <label class="check"><input type="checkbox" checked={release} onChange={(e) => setRelease((e.target as HTMLInputElement).checked)} />Release programmer after</label>
+        <label class="check"><input type="checkbox" checked={release} onChange={(e) => setRelease((e.target as HTMLInputElement).checked)} />{t("Release programmer after")}</label>
       </div>
     </Modal>
   );
@@ -115,13 +117,13 @@ function RecordPalette({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<PaletteKind>("color");
   const [name, setName] = useState("");
   const n = show.value?.palettes.length ?? 0;
-  const ok = () => { send({ type: "prog_record_palette", id: null, fixtures: selection.value, kind, name: name.trim() || `Palette ${n + 1}` }); onClose(); };
+  const ok = () => { send({ type: "prog_record_palette", id: null, fixtures: selection.value, kind, name: name.trim() || t("Palette {n}", { n: n + 1 }) }); onClose(); };
   return (
-    <Modal title="Record palette" onClose={onClose} footer={<><button class="btn" onClick={onClose}>Cancel</button><button class="btn primary" onClick={ok}>Record</button></>}>
+    <Modal title={t("Record palette")} onClose={onClose} footer={<><button class="btn" onClick={onClose}>{t("Cancel")}</button><button class="btn primary" onClick={ok}>{t("Record")}</button></>}>
       <div class="row wrap">{(["intensity", "position", "color", "beam", "all"] as PaletteKind[]).map((k) => (
-        <button key={k} class={`btn ${kind === k ? "sel" : ""}`} onClick={() => setKind(k)}>{k}</button>))}</div>
-      <div class="field"><label>Name</label><input class="input" autoFocus value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === "Enter" && ok()} /></div>
-      <div class="dim">Records from the programmer values of the {selection.value.length} selected fixture(s).</div>
+        <button key={k} class={`btn ${kind === k ? "sel" : ""}`} onClick={() => setKind(k)}>{t(KIND_LABEL[k])}</button>))}</div>
+      <div class="field"><label>{t("Name")}</label><input class="input" autoFocus value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === "Enter" && ok()} /></div>
+      <div class="dim">{t("Records from the programmer values of the {n} selected fixture(s).", { n: selection.value.length })}</div>
     </Modal>
   );
 }

@@ -1,12 +1,13 @@
 import type { ComponentChildren } from "preact";
 import { PageHead } from "../../ui";
+import { t } from "../../i18n";
 
 export function SaveBar(props: { dirty: boolean; save: () => void; revert: () => void }) {
   return (
     <div class="dirty-bar" role="status">
-      <span class={`chip ${props.dirty ? "warn" : "ok"}`}>{props.dirty ? "Unsaved changes" : "Saved"}</span>
-      <button class="btn tall" disabled={!props.dirty} onClick={props.revert}>Revert</button>
-      <button class="btn tall primary" disabled={!props.dirty} onClick={props.save}>Save</button>
+      <span class={`chip ${props.dirty ? "warn" : "ok"}`}>{props.dirty ? t("Unsaved changes") : t("Saved")}</span>
+      <button class="btn tall" disabled={!props.dirty} onClick={props.revert}>{t("Revert")}</button>
+      <button class="btn tall primary" disabled={!props.dirty} onClick={props.save}>{t("Save")}</button>
     </div>
   );
 }

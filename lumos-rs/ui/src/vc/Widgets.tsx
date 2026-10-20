@@ -2,11 +2,13 @@
 import { computed } from "@preact/signals";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { fire, rt } from "../store";
+import { t } from "../i18n";
 import type { VcWidget } from "../types";
 import { Fader } from "../widgets/Fader";
 import { Knob } from "../widgets/Knob";
 import { XYPad } from "../widgets/XYPad";
 import { pageId } from "./editor";
+import { attrLabel } from "./model";
 
 export const vcState = computed(() => new Map((rt.value?.vc ?? []).map((s) => [s.id, s])));
 
@@ -42,7 +44,7 @@ function ButtonW({ w, interactive }: Ctx) {
       onKeyUp={(e) => { if (interactive && (e.key === " " || e.key === "Enter")) up(); }}>
       <span class="vc-btn-led" aria-hidden="true" />
       <span class="vc-btn-label">{w.label}</span>
-      {w.mode === "toggle" && <span class="vc-btn-mode">TOGGLE</span>}
+      {w.mode === "toggle" && <span class="vc-btn-mode">{t("TOGGLE")}</span>}
     </button>
   );
 }
@@ -79,7 +81,7 @@ function XyW({ w, interactive }: Ctx) {
   const last = useRef(0);
   return (
     <div class="vc-xy" style={{ pointerEvents: interactive ? "auto" : "none" }}>
-      <XYPad x={xy[0]} y={xy[1]} color={w.color} labelX={w.action.type === "xy" ? w.action.x_attr : "X"} labelY={w.action.type === "xy" ? w.action.y_attr : "Y"}
+      <XYPad x={xy[0]} y={xy[1]} color={w.color} labelX={w.action.type === "xy" ? attrLabel(w.action.x_attr) : "X"} labelY={w.action.type === "xy" ? attrLabel(w.action.y_attr) : "Y"}
         onChange={(x, y) => {
           setXy([x, y]); xyLocal.set(w.id, [x, y]);
           const n = performance.now(); if (n - last.current < 33) return; last.current = n;
@@ -97,16 +99,16 @@ function CueListW({ w, interactive }: Ctx) {
   const act = (cmd: "go" | "back" | "pause") => interactive && id && fire({ type: cmd, cuelist: id });
   return (
     <div class="vc-cl">
-      <div class="row"><b class="grow vc-cl-title">{w.label}</b><span class={`chip ${c?.state === "running" ? "ok" : ""}`}>{c?.state ?? "—"}</span></div>
+      <div class="row"><b class="grow vc-cl-title">{w.label}</b><span class={`chip ${c?.state === "running" ? "ok" : ""}`}>{c?.state ? t(c.state) : "—"}</span></div>
       <div class="row vc-cl-cues">
-        <div><div class="vc-cap">CURRENT</div><div class="vc-cl-num">{c?.current ?? "–"}</div></div>
-        <div><div class="vc-cap">NEXT</div><div class="vc-cl-num dim">{c?.next ?? "–"}</div></div>
+        <div><div class="vc-cap">{t("CURRENT")}</div><div class="vc-cl-num">{c?.current ?? "–"}</div></div>
+        <div><div class="vc-cap">{t("NEXT")}</div><div class="vc-cl-num dim">{c?.next ?? "–"}</div></div>
         <div class="grow" />
       </div>
       <div class="vc-cl-prog"><i style={{ width: `${Math.round((c?.progress ?? 0) * 100)}%`, background: w.color }} /></div>
       <div class="row vc-cl-btns">
-        <button class="btn go grow" tabIndex={interactive ? 0 : -1} onPointerDown={() => act("go")}>GO</button>
-        <button class="btn grow" tabIndex={interactive ? 0 : -1} onPointerDown={() => act("back")}>BACK</button>
+        <button class="btn go grow" tabIndex={interactive ? 0 : -1} onPointerDown={() => act("go")}>{t("GO")}</button>
+        <button class="btn grow" tabIndex={interactive ? 0 : -1} onPointerDown={() => act("back")}>{t("BACK")}</button>
         <button class="btn" tabIndex={interactive ? 0 : -1} onPointerDown={() => act("pause")}>⏸</button>
       </div>
     </div>
@@ -133,7 +135,7 @@ function SpeedW({ w, interactive }: Ctx) {
       <div class="vc-cap">{w.label}</div>
       <div class="vc-speed-bpm mono">{Math.round(hz * 60)}<small> BPM</small></div>
       <div class="dim mono" style={{ fontSize: "var(--fs-xs)" }}>{hz.toFixed(2)} Hz</div>
-      <button class="btn lg vc-tap" tabIndex={interactive ? 0 : -1} onPointerDown={tap}>TAP</button>
+      <button class="btn lg vc-tap" tabIndex={interactive ? 0 : -1} onPointerDown={tap}>{t("TAP")}</button>
       <div class="row">
         <button class="btn sm grow" tabIndex={interactive ? 0 : -1} onClick={() => interactive && setHz(hz / 2)}>½×</button>
         <button class="btn sm grow" tabIndex={interactive ? 0 : -1} onClick={() => interactive && setHz(hz * 2)}>2×</button>
@@ -149,7 +151,7 @@ function ClockW({ w }: Ctx) {
   return (
     <div class="vc-clock">
       <div class="mono vc-clock-big">{tc?.running ? tc.text : now.toLocaleTimeString([], { hour12: false })}</div>
-      <div class="vc-cap">{tc?.running ? "TIMECODE" : w.label}</div>
+      <div class="vc-cap">{tc?.running ? t("TIMECODE") : w.label}</div>
     </div>
   );
 }

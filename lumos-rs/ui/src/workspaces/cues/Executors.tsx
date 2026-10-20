@@ -3,8 +3,10 @@ import { rt, send, show } from "../../store";
 import type { ExecKind, Executor } from "../../types";
 import { Modal } from "../../ui";
 import { ExecutorStrip } from "../../widgets";
+import { t } from "../../i18n";
 
 const SLOTS = 10;
+const TYPE_LABEL = { cuelist: "Cuelist", group: "Group", effect: "Effect", master: "Grand master" } as const;
 
 function kindLabel(k: ExecKind): string {
   const s = show.value;
@@ -12,7 +14,7 @@ function kindLabel(k: ExecKind): string {
     case "cuelist": return s?.cuelists.find((c) => c.id === k.cuelist)?.name ?? `CL ${k.cuelist}`;
     case "group": return s?.groups.find((g) => g.id === k.group)?.name ?? `Grp ${k.group}`;
     case "effect": return s?.effects.find((e) => e.id === k.effect)?.name ?? `FX ${k.effect}`;
-    case "master": return "Grand Master";
+    case "master": return t("Grand Master");
     default: return "";
   }
 }
@@ -26,10 +28,10 @@ export function Executors() {
   return (
     <div class="panel lv-execs">
       <div class="row" style={{ marginBottom: 6 }}>
-        <span class="label">Executors</span>
-        <div class="tabs" role="tablist" aria-label="Executor page">
+        <span class="label">{t("Executors")}</span>
+        <div class="tabs" role="tablist" aria-label={t("Executor page")}>
           {Array.from({ length: maxPage + 1 }, (_, i) => (
-            <button key={i} role="tab" aria-selected={i === page} class={`tab ${i === page ? "active" : ""}`} onClick={() => setPage(i)}>Page {i + 1}</button>
+            <button key={i} role="tab" aria-selected={i === page} class={`tab ${i === page ? "active" : ""}`} onClick={() => setPage(i)}>{t("Page {n}", { n: i + 1 })}</button>
           ))}
         </div>
       </div>
@@ -72,26 +74,26 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
   };
   const sel = (v: number, set: (n: number) => void, opts: { id: number; name: string }[]) => (
     <select class="input" value={v} onChange={(e) => set(Number((e.target as HTMLSelectElement).value))}>
-      {opts.length === 0 && <option value={0}>— none available —</option>}
+      {opts.length === 0 && <option value={0}>{t("— none available —")}</option>}
       {opts.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
     </select>
   );
   return (
-    <Modal title={`Executor ${page + 1}.${slot + 1}`} onClose={onClose} footer={<>
-      {exec && <button class="btn danger" onClick={() => { send({ type: "exec_remove", id: exec.id }); onClose(); }}>Clear</button>}
+    <Modal title={t("Executor {p}.{s}", { p: page + 1, s: slot + 1 })} onClose={onClose} footer={<>
+      {exec && <button class="btn danger" onClick={() => { send({ type: "exec_remove", id: exec.id }); onClose(); }}>{t("Clear")}</button>}
       <span class="sp" />
-      <button class="btn" onClick={onClose}>Cancel</button>
-      <button class="btn primary" disabled={!valid} onClick={save}>Assign</button>
+      <button class="btn" onClick={onClose}>{t("Cancel")}</button>
+      <button class="btn primary" disabled={!valid} onClick={save}>{t("Assign")}</button>
     </>}>
-      <div class="row wrap" role="tablist" aria-label="Executor type">
-        {(["cuelist", "group", "effect", "master"] as const).map((t) => (
-          <button key={t} role="tab" class={`btn ${type === t ? "sel" : ""}`} onClick={() => setType(t)}>{t === "master" ? "Grand master" : t}</button>
+      <div class="row wrap" role="tablist" aria-label={t("Executor type")}>
+        {(["cuelist", "group", "effect", "master"] as const).map((k) => (
+          <button key={k} role="tab" class={`btn ${type === k ? "sel" : ""}`} onClick={() => setType(k)}>{t(TYPE_LABEL[k])}</button>
         ))}
       </div>
-      {type === "cuelist" && <div class="field"><label>Cuelist</label>{sel(cuelist, setCuelist, s.cuelists)}</div>}
-      {type === "group" && <div class="field"><label>Group (dimmer master)</label>{sel(group, setGroup, s.groups)}</div>}
-      {type === "effect" && <div class="field"><label>Effect</label>{sel(effect, setEffect, s.effects)}</div>}
-      <div class="field"><label>Label</label><input class="input" value={label} placeholder="(auto)" onInput={(e) => setLabel((e.target as HTMLInputElement).value)} /></div>
+      {type === "cuelist" && <div class="field"><label>{t("Cuelist")}</label>{sel(cuelist, setCuelist, s.cuelists)}</div>}
+      {type === "group" && <div class="field"><label>{t("Group (dimmer master)")}</label>{sel(group, setGroup, s.groups)}</div>}
+      {type === "effect" && <div class="field"><label>{t("Effect")}</label>{sel(effect, setEffect, s.effects)}</div>}
+      <div class="field"><label>{t("Label")}</label><input class="input" value={label} placeholder={t("(auto)")} onInput={(e) => setLabel((e.target as HTMLInputElement).value)} /></div>
     </Modal>
   );
 }

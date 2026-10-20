@@ -5,6 +5,7 @@ import { dmx, fire, library, show } from "../store";
 import { attrColor, attrLabel, fixtureAttrs, modeOf } from "../lib/attrs";
 import { useDmxTick } from "../lib/hooks";
 import { Fader } from "../widgets";
+import { t } from "../i18n";
 
 const PAGE = 32;
 const overrides = signal<Record<string, number>>({});
@@ -44,20 +45,20 @@ export function Desk() {
   return (
     <div class="lv-desk">
       <div class="row wrap" style={{ padding: "var(--s-2) var(--s-3)", borderBottom: "1px solid var(--line)", background: "var(--bg-1)" }}>
-        <label class="label" for="desk-uni">Universe</label>
+        <label class="label" for="desk-uni">{t("Universe")}</label>
         <select id="desk-uni" class="input" style={{ width: 200 }} value={uni} onChange={(e) => { setUni(Number((e.target as HTMLSelectElement).value)); setPage(0); }}>
           {universes.map((u) => <option key={u.id} value={u.id}>{u.id} — {u.name}</option>)}
         </select>
-        <div class="row" role="tablist" aria-label="Channel page">
+        <div class="row" role="tablist" aria-label={t("Channel page")}>
           {Array.from({ length: 512 / PAGE }, (_, i) => (
             <button key={i} role="tab" aria-selected={i === page} class={`btn sm ${i === page ? "sel" : ""}`} onClick={() => setPage(i)}>{i * PAGE + 1}</button>
           ))}
         </div>
         <span class="sp" />
         <button class={`btn sm ${pct ? "sel" : ""}`} onClick={() => setPct(!pct)}>{pct ? "%" : "0–255"}</button>
-        <button class="btn sm danger" disabled={!heldOnPage.length} onClick={() => heldOnPage.forEach((k) => { const [u, c] = k.split(":").map(Number); setOv(u, c, null); })}>Release page</button>
+        <button class="btn sm danger" disabled={!heldOnPage.length} onClick={() => heldOnPage.forEach((k) => { const [u, c] = k.split(":").map(Number); setOv(u, c, null); })}>{t("Release page")}</button>
       </div>
-      <div class="lv-desk-strips" role="group" aria-label="DMX faders">
+      <div class="lv-desk-strips" role="group" aria-label={t("DMX faders")}>
         {Array.from({ length: PAGE }, (_, i) => {
           const ch = page * PAGE + i + 1;
           const ov = overrides.value[key(uni, ch)];
@@ -68,14 +69,14 @@ export function Desk() {
             <div key={ch} class={`lv-ch ${ov !== undefined ? "held" : ""}`}>
               <div class="lv-ch-n">{ch}</div>
               <Fader value={v / 255} held={ov !== undefined} color={o ? attrColor(o.attr) : "var(--accent)"} width={36} height="auto"
-                ariaLabel={`Channel ${ch}`} onChange={(x) => setOv(uni, ch, Math.round(x * 255))} />
+                ariaLabel={t("Channel {n}", { n: ch })} onChange={(x) => setOv(uni, ch, Math.round(x * 255))} />
               <div class="lv-ch-v" style={{ color: ov !== undefined ? "var(--live)" : undefined }}>{fmt(v)}</div>
-              <button class="btn sm" aria-label={`Flash channel ${ch}`}
+              <button class="btn sm" aria-label={t("Flash channel {n}", { n: ch })}
                 onPointerDown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); fire({ type: "dmx_set", universe: uni, channel: ch, value: 255 }); }}
                 onPointerUp={() => fire({ type: "dmx_set", universe: uni, channel: ch, value: overrides.value[key(uni, ch)] ?? null })}
-                onPointerCancel={() => fire({ type: "dmx_set", universe: uni, channel: ch, value: overrides.value[key(uni, ch)] ?? null })}>FL</button>
-              <button class="btn sm ghost" disabled={ov === undefined} aria-label={`Release channel ${ch}`} onClick={() => setOv(uni, ch, null)}>REL</button>
-              <div class="lv-ch-lbl" title={o ? `${o.name} · ${attrLabel(o.attr)}${o.fine ? " (fine)" : ""}` : ""}>
+                onPointerCancel={() => fire({ type: "dmx_set", universe: uni, channel: ch, value: overrides.value[key(uni, ch)] ?? null })}>{t("FL")}</button>
+              <button class="btn sm ghost" disabled={ov === undefined} aria-label={t("Release channel {n}", { n: ch })} onClick={() => setOv(uni, ch, null)}>{t("REL")}</button>
+              <div class="lv-ch-lbl" title={o ? `${o.name} · ${attrLabel(o.attr)}${o.fine ? " " + t("(fine)") : ""}` : ""}>
                 {o ? <>{o.name}<br />{attrLabel(o.attr)}{o.fine ? " ʟ" : ""}</> : ""}
               </div>
             </div>

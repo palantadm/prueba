@@ -1,4 +1,5 @@
 // Frame renderer for the 2D visualiser (Canvas2D, HiDPI).
+import { t } from "../i18n";
 import type { Fixture, FixtureProfile, Stage, StageObject } from "../types";
 import { computeFixture, objObb, obstacles, beamOf, angleOf, type FxGeo } from "./fixture";
 import { drawBody, glow, goboGlyph, rgba, strobeBolt, symbolSize, type Theme } from "./glyphs";
@@ -220,9 +221,9 @@ function drawStageAndGrid(d: DrawInput) {
     const [x0, y0] = toScreen(cam, -w / 2, -dd / 2), [x1, y1] = toScreen(cam, w / 2, dd / 2);
     ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
     ctx.textAlign = "center"; ctx.textBaseline = "top";
-    ctx.fillText("▼  AUDIENCE", (x0 + x1) / 2, y1 + 8);
+    ctx.fillText("▼  " + t("AUDIENCE"), (x0 + x1) / 2, y1 + 8);
     ctx.textBaseline = "bottom";
-    ctx.fillText("BACKSTAGE", (x0 + x1) / 2, y0 - 6);
+    ctx.fillText(t("BACKSTAGE"), (x0 + x1) / 2, y0 - 6);
     // centre-line + plaster line
     ctx.setLineDash([8, 5]); ctx.strokeStyle = th.faint; ctx.lineWidth = 1;
     const [cx0] = toScreen(cam, 0, 0);
@@ -236,9 +237,9 @@ function drawStageAndGrid(d: DrawInput) {
     ctx.beginPath(); ctx.moveTo(x0, yh); ctx.lineTo(x1, yh); ctx.stroke();
     ctx.setLineDash([]);
     ctx.textAlign = "left"; ctx.textBaseline = "bottom";
-    ctx.fillText(`GRID ${h} m`, x0 + 4, yh - 3);
+    ctx.fillText(t("GRID {h} m", { h }), x0 + 4, yh - 3);
     ctx.textBaseline = "top"; ctx.textAlign = view === "side" ? "right" : "center";
-    ctx.fillText(view === "side" ? "AUDIENCE  ▶" : "◀ −X   ·   FRONT VIEW   ·   +X ▶", view === "side" ? x1 - 4 : (x0 + x1) / 2, y0 + 8);
+    ctx.fillText(view === "side" ? t("AUDIENCE") + "  ▶" : "◀ −X   ·   " + t("FRONT VIEW") + "   ·   +X ▶", view === "side" ? x1 - 4 : (x0 + x1) / 2, y0 + 8);
   }
   ctx.restore();
 }
@@ -248,7 +249,7 @@ function drawViewTag(d: DrawInput) {
   const { ctx, th, view } = d;
   ctx.save();
   ctx.font = `700 11px ${th.ui}`; ctx.fillStyle = th.faint; ctx.textAlign = "right"; ctx.textBaseline = "top";
-  ctx.fillText(view === "plan" ? "PLAN VIEW" : view === "front" ? "FRONT ELEVATION" : "SIDE ELEVATION", d.cam.w - 12, 62);
+  ctx.fillText(view === "plan" ? t("PLAN VIEW") : view === "front" ? t("FRONT ELEVATION") : t("SIDE ELEVATION"), d.cam.w - 12, 62);
   ctx.restore();
 }
 
@@ -502,7 +503,7 @@ function drawObject(d: DrawInput, o: StageObject): [number, number][] | null {
       path(poly); ctx.fill(); ctx.stroke();
       ctx.fillStyle = led ? th.accent : th.bg0;
       ctx.font = `700 9px ${th.ui}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-      if (view !== "plan") ctx.fillText(led ? "LED" : "PROJ", cx, cy);
+      if (view !== "plan") ctx.fillText(led ? "LED" : t("PROJ"), cx, cy);
       break;
     }
     default: {

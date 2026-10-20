@@ -8,15 +8,16 @@ import { attrState, releaseAttrs, setAttrs } from "../../lib/program";
 import { colorHistory, pushColor } from "../../lib/state";
 import { useDmxTick } from "../../lib/hooks";
 import { ColorPicker, Fader, Knob, XYPad } from "../../widgets";
+import { t } from "../../i18n";
 
 const sel = (): Fixture[] => selection.value.map((i) => fixtureById(i)).filter((f): f is Fixture => !!f);
 
 function Card(p: { title: string; group: keyof typeof GROUP_COLOR; children: preact.ComponentChildren; onRelease?: () => void; held?: boolean }) {
   return (
-    <section class="lv-card" aria-label={p.title}>
+    <section class="lv-card" aria-label={t(p.title)}>
       <div class="lv-card-h" style={{ color: GROUP_COLOR[p.group] }}>
-        <i style={{ background: GROUP_COLOR[p.group] }} />{p.title}<span class="sp" />
-        {p.held && p.onRelease && <button class="btn sm" onClick={p.onRelease}>Release</button>}
+        <i style={{ background: GROUP_COLOR[p.group] }} />{t(p.title)}<span class="sp" />
+        {p.held && p.onRelease && <button class="btn sm" onClick={p.onRelease}>{t("Release")}</button>}
       </div>
       {p.children}
     </section>
@@ -29,7 +30,7 @@ function Slots({ fxs, attr, value, held }: { fxs: Fixture[]; attr: string; value
   if (!ch) return null;
   const dmxv = Math.round(value * 255);
   return (
-    <div class="lv-slots" role="group" aria-label={`${attrLabel(attr)} slots`}>
+    <div class="lv-slots" role="group" aria-label={t("{attr} slots", { attr: attrLabel(attr) })}>
       {ch.capabilities.map((c, i) => {
         const on = dmxv >= c.min && dmxv <= c.max;
         return (
@@ -58,8 +59,8 @@ export function AttrPanels() {
   useDmxTick(10);
   const fxs = sel();
   if (!fxs.length) {
-    return <div class="panel lv-col"><div class="panel-head">Attributes</div>
-      <div class="panel-body dim">Select fixtures in the pool to edit their attributes.</div></div>;
+    return <div class="panel lv-col"><div class="panel-head">{t("Attributes")}</div>
+      <div class="panel-body dim">{t("Select fixtures in the pool to edit their attributes.")}</div></div>;
   }
   const has = unionAttrs(fxs);
   const anyHeld = (attrs: string[]) => attrs.some((a) => attrState(fxs, a).held);
@@ -75,7 +76,7 @@ export function AttrPanels() {
 
   return (
     <div class="panel lv-col">
-      <div class="panel-head"><span>Attributes</span><span class="sp" /><span class="chip">{fxs.length} selected</span></div>
+      <div class="panel-head"><span>{t("Attributes")}</span><span class="sp" /><span class="chip">{t("{n} selected", { n: fxs.length })}</span></div>
       <div class="lv-scroll" style={{ padding: "var(--s-2)" }}>
         {has.has("dimmer") && <IntensityCard fxs={fxs} held={anyHeld(["dimmer"])} onRelease={rel(["dimmer"])} />}
         {posAttrs.length > 0 && <PositionCard fxs={fxs} attrs={posAttrs} held={anyHeld(posAttrs)} onRelease={rel(posAttrs)} />}
@@ -94,9 +95,9 @@ function IntensityCard({ fxs, held, onRelease }: { fxs: Fixture[]; held: boolean
       <div class="row" style={{ alignItems: "flex-end", gap: 24 }}>
         <AttrFader fxs={fxs} attr="dimmer" height={150} />
         <div class="col" style={{ minWidth: 100 }}>
-          <button class="btn" onClick={() => set(1)}>Full</button>
+          <button class="btn" onClick={() => set(1)}>{t("Full")}</button>
           <button class="btn" onClick={() => set(0.5)}>50%</button>
-          <button class="btn" onClick={() => set(0)}>Out</button>
+          <button class="btn" onClick={() => set(0)}>{t("Out")}</button>
         </div>
       </div>
     </Card>
@@ -124,21 +125,21 @@ function PositionCard({ fxs, attrs, held, onRelease }: { fxs: Fixture[]; attrs: 
           <XYPad x={pan.value} y={tilt.value} held={pan.held || tilt.held}
             onChange={(x, y) => setAttrs(ids, { pan: x, tilt: y })} />
           <div class="row mono dim" style={{ justifyContent: "space-between" }}>
-            <span>Pan {pct(pan.value)}</span><span>Tilt {pct(tilt.value)}</span>
+            <span>{t("Pan")} {pct(pan.value)}</span><span>{t("Tilt")} {pct(tilt.value)}</span>
           </div>
         </div>
         <div class="col" style={{ minWidth: 150 }}>
-          <div class="label">Fine</div>
+          <div class="label">{t("Fine")}</div>
           <div class="row">
-            <button class="btn" aria-label="Pan left" onClick={() => nudge("pan", -0.002)}>◀</button>
-            <button class="btn" aria-label="Pan right" onClick={() => nudge("pan", 0.002)}>▶</button>
-            <button class="btn" aria-label="Tilt up" onClick={() => nudge("tilt", 0.002)}>▲</button>
-            <button class="btn" aria-label="Tilt down" onClick={() => nudge("tilt", -0.002)}>▼</button>
+            <button class="btn" aria-label={t("Pan left")} onClick={() => nudge("pan", -0.002)}>◀</button>
+            <button class="btn" aria-label={t("Pan right")} onClick={() => nudge("pan", 0.002)}>▶</button>
+            <button class="btn" aria-label={t("Tilt up")} onClick={() => nudge("tilt", 0.002)}>▲</button>
+            <button class="btn" aria-label={t("Tilt down")} onClick={() => nudge("tilt", -0.002)}>▼</button>
           </div>
-          <button class="btn" onClick={() => setAttrs(ids, { pan: 0.5, tilt: 0.5 })}>Home</button>
-          <div class="label" style={{ marginTop: 6 }}>Fan across selection</div>
-          <Fader horizontal width={150} value={fan} onChange={setFan} color="var(--attr-position)" ariaLabel="Fan width" />
-          <button class="btn" disabled={ids.length < 2} onClick={doFan}>Fan pan ({Math.round(fan * 200)}%)</button>
+          <button class="btn" onClick={() => setAttrs(ids, { pan: 0.5, tilt: 0.5 })}>{t("Home")}</button>
+          <div class="label" style={{ marginTop: 6 }}>{t("Fan across selection")}</div>
+          <Fader horizontal width={150} value={fan} onChange={setFan} color="var(--attr-position)" ariaLabel={t("Fan width")} />
+          <button class="btn" disabled={ids.length < 2} onClick={doFan}>{t("Fan pan ({n}%)", { n: Math.round(fan * 200) })}</button>
         </div>
       </div>
     </Card>
@@ -163,13 +164,13 @@ function ColorCard({ fxs, attrs, held, onRelease }: { fxs: Fixture[]; attrs: str
             <ColorPicker rgb={rgb} onChange={apply} onEnd={(c) => pushColor(rbHex(c))} size={240} />
             <div class="row">
               <span class="lv-sw" style={{ background: hex, width: 28, height: 28 }} />
-              <input class="input mono" aria-label="Hex colour" value={hexIn ?? hex} style={{ width: 100 }}
+              <input class="input mono" aria-label={t("Hex colour")} value={hexIn ?? hex} style={{ width: 100 }}
                 onInput={(e) => { const v = (e.target as HTMLInputElement).value; setHexIn(v); const c = hexToRgb(v); if (c) apply(c); }}
                 onBlur={() => { if (hexIn && hexToRgb(hexIn)) pushColor(rgbToHex(...hexToRgb(hexIn)!)); setHexIn(null); }} />
             </div>
-            <div class="lv-hist" aria-label="Recent colours">
+            <div class="lv-hist" aria-label={t("Recent colours")}>
               {colorHistory.value.map((c) => (
-                <button key={c} style={{ background: c }} aria-label={`Colour ${c}`} onClick={() => { const v = hexToRgb(c); if (v) apply(v); }} />
+                <button key={c} style={{ background: c }} aria-label={t("Colour {c}", { c })} onClick={() => { const v = hexToRgb(c); if (v) apply(v); }} />
               ))}
             </div>
           </div>
@@ -183,13 +184,13 @@ function ColorCard({ fxs, attrs, held, onRelease }: { fxs: Fixture[]; attrs: str
                 <Fader horizontal width="100%" height={28} value={s.value} held={s.held} color={attrColor(a)} ariaLabel={attrLabel(a)}
                   onChange={(v) => setAttrs(ids, { [a]: v })} />
                 <span class="mono" style={{ color: s.held ? "var(--live)" : undefined }}>{Math.round(s.value * 255)}</span>
-                {s.held ? <button class="lv-x" aria-label={`Release ${attrLabel(a)}`} onClick={() => releaseAttrs(ids, [a])}>✕</button> : <span />}
+                {s.held ? <button class="lv-x" aria-label={t("Release {label}", { label: attrLabel(a) })} onClick={() => releaseAttrs(ids, [a])}>✕</button> : <span />}
               </div>
             );
           })}
           {attrs.includes("colorwheel") && (
             <>
-              <div class="label" style={{ marginTop: 6 }}>Colour wheel</div>
+              <div class="label" style={{ marginTop: 6 }}>{t("Colour wheel")}</div>
               <Slots fxs={fxs} attr="colorwheel" value={wheel.value} held={wheel.held} />
             </>
           )}
@@ -218,7 +219,7 @@ function EncoderCard({ title, group, fxs, attrs, onRelease }: { title: string; g
         const s = attrState(fxs, a);
         return (
           <div key={a} style={{ marginTop: 8 }}>
-            <div class="label">{attrLabel(a)} slots</div>
+            <div class="label">{t("{attr} slots", { attr: attrLabel(a) })}</div>
             <Slots fxs={fxs} attr={a} value={s.value} held={s.held} />
           </div>
         );

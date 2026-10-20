@@ -4,6 +4,7 @@ import { EmptyState, PageHead, Segmented, Toggle } from "../ui";
 import { footprint, modeOf, profileById } from "../lib/fixtures";
 import { attrLabel } from "../lib/shell-attrs";
 import { releaseDmx, requestDmx } from "../lib/dmxsub";
+import { t } from "../i18n";
 
 type Fmt = "dec" | "hex" | "pct";
 type Info = { fixture: number; name: string; attr: string } | null;
@@ -118,12 +119,12 @@ export function Monitor() {
   const info = shown ? chInfo.get(shown) ?? null : null;
   return (
     <div class="page">
-      <PageHead title="DMX monitor" sub="Final merged output, as sent to the outputs.">
-        <Segmented<Fmt> value={fmt} onChange={setFmt} label="Number format" options={[{ value: "dec", label: "DEC" }, { value: "hex", label: "HEX" }, { value: "pct", label: "%" }]} />
-        <Toggle checked={nz} onChange={setNz} label="Only non-zero" />
+      <PageHead title={t("DMX monitor")} sub={t("Final merged output, as sent to the outputs.")}>
+        <Segmented<Fmt> value={fmt} onChange={setFmt} label={t("Number format")} options={[{ value: "dec", label: "DEC" }, { value: "hex", label: "HEX" }, { value: "pct", label: "%" }]} />
+        <Toggle checked={nz} onChange={setNz} label={t("Only non-zero")} />
       </PageHead>
-      {unis.length === 0 ? <EmptyState title="No universes" hint="Add universes in Settings." /> : <>
-        <div class="row scroll" role="tablist" aria-label="Universes" style={{ padding: "6px 12px", gap: 4, flex: "none", borderBottom: "1px solid var(--line)" }}>
+      {unis.length === 0 ? <EmptyState title={t("No universes")} hint={t("Add universes in Settings.")} /> : <>
+        <div class="row scroll" role="tablist" aria-label={t("Universes")} style={{ padding: "6px 12px", gap: 4, flex: "none", borderBottom: "1px solid var(--line)" }}>
           {unis.map((id) => (
             <button key={id} role="tab" aria-selected={id === u} class={`btn sm ${id === u ? "sel" : ""}`} style={{ minWidth: 44 }} onClick={() => { setU(id); setPin(null); }} title={show.value?.universes.find((x) => x.id === id)?.name}>
               <span class={`dot ${active.has(id) ? "ok" : ""}`} style={{ width: 6, height: 6 }} />U{id}
@@ -131,7 +132,7 @@ export function Monitor() {
           ))}
         </div>
         <div class="grow scroll" ref={wrap} style={{ padding: 0 }}>
-          <canvas ref={cv} role="img" aria-label={`DMX values of universe ${u}`} style={{ display: "block", cursor: "crosshair" }}
+          <canvas ref={cv} role="img" aria-label={t("DMX values of universe {u}", { u })} style={{ display: "block", cursor: "crosshair" }}
             onMouseMove={(e) => setHover(chAt(e as MouseEvent))} onMouseLeave={() => setHover(null)}
             onClick={(e) => { const c = chAt(e as MouseEvent); setPin(c === pin ? null : c); const f = c ? chInfo.get(c) : null; if (f) selection.value = [f.fixture]; }} />
         </div>
@@ -139,9 +140,9 @@ export function Monitor() {
           {shown ? <>
             <b class="mono" style={{ color: "var(--text)" }}>U{u}.{String(shown).padStart(3, "0")}</b>
             <span class="mono" style={{ color: "var(--text)" }}>{v} · 0x{v.toString(16).toUpperCase().padStart(2, "0")} · {Math.round((v / 255) * 100)}%</span>
-            {info ? <span style={{ color: "var(--text)" }}>#{info.fixture} {info.name} — <span style={{ color: "var(--live)" }}>{attrLabel(info.attr.replace(" fine", ""))}{info.attr.endsWith("fine") ? " (fine)" : ""}</span></span> : <span class="faint">unpatched</span>}
-            {pin && <span class="faint">(pinned — click again to release)</span>}
-          </> : <span class="faint">Hover a channel for details, click to pin and select its fixture.</span>}
+            {info ? <span style={{ color: "var(--text)" }}>#{info.fixture} {info.name} — <span style={{ color: "var(--live)" }}>{attrLabel(info.attr.replace(" fine", ""))}{info.attr.endsWith("fine") ? ` ${t("(fine)")}` : ""}</span></span> : <span class="faint">{t("unpatched")}</span>}
+            {pin && <span class="faint">{t("(pinned — click again to release)")}</span>}
+          </> : <span class="faint">{t("Hover a channel for details, click to pin and select its fixture.")}</span>}
         </div>
       </>}
     </div>

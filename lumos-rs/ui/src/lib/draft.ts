@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { send, show, toast } from "../store";
 import type { Settings } from "../types";
+import { t } from "../i18n";
 
 export function useSettingsDraft() {
   const server = show.value?.settings;
@@ -25,7 +26,7 @@ export function useSettingsDraft() {
   };
   const save = async () => {
     if (!draft) return;
-    try { await send({ type: "settings_save", settings: draft }); toast("Settings saved", "ok", 1500); } catch { /* toasted */ }
+    try { await send({ type: "settings_save", settings: draft }); toast(t("Settings saved"), "ok", 1500); } catch { /* toasted */ }
   };
   const revert = () => server && setDraft(structuredClone(server));
   return { draft, patch, dirty, save, revert };

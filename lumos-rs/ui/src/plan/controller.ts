@@ -1,5 +1,7 @@
 // Canvas controller for the 2D workspace: render loop, camera, picking, dragging, aiming, export.
 import { fire, library, selection, show } from "../store";
+import { t, tp } from "../i18n";
+
 import { aimPanTilt } from "../lib/stage-dmx";
 import { dmx } from "../store";
 import type { FixtureProfile } from "../types";
@@ -437,22 +439,22 @@ export class PlanController {
       if (!selection.value.includes(fid)) selection.value = [fid];
       const f = effFixtures().find((q) => q.id === fid);
       const sameProf = effFixtures().filter((q) => q.profile === f?.profile).map((q) => q.id);
-      items.push({ label: `Fixture ${fid} · ${f?.name ?? ""}`, disabled: true });
-      items.push({ label: `Select all "${f?.profile.split("/").pop()}" (${sameProf.length})`, run: () => (selection.value = sameProf) });
+      items.push({ label: t("Fixture {id} · {name}", { id: fid, name: f?.name ?? "" }), disabled: true });
+      items.push({ label: t("Select all “{model}” ({n})", { model: f?.profile.split("/").pop() ?? "", n: sameProf.length }), run: () => (selection.value = sameProf) });
       for (const g of show.value?.groups ?? []) {
-        if (g.fixtures.includes(fid)) items.push({ label: `Select group “${g.name}”`, run: () => (selection.value = g.fixtures.slice()) });
+        if (g.fixtures.includes(fid)) items.push({ label: t("Select group “{name}”", { name: g.name }), run: () => (selection.value = g.fixtures.slice()) });
       }
       items.push({ sep: true, label: "" });
     }
     const m2 = selection.value.filter((id) => this.last.geos.get(id)?.moving);
-    items.push({ label: `Aim ${m2.length || movers.length || 0} mover${(m2.length || movers.length) === 1 ? "" : "s"} here`, disabled: !(m2.length || movers.length), run: () => this.aimSelectionAt(T) });
-    items.push({ label: "Home pan/tilt (centre)", disabled: !m2.length, run: () => this.homeSelection() });
-    items.push({ label: "Release pan/tilt", disabled: !m2.length, run: () => fire({ type: "prog_release", fixtures: m2, attrs: ["pan", "tilt"] }) });
+    items.push({ label: tp(m2.length || movers.length || 0, "Aim {n} mover here", "Aim {n} movers here"), disabled: !(m2.length || movers.length), run: () => this.aimSelectionAt(T) });
+    items.push({ label: t("Home pan/tilt (centre)"), disabled: !m2.length, run: () => this.homeSelection() });
+    items.push({ label: t("Release pan/tilt"), disabled: !m2.length, run: () => fire({ type: "prog_release", fixtures: m2, attrs: ["pan", "tilt"] }) });
     items.push({ sep: true, label: "" });
-    items.push({ label: "Select all movers", run: () => (selection.value = [...this.last.geos.values()].filter((g) => g.moving).map((g) => g.fx.id)) });
-    items.push({ label: "Select all", run: () => (selection.value = effFixtures().map((f) => f.id)) });
-    items.push({ label: "Select none", run: () => (selection.value = []) });
-    items.push({ label: "Fit view", run: () => this.fit() });
+    items.push({ label: t("Select all movers"), run: () => (selection.value = [...this.last.geos.values()].filter((g) => g.moving).map((g) => g.fx.id)) });
+    items.push({ label: t("Select all"), run: () => (selection.value = effFixtures().map((f) => f.id)) });
+    items.push({ label: t("Select none"), run: () => (selection.value = []) });
+    items.push({ label: t("Fit view"), run: () => this.fit() });
     menu.value = { x, y, items };
   }
 
@@ -512,7 +514,7 @@ export class PlanController {
       bg, bgImg: bg ? loadImage(bg.url) : null, rubber: null, hover: null, clean: true,
     });
     ctx.fillStyle = this.th.text; ctx.font = `700 14px ${this.th.ui}`; ctx.textAlign = "left"; ctx.textBaseline = "top";
-    ctx.fillText(`${title} — ${view.value === "plan" ? "Plan" : view.value === "front" ? "Front elevation" : "Side elevation"}`, 16, 14);
+    ctx.fillText(`${title} — ${view.value === "plan" ? t("Plan") : view.value === "front" ? t("Front elevation") : t("Side elevation")}`, 16, 14);
     ctx.fillStyle = this.th.dim; ctx.font = `11px ${this.th.ui}`;
     ctx.fillText(new Date().toLocaleString(), 16, 34);
     cv.toBlob((b) => {

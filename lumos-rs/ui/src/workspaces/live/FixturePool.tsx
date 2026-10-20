@@ -5,6 +5,7 @@ import { fixtureLevel, fixtureRgb, hasAttr } from "../../lib/attrs";
 import { useDmxTick, useLongPress } from "../../lib/hooks";
 import { ConfirmDialog, PromptDialog } from "./dialogs";
 import { Modal } from "../../ui";
+import { t } from "../../i18n";
 
 const sortedFx = (): Fixture[] => [...(show.value?.fixtures ?? [])].sort((a, b) => a.id - b.id);
 
@@ -70,22 +71,22 @@ export function FixturePool() {
   return (
     <div class="panel lv-col pool">
       <div class="panel-head">
-        <span>Fixtures</span><span class="sp" />
+        <span>{t("Fixtures")}</span><span class="sp" />
         <span class="chip"><span class="lv-chipsel">{selection.value.length}</span> / {fixtures.length}</span>
       </div>
-      <div class="lv-selbar" role="toolbar" aria-label="Selection">
-        <button class="btn sm" onClick={() => (selection.value = ids)}>All</button>
-        <button class="btn sm" onClick={() => (selection.value = [])}>None</button>
-        <button class="btn sm" onClick={() => (selection.value = ids.filter((i) => !sel.has(i)))}>Invert</button>
-        <button class="btn sm" onClick={() => (selection.value = selection.value.filter((_, i) => i % 2 === 0))}>Odd</button>
-        <button class="btn sm" onClick={() => (selection.value = selection.value.filter((_, i) => i % 2 === 1))}>Even</button>
-        <button class="btn sm" onClick={() => step(-1)} aria-label="Previous fixture">◀ Prev</button>
-        <button class="btn sm" onClick={() => step(1)} aria-label="Next fixture">Next ▶</button>
+      <div class="lv-selbar" role="toolbar" aria-label={t("Selection")}>
+        <button class="btn sm" onClick={() => (selection.value = ids)}>{t("All")}</button>
+        <button class="btn sm" onClick={() => (selection.value = [])}>{t("None")}</button>
+        <button class="btn sm" onClick={() => (selection.value = ids.filter((i) => !sel.has(i)))}>{t("Invert")}</button>
+        <button class="btn sm" onClick={() => (selection.value = selection.value.filter((_, i) => i % 2 === 0))}>{t("Odd")}</button>
+        <button class="btn sm" onClick={() => (selection.value = selection.value.filter((_, i) => i % 2 === 1))}>{t("Even")}</button>
+        <button class="btn sm" onClick={() => step(-1)} aria-label={t("Previous fixture")}>{t("◀ Prev")}</button>
+        <button class="btn sm" onClick={() => step(1)} aria-label={t("Next fixture")}>{t("Next ▶")}</button>
       </div>
       <GroupsRow />
       <div class="lv-scroll">
         <div ref={wrap} class="lv-pool" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
-          {fixtures.length === 0 && <div class="dim" style={{ gridColumn: "1/-1", padding: 16 }}>No fixtures patched. Add fixtures in the Patch workspace.</div>}
+          {fixtures.length === 0 && <div class="dim" style={{ gridColumn: "1/-1", padding: 16 }}>{t("No fixtures patched. Add fixtures in the Patch workspace.")}</div>}
           {fixtures.map((fx) => {
             const lvl = fixtureLevel(fx);
             const held = !!prog[fx.id] && Object.keys(prog[fx.id]!).length > 0;
@@ -93,7 +94,7 @@ export function FixturePool() {
             const hasColor = hasAttr(fx, "red") || hasAttr(fx, "green") || hasAttr(fx, "blue");
             return (
               <div key={fx.id} data-fid={fx.id} class={`lv-fx ${sel.has(fx.id) ? "sel" : ""} ${held ? "held" : ""}`}
-                role="button" aria-pressed={sel.has(fx.id)} aria-label={`Fixture ${fx.id} ${fx.name}`}
+                role="button" aria-pressed={sel.has(fx.id)} aria-label={t("Fixture {id} {name}", { id: fx.id, name: fx.name })}
                 onClick={(e) => click(fx.id, e)}>
                 <span class="lv-fx-id">{fx.id}</span>
                 <span class="lv-fx-name">{fx.name}</span>
@@ -115,11 +116,11 @@ function GroupsRow() {
   const [edit, setEdit] = useState<Group | null>(null);
   const nextId = () => Math.max(0, ...groups.map((g) => g.id)) + 1;
   return (
-    <div class="lv-groups" role="toolbar" aria-label="Groups">
+    <div class="lv-groups" role="toolbar" aria-label={t("Groups")}>
       {groups.map((g) => <GroupBtn key={g.id} g={g} onEdit={() => setEdit(g)} />)}
-      <button class="btn sm" disabled={!selection.value.length} onClick={() => setNaming(true)} title="Record group from selection">+ Group</button>
+      <button class="btn sm" disabled={!selection.value.length} onClick={() => setNaming(true)} title={t("Record group from selection")}>{t("+ Group")}</button>
       {naming && (
-        <PromptDialog title="Record group" label="Group name" initial={`Group ${nextId()}`} ok="Record" onClose={() => setNaming(false)}
+        <PromptDialog title={t("Record group")} label={t("Group name")} initial={t("Group {n}", { n: nextId() })} ok={t("Record")} onClose={() => setNaming(false)}
           onSubmit={(name) => send({ type: "group_save", group: { id: nextId(), name, fixtures: [...selection.value].sort((a, b) => a - b) } })} />
       )}
       {edit && <GroupEdit g={edit} onClose={() => setEdit(null)} />}
@@ -133,7 +134,7 @@ function GroupBtn({ g, onEdit }: { g: Group; onEdit: () => void }) {
   return (
     <button class={`btn sm ${active ? "sel" : ""}`} {...lp as any}
       onClick={() => { if (!lp.wasLong()) selection.value = [...g.fixtures]; }}
-      title={`${g.fixtures.length} fixtures — right-click / long-press to edit`}>
+      title={t("{n} fixtures — right-click / long-press to edit", { n: g.fixtures.length })}>
       {g.name} <span class="faint">{g.fixtures.length}</span>
     </button>
   );
@@ -142,21 +143,21 @@ function GroupBtn({ g, onEdit }: { g: Group; onEdit: () => void }) {
 function GroupEdit({ g, onClose }: { g: Group; onClose: () => void }) {
   const [name, setName] = useState(g.name);
   const [del, setDel] = useState(false);
-  if (del) return <ConfirmDialog title="Delete group" text={`Delete group “${g.name}”?`} ok="Delete" danger onClose={onClose}
+  if (del) return <ConfirmDialog title={t("Delete group")} text={t("Delete group “{name}”?", { name: g.name })} ok={t("Delete")} danger onClose={onClose}
     onYes={() => send({ type: "group_remove", id: g.id })} />;
   return (
-    <Modal title={`Group “${g.name}”`} onClose={onClose} footer={<>
-      <button class="btn danger" onClick={() => setDel(true)}>Delete</button><span class="sp" />
-      <button class="btn" onClick={onClose}>Cancel</button>
-      <button class="btn primary" onClick={() => { send({ type: "group_save", group: { ...g, name: name.trim() || g.name } }); onClose(); }}>Save name</button>
+    <Modal title={t("Group “{name}”", { name: g.name })} onClose={onClose} footer={<>
+      <button class="btn danger" onClick={() => setDel(true)}>{t("Delete")}</button><span class="sp" />
+      <button class="btn" onClick={onClose}>{t("Cancel")}</button>
+      <button class="btn primary" onClick={() => { send({ type: "group_save", group: { ...g, name: name.trim() || g.name } }); onClose(); }}>{t("Save name")}</button>
     </>}>
-      <div class="field"><label>Name</label><input class="input" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} /></div>
+      <div class="field"><label>{t("Name")}</label><input class="input" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} /></div>
       <div class="row">
         <button class="btn" disabled={!selection.value.length}
           onClick={() => { send({ type: "group_save", group: { ...g, fixtures: [...selection.value].sort((a, b) => a - b) } }); onClose(); }}>
-          Replace members with current selection ({selection.value.length})</button>
+          {t("Replace members with current selection ({n})", { n: selection.value.length })}</button>
       </div>
-      <div class="dim">Members: {g.fixtures.join(", ") || "—"}</div>
+      <div class="dim">{t("Members:")} {g.fixtures.join(", ") || "—"}</div>
     </Modal>
   );
 }

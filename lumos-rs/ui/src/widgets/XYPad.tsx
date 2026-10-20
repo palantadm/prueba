@@ -1,4 +1,5 @@
 import { useRef, useState } from "preact/hooks";
+import { t } from "../i18n";
 
 /** 2-D pad. x: left→right, y: bottom→top (0..1). Shift = fine relative movement. */
 export function XYPad(p: {
@@ -42,7 +43,7 @@ export function XYPad(p: {
   };
   return (
     <div ref={ref} class={`lv-xy ${p.held ? "held" : ""}`} style={{ "--fc": color } as any} tabIndex={0}
-      role="application" aria-label={`${p.labelX ?? "Pan"} / ${p.labelY ?? "Tilt"} pad`}
+      role="application" aria-label={t("{x} / {y} pad", { x: p.labelX ?? t("Pan"), y: p.labelY ?? t("Tilt") })}
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onKeyDown={key}>
       <div class="lv-xy-h" style={{ bottom: `${y * 100}%` }} />
       <div class="lv-xy-v" style={{ left: `${x * 100}%` }} />

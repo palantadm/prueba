@@ -1,6 +1,7 @@
 // Global client state + WebSocket link to the Lumos engine.
 // The server is authoritative: the UI only sends Commands and renders what comes back.
 import { signal } from "@preact/signals";
+import { tErr } from "./i18n/errors";
 import type { Command, FixtureProfile, Runtime, ServerMsg, Show, ShowInfo, Source } from "./types";
 
 export const connected = signal(false);
@@ -47,14 +48,14 @@ export function send(cmd: Command, opts: { quiet?: boolean } = {}): Promise<void
   return new Promise((ok, err) => {
     if (!ws || ws.readyState !== WebSocket.OPEN) {
       const e = new Error("Not connected");
-      if (!opts.quiet) toast(e.message, "err");
+      if (!opts.quiet) toast(tErr(e.message), "err");
       return err(e);
     }
     const id = String(seq++);
     pending.set(id, {
       ok,
       err: (e) => {
-        if (!opts.quiet) toast(e.message, "err");
+        if (!opts.quiet) toast(tErr(e.message), "err");
         err(e);
       },
     });
@@ -94,7 +95,7 @@ function onMessage(ev: MessageEvent) {
     case "midi_out": hooks.midiOut?.(m.port, m.bytes); break;
     case "log":
       serverLog.value = [{ level: m.level, msg: m.msg, at: Date.now() }, ...serverLog.value].slice(0, 200);
-      if (m.level === "error") toast(m.msg, "err");
+      if (m.level === "error") toast(tErr(m.msg), "err");
       break;
     case "ack": {
       const p = pending.get(m.id);

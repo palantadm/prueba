@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect } from "preact/hooks";
 import { toasts } from "../store";
+import { t } from "../i18n";
 
 export function Modal(props: {
   title: string;
@@ -19,7 +20,7 @@ export function Modal(props: {
       <div class="modal" role="dialog" aria-modal="true" aria-label={props.title} style={props.width ? { width: props.width } : undefined}>
         <div class="modal-head">
           <span class="grow">{props.title}</span>
-          <button class="btn ghost icon" aria-label="Close" onClick={props.onClose}>✕</button>
+          <button class="btn ghost icon" aria-label={t("Close")} onClick={props.onClose}>✕</button>
         </div>
         <div class="modal-body">{props.children}</div>
         {props.footer && <div class="modal-foot">{props.footer}</div>}

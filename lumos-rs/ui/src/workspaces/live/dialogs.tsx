@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { Modal } from "../../ui";
+import { t } from "../../i18n";
 
 export function PromptDialog(p: {
   title: string; label: string; initial?: string; ok?: string;
@@ -10,7 +11,7 @@ export function PromptDialog(p: {
   const go = () => { if (v.trim()) { p.onSubmit(v.trim()); p.onClose(); } };
   return (
     <Modal title={p.title} onClose={p.onClose} footer={<>
-      <button class="btn" onClick={p.onClose}>Cancel</button>
+      <button class="btn" onClick={p.onClose}>{t("Cancel")}</button>
       <button class="btn primary" onClick={go} disabled={!v.trim()}>{p.ok ?? "OK"}</button>
     </>}>
       <div class="field">
@@ -26,7 +27,7 @@ export function PromptDialog(p: {
 export function ConfirmDialog(p: { title: string; text: string; ok?: string; danger?: boolean; onYes: () => void; onClose: () => void }) {
   return (
     <Modal title={p.title} onClose={p.onClose} footer={<>
-      <button class="btn" onClick={p.onClose}>Cancel</button>
+      <button class="btn" onClick={p.onClose}>{t("Cancel")}</button>
       <button class={`btn ${p.danger ? "danger" : "primary"}`} onClick={() => { p.onYes(); p.onClose(); }}>{p.ok ?? "OK"}</button>
     </>}>
       <div>{p.text}</div>

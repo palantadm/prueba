@@ -1,6 +1,7 @@
 // Web MIDI → server bridge. Every message from enabled input ports is forwarded as `midi_in`.
 import { signal } from "@preact/signals";
 import { fire, hooks } from "./store";
+import { t } from "./i18n";
 
 export type MidiPort = { id: string; name: string; manufacturer: string; connected: boolean };
 export type MidiState = "idle" | "ready" | "denied" | "unsupported";
@@ -61,7 +62,7 @@ export async function initMidi() {
   if (access) return;
   if (!("requestMIDIAccess" in navigator)) {
     midiState.value = "unsupported";
-    midiError.value = "This browser has no Web MIDI support. Use Chrome, Edge or Firefox (Safari is not supported).";
+    midiError.value = t("This browser has no Web MIDI support. Use Chrome, Edge or Firefox (Safari is not supported).");
     return;
   }
   try {
@@ -71,7 +72,7 @@ export async function initMidi() {
     refresh();
   } catch (e) {
     midiState.value = "denied";
-    midiError.value = `MIDI access was denied or unavailable (${(e as Error).message || "permission"}). Allow MIDI for this site in the browser's site settings.`;
+    midiError.value = t("MIDI access was denied or unavailable ({reason}). Allow MIDI for this site in the browser's site settings.", { reason: (e as Error).message || t("permission") });
   }
 }
 
@@ -118,7 +119,7 @@ export function sendMidi(port: string | null, bytes: number[], force = false): n
     if (!(port ? name === port && (force || enabled) : force || enabled)) return;
     try { o.send(bytes); n++; } catch { /* port vanished */ }
   });
-  if (n) midiOutLog.value = [{ at: Date.now(), port: port ?? "enabled outputs", text: describe(bytes) }, ...midiOutLog.value].slice(0, 60);
+  if (n) midiOutLog.value = [{ at: Date.now(), port: port ?? t("enabled outputs"), text: describe(bytes) }, ...midiOutLog.value].slice(0, 60);
   return n;
 }
 

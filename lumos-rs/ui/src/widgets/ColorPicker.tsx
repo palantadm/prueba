@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { hsvToRgb, rgbToHsv } from "../lib/attrs";
+import { t } from "../i18n";
 
 type RGB = [number, number, number];
 
@@ -40,10 +41,10 @@ export function ColorPicker(p: { rgb: RGB; onChange: (rgb: RGB) => void; onEnd?:
   return (
     <div class="lv-cp" style={{ width: p.size ?? 240 }}>
       <div ref={box} class="lv-cp-sv" style={{ background: `linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,${hue})` }}
-        role="application" aria-label="Saturation and brightness" {...mk("sv", svAt)}>
+        role="application" aria-label={t("Saturation and brightness")} {...mk("sv", svAt)}>
         <div class="lv-cp-dot" style={{ left: `${hsv[1] * 100}%`, top: `${(1 - hsv[2]) * 100}%` }} />
       </div>
-      <div ref={strip} class="lv-cp-hue" role="application" aria-label="Hue" {...mk("h", hAt)}>
+      <div ref={strip} class="lv-cp-hue" role="application" aria-label={t("Hue")} {...mk("h", hAt)}>
         <div class="lv-cp-hdot" style={{ left: `${hsv[0] * 100}%` }} />
       </div>
     </div>
