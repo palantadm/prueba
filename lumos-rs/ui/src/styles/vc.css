@@ -114,3 +114,8 @@
   .vc-props { width: auto; max-height: 46%; border-left: 0; border-top: 1px solid var(--line); }
   .vc-stage { padding: 6px; }
 }
+
+/* i18n: Spanish captions are longer ("SIGUIENTE"); never overflow narrow cue-list widgets */
+.vc-cl-cues > div { min-width: 0; }
+.vc-cl-cues .vc-cap { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc-btn-label { overflow-wrap: anywhere; }

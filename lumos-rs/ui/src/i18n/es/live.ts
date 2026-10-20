@@ -112,7 +112,7 @@ export const live: Record<string, string> = {
   "Insert cue": "Insertar cue",
 
   // ── Executors
-  "Grand Master": "Master general",
+  "Grand Master": "Master gral.",
   "Executors": "Ejecutores",
   "Executor page": "Página de ejecutores",
   "Page {n}": "Página {n}",
@@ -167,9 +167,9 @@ export const live: Record<string, string> = {
   "Odd": "Impares",
   "Even": "Pares",
   "Previous fixture": "Aparato anterior",
-  "◀ Prev": "◀ Ant.",
+  "◀ Prev": "◀",
   "Next fixture": "Aparato siguiente",
-  "Next ▶": "Sig. ▶",
+  "Next ▶": "▶",
   "No fixtures patched. Add fixtures in the Patch workspace.": "No hay aparatos parcheados. Añade aparatos en Patch.",
   "Fixture {id} {name}": "Aparato {id} {name}",
   "Groups": "Grupos",
@@ -254,4 +254,25 @@ export const live: Record<string, string> = {
   // ── Widgets
   "{x} / {y} pad": "Pad {x} / {y}",
   "Saturation and brightness": "Saturación y brillo",
+};
+
+/** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */
+export const capLabelsEs: Record<string, string> = {
+  "Open": "Abierto",
+  "Closed": "Cerrado",
+  "Off": "Apagado",
+  "White": "Blanco",
+  "Red": "Rojo",
+  "Orange": "Naranja",
+  "Yellow": "Amarillo",
+  "Green": "Verde",
+  "Cyan": "Cian",
+  "Blue": "Azul",
+  "Magenta": "Magenta",
+  "Prism": "Prisma",
+  "Rotation": "Rotación",
+  "Shake / scroll": "Vibración / desplazamiento",
+  "Strobe slow→fast": "Strobe lento→rápido",
+  "Fog output": "Salida de niebla",
+  "Haze output": "Salida de haze",
 };

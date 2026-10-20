@@ -2,7 +2,7 @@ import { useState } from "preact/hooks";
 import { selection } from "../../store";
 import type { Fixture } from "../../types";
 import {
-  attrColor, attrHome, attrLabel, channelOf, fixtureById, GROUP_COLOR, hexToRgb, pct, rgbToHex, unionAttrs,
+  attrColor, attrHome, attrLabel, capLabel, channelOf, fixtureById, GROUP_COLOR, hexToRgb, pct, rgbToHex, unionAttrs,
 } from "../../lib/attrs";
 import { attrState, releaseAttrs, setAttrs } from "../../lib/program";
 import { colorHistory, pushColor } from "../../lib/state";
@@ -36,7 +36,7 @@ function Slots({ fxs, attr, value, held }: { fxs: Fixture[]; attr: string; value
         return (
           <button key={i} class={`lv-slot ${on && held ? "on" : ""}`} title={`${c.min}–${c.max}`}
             onClick={() => setAttrs(selection.value, { [attr]: (c.min + c.max) / 2 / 255 })}>
-            {c.color && <span class="lv-sw" style={{ background: c.color }} />}{c.label}
+            {c.color && <span class="lv-sw" style={{ background: c.color }} />}{capLabel(c.label)}
           </button>
         );
       })}

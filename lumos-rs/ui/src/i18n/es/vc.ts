@@ -235,6 +235,7 @@ export const vc: Record<string, string> = {
   "Iris": "Iris",
   "Shutter/Strobe": "Shutter/Strobe",
   "Control": "Control",
+  "CC": "CC",
   "Output ports · controller feedback": "Puertos de salida · feedback a controladores",
   "Relay engine feedback from this browser": "Retransmitir el feedback del motor desde este navegador",
   "Turn off on all but one browser to avoid duplicate messages": "Desactívalo en todos los navegadores menos uno para evitar mensajes duplicados",
