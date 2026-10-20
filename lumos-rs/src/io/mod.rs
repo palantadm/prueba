@@ -106,6 +106,10 @@ pub struct IoHub {
     feedback: Option<(UdpSocket, SocketAddr)>,
     feedback_key: String,
 
+    /// Shared non-blocking socket + resolved-address cache for ad-hoc OSC sends (virtual-console feedback).
+    osc_tx: Option<UdpSocket>,
+    osc_resolved: Mutex<std::collections::HashMap<(String, u16), Option<SocketAddr>>>,
+
     pub(crate) counters: Counters,
 }
 
@@ -130,6 +134,8 @@ impl IoHub {
             artnet_port: artnet::ARTNET_PORT,
             feedback: None,
             feedback_key: String::new(),
+            osc_tx: UdpSocket::bind("0.0.0.0:0").ok().and_then(|s| s.set_nonblocking(true).ok().map(|_| s)),
+            osc_resolved: Mutex::new(std::collections::HashMap::new()),
             counters: Counters::default(),
         }
     }
@@ -265,6 +271,27 @@ impl IoHub {
             recent: self.recent.lock().iter().cloned().collect(),
         };
         (outs, inputs)
+    }
+
+    /// Send one float OSC message to an arbitrary target (non-blocking; address resolved once and cached).
+    /// Returns whether the datagram was handed to the socket.
+    pub fn osc_send(&self, host: &str, port: u16, addr: &str, value: f32) -> bool {
+        let Some(sock) = &self.osc_tx else { return false };
+        let target = {
+            let mut cache = self.osc_resolved.lock();
+            *cache.entry((host.to_string(), port)).or_insert_with(|| {
+                (host, port).to_socket_addrs().ok().and_then(|mut a| a.find(|s| s.is_ipv4()))
+            })
+        };
+        let Some(target) = target else { return false };
+        let pkt = rosc::OscPacket::Message(rosc::OscMessage {
+            addr: addr.to_string(),
+            args: vec![rosc::OscType::Float(value)],
+        });
+        match rosc::encoder::encode(&pkt) {
+            Ok(buf) => sock.send_to(&buf, target).is_ok(),
+            Err(_) => false,
+        }
     }
 
     /// Send one OSC message to the configured feedback target (no-op when disabled).

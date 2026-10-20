@@ -510,3 +510,24 @@ fn serial_missing_port_reports_error_and_send_never_blocks() {
     assert_eq!(serial::SerialSink::new(SerialDriver::EnttecPro, "").stat().state, OutState::Error);
     let _ = list_serial_ports(); // must not panic without hardware
 }
+
+#[test]
+fn osc_send_reaches_arbitrary_target() {
+    let (tx, _rx) = unbounded_channel();
+    let hub = IoHub::new(tx);
+    let rcv = UdpSocket::bind("127.0.0.1:0").unwrap();
+    rcv.set_read_timeout(Some(std::time::Duration::from_millis(1000))).unwrap();
+    let port = rcv.local_addr().unwrap().port();
+    assert!(hub.osc_send("127.0.0.1", port, "/vc/led/3", 0.5));
+    let mut buf = [0u8; 256];
+    let (n, _) = rcv.recv_from(&mut buf).unwrap();
+    let (_, pkt) = rosc::decoder::decode_udp(&buf[..n]).unwrap();
+    match pkt {
+        OscPacket::Message(m) => {
+            assert_eq!(m.addr, "/vc/led/3");
+            assert_eq!(m.args, vec![OscType::Float(0.5)]);
+        }
+        p => panic!("unexpected {p:?}"),
+    }
+    assert!(!hub.osc_send("no-such-host.invalid", 9, "/x", 1.0));
+}

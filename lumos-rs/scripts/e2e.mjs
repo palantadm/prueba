@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import dgram from "node:dgram";
 
 const bin = process.argv[2] ?? "target/debug/lumos";
 const data = mkdtempSync(join(tmpdir(), "lumos-e2e-"));
@@ -22,7 +23,7 @@ const base = await new Promise((res, rej) => {
 
 const ws = new WebSocket(`ws://${base}/ws`);
 ws.binaryType = "arraybuffer";
-const state = { show: null, rt: null, library: [], hello: null, shows: null, frames: new Map(), learned: [] };
+const state = { show: null, rt: null, library: [], hello: null, shows: null, frames: new Map(), learned: [], midiOut: [] };
 const waiters = [];
 let seq = 1; const acks = new Map();
 ws.onmessage = (e) => {
@@ -30,7 +31,7 @@ ws.onmessage = (e) => {
   else {
     const m = JSON.parse(e.data);
     if (m.t === "show") state.show = m.show; else if (m.t === "rt") state.rt = m.rt; else if (m.t === "library") state.library = m.profiles;
-    else if (m.t === "hello") state.hello = m; else if (m.t === "shows") state.shows = m.shows; else if (m.t === "learned") state.learned.push(m.source);
+    else if (m.t === "hello") state.hello = m; else if (m.t === "shows") state.shows = m.shows; else if (m.t === "learned") state.learned.push(m.source); else if (m.t === "midi_out") state.midiOut.push(m);
     else if (m.t === "ack") { if (m.id === "") console.log("  unmatched ack:", m.err); acks.get(m.id)?.(m); acks.delete(m.id); }
   }
   waiters.forEach((w) => w());
@@ -130,6 +131,60 @@ ok((await (await fetch(`http://${base}${up.url}`)).text()) === "hello", "media s
 const idx = await fetch(`http://${base}/`);
 ok(idx.ok && (await idx.text()).includes("<"), "GET / serves UI");
 ok((await fetch(`http://${base}/some/spa/route`)).ok, "SPA fallback");
+
+console.log("virtual console");
+const oscSock = dgram.createSocket("udp4"); const oscGot = [];
+oscSock.on("message", (m) => oscGot.push(m.toString("latin1")));
+await new Promise((r) => oscSock.bind(0, "127.0.0.1", r));
+const oscPort = oscSock.address().port;
+const W = (id, kind, action, mode, extra = {}) => ({ id, kind, label: `w${id}`, x: 0, y: 0, w: 2, h: 2, color: "#35c46a", action, mode, orientation: "", inputs: [], feedback: [], out_min: 0, out_max: 1, ...extra });
+const page = { id: 1, name: "Main", cols: 8, rows: 6, widgets: [
+  W(11, "button", { type: "blackout" }, "toggle", {
+    inputs: [{ source: { type: "midi", port: null, kind: "note", channel: 1, number: 36 }, invert: false, in_min: 0, in_max: 1 }],
+    feedback: [{ type: "midi", port: "APC", kind: "note", channel: 1, number: 36, on: 127, off: 0, scale: false },
+               { type: "osc", host: "127.0.0.1", port: oscPort, address: "/vc/bo", on: 1, off: 0 }] }),
+  W(12, "slider", { type: "grand_master" }, "trigger", {
+    inputs: [{ source: { type: "midi", port: null, kind: "cc", channel: 1, number: 7 }, invert: false, in_min: 0, in_max: 1 }],
+    feedback: [{ type: "midi", port: null, kind: "cc", channel: 1, number: 7, on: 127, off: 0, scale: true }] }),
+  W(13, "button", { type: "dmx", universe: 2, channel: 9 }, "momentary"),
+] };
+r = await cmd({ type: "vc_save", pages: [page] });
+ok(r.ok, "vc_save");
+await until(() => state.show.vconsole?.[0]?.widgets.length === 3, "vconsole in show");
+await until(() => state.rt.vc?.length === 3, "widget states in runtime");
+ok(state.rt.vc.length === 3, "rt.vc has 3 widget states");
+r = await cmd({ type: "vc_press", widget: 13, down: true });
+ok(r.ok, "vc_press down");
+await until(() => state.frames.get(2)?.[8] === 255, "momentary button drives DMX 2:9", 3000);
+ok(state.frames.get(2)?.[8] === 255, "DMX u2 ch9 = 255 while held");
+await cmd({ type: "vc_press", widget: 13, down: false });
+await until(() => state.frames.get(2)?.[8] === 0, "release", 3000);
+ok(state.frames.get(2)?.[8] === 0, "DMX u2 ch9 released");
+state.midiOut.length = 0;
+await cmd({ type: "midi_in", port: "APC", bytes: [0x90, 36, 100] });
+await until(() => state.rt.blackout === true, "blackout via MIDI note", 3000);
+ok(state.rt.blackout === true, "MIDI note toggles blackout widget");
+await until(() => state.midiOut.some((m) => m.port === "APC" && m.bytes.join() === "144,36,127"), "LED feedback", 3000);
+ok(state.midiOut.some((m) => m.port === "APC" && m.bytes.join() === "144,36,127"), "MidiOut LED on (note 36 vel 127)");
+await until(() => oscGot.some((m) => m.startsWith("/vc/bo")), "OSC feedback", 3000);
+ok(oscGot.some((m) => m.startsWith("/vc/bo")), "OSC feedback datagram received");
+await cmd({ type: "midi_in", port: "APC", bytes: [0x90, 36, 100] });
+await until(() => state.rt.blackout === false, "blackout off", 3000);
+await cmd({ type: "midi_in", port: "APC", bytes: [0xB0, 7, 127] });
+await until(() => Math.abs(state.rt.grand_master - 1) < 1e-3, "GM", 3000);
+await cmd({ type: "vc_value", widget: 12, value: 0.25 });
+await until(() => Math.abs(state.rt.grand_master - 0.25) < 1e-3, "GM via vc_value", 3000);
+ok(Math.abs(state.rt.grand_master - 0.25) < 1e-3, "vc_value sets grand master");
+await until(() => state.midiOut.some((m) => m.bytes.join() === "176,7,32"), "fader feedback", 3000);
+ok(state.midiOut.some((m) => m.bytes.join() === "176,7,32"), "MidiOut scaled fader value (0.25 → 32)");
+await cmd({ type: "vc_value", widget: 12, value: 1 });
+r = await cmd({ type: "vc_press", widget: 999, down: true });
+ok(!r.ok, "unknown widget rejected");
+r = await cmd({ type: "learn_start", binding: null });
+await cmd({ type: "midi_in", port: "APC", bytes: [0xB0, 21, 64] });
+await until(() => state.learned.length > 0, "learned source", 3000);
+ok(state.learned.at(-1)?.number === 21, "learn returns the source for the UI to store in a widget");
+oscSock.close();
 
 console.log("idle CPU");
 const cpu = () => { const f = readFileSync(`/proc/${proc.pid}/stat`, "utf8").split(") ")[1].split(" "); return (+f[11] + +f[12]) / 100; };

@@ -4,6 +4,7 @@ mod bindings;
 mod effects;
 mod patch;
 mod playback;
+mod vconsole;
 
 use crate::io::{IoEvent, IoHub, MtcDecoder};
 use crate::library;
@@ -12,6 +13,7 @@ use crate::persist::Store;
 use bindings::*;
 use patch::*;
 use playback::*;
+use vconsole::VcRt;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::sync::Arc;
@@ -145,6 +147,7 @@ struct Engine {
     recent: VecDeque<String>,
     tc: Tc,
     osc_fb: HashMap<String, f32>,
+    vc: VcRt,
 }
 
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
@@ -221,6 +224,7 @@ impl Engine {
             recent: VecDeque::new(),
             tc: Tc { running: false, frames_f: 0.0, last_mtc: None, dec: MtcDecoder::default(), prev_disp: 0 },
             osc_fb: HashMap::new(),
+            vc: VcRt::default(),
         };
         e.hz = e.show.settings.tick_hz.clamp(10, 100);
         e.rebuild_derived();
@@ -277,6 +281,7 @@ impl Engine {
                 }
             }
             EngineIn::Snapshot { reply } => {
+                self.vc_request_refresh();
                 let mut v = vec![
                     json(&ServerMsg::Hello { version: env!("CARGO_PKG_VERSION").into() }),
                     json(&ServerMsg::Library { profiles: self.library_list() }),
@@ -375,6 +380,7 @@ impl Engine {
         self.effect_flash.clear();
         self.dmx_override.clear();
         self.bind_last.clear();
+        self.vc = VcRt::default();
         self.last_merged.clear();
         self.ext_dmx.clear();
         self.hz = self.show.settings.tick_hz.clamp(10, 100);
@@ -727,8 +733,12 @@ impl Engine {
                 self.touch();
             }
             SubscribeDmx { .. } => {}
-            // TODO(be-vc / be-lib): implemented by the virtual-console and library work.
-            VcSave { .. } | VcPress { .. } | VcValue { .. } | VcXy { .. } | LibraryRemove { .. } => {}
+            VcSave { pages } => self.vc_save(pages)?,
+            VcPress { widget, down } => self.vc_press(widget, down)?,
+            VcValue { widget, value } => self.vc_set_value(widget, value)?,
+            VcXy { widget, x, y } => self.vc_xy(widget, x, y)?,
+            // TODO(be-lib): implemented by the library work.
+            LibraryRemove { .. } => {}
         }
         Ok(())
     }
@@ -1223,6 +1233,7 @@ impl Engine {
                 return;
             }
         }
+        self.vc_input(&ev);
         let value = ev.value();
         let matches: Vec<(u32, Action, f32)> = self
             .show
@@ -1376,9 +1387,27 @@ impl Engine {
             let fl = &self.effect_flash;
             let execs = &self.show.executors;
             let exec = &self.exec;
+            let overridden: Vec<Effect>;
+            let effs: &[Effect] = if self.vc.effect_rate.is_empty() {
+                &self.show.effects
+            } else {
+                overridden = self
+                    .show
+                    .effects
+                    .iter()
+                    .map(|e| {
+                        let mut e = e.clone();
+                        if let Some(r) = self.vc.effect_rate.get(&e.id) {
+                            e.rate = *r;
+                        }
+                        e
+                    })
+                    .collect();
+                &overridden
+            };
             effects::apply(
                 &mut merged,
-                &self.show.effects,
+                effs,
                 &|id| on.contains(&id) || fl.contains(&id),
                 &|id| {
                     execs
@@ -1575,6 +1604,7 @@ impl Engine {
                 let _ = self.out.send(Out::Json(Arc::from(s)));
             }
             self.osc_feedback(&rt);
+            self.vc_feedback(&rt.vc);
         }
     }
 
@@ -1663,7 +1693,7 @@ impl Engine {
             timecode: TimecodeRt { running: self.tc.running, frames, text: fmt_tc(frames, fps) },
             learn: self.learn,
             fps: self.fps,
-            vc: vec![],
+            vc: self.vc_states(),
         }
     }
 }
@@ -1673,10 +1703,10 @@ fn json(m: &ServerMsg) -> String {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests_support {
     use super::*;
 
-    fn engine() -> Engine {
+    pub fn engine() -> Engine {
         let dir = std::env::temp_dir().join(format!("lumos-eng-{}-{}", std::process::id(), rand_suffix()));
         let store = Store::new(dir).unwrap();
         let (out, _) = broadcast::channel(16);
@@ -1693,21 +1723,40 @@ mod tests {
         N.fetch_add(1, Ordering::SeqCst)
     }
 
-    fn add(e: &mut Engine, profile: &str, mode: &str, n: u32) {
+    pub fn add(e: &mut Engine, profile: &str, mode: &str, n: u32) {
         e.handle(Command::FixtureAdd { profile: profile.into(), mode: mode.into(), count: n, universe: 1, address: None, name: None }).unwrap();
         e.rebuild_derived();
     }
 
-    fn set(e: &mut Engine, f: u32, a: &str, v: f32) {
+    pub fn set(e: &mut Engine, f: u32, a: &str, v: f32) {
         let mut m = Attrs::new();
         m.insert(a.into(), v);
         e.handle(Command::ProgSet { fixtures: vec![f], attrs: m }).unwrap();
     }
 
-    fn frame(e: &mut Engine) -> [u8; 512] {
+    pub fn frame(e: &mut Engine) -> [u8; 512] {
         e.render(0.0);
         **e.frames.get(&1).unwrap()
     }
+
+    /// Collect `MidiOut` messages currently queued on a broadcast receiver.
+    pub fn drain_midi(rx: &mut broadcast::Receiver<Out>) -> Vec<(Option<String>, Vec<u8>)> {
+        let mut v = Vec::new();
+        while let Ok(m) = rx.try_recv() {
+            if let Out::Json(j) = m {
+                if let Ok(ServerMsg::MidiOut { port, bytes }) = serde_json::from_str::<ServerMsg>(&j) {
+                    v.push((port, bytes));
+                }
+            }
+        }
+        v
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::tests_support::*;
+    use super::*;
 
     #[test]
     fn auto_address_and_map() {
