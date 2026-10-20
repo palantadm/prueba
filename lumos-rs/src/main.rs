@@ -1,9 +1,12 @@
 mod api;
 mod engine;
+mod gdtf;
+mod glb;
 mod io;
 mod library;
 mod model;
 mod persist;
+mod qxf;
 
 use clap::Parser;
 use std::net::SocketAddr;

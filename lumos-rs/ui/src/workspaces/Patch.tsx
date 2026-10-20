@@ -4,6 +4,7 @@ import { library, selection, send, show, toast } from "../store";
 import { EmptyState, NumberField, PageHead, Segmented, Select, TextField, VirtualList, confirmDialog } from "../ui";
 import { collisions, footprint, modeOf, profileById } from "../lib/fixtures";
 import { AddDialog } from "./patch/AddDialog";
+import { ImportDialog } from "./patch/ImportDialog";
 import { UniverseMap } from "./patch/UniverseMap";
 
 const ROW = 40;
@@ -19,9 +20,9 @@ export function Patch() {
   const fixtures = show.value?.fixtures ?? [];
   const [view, setView] = useState<"table" | "map">("table");
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [q, setQ] = useState("");
   const anchor = useRef<number | null>(null);
-  const file = useRef<HTMLInputElement>(null);
   const sorted = useMemo(() => [...fixtures].sort((a, b) => a.id - b.id), [fixtures]);
   const bad = useMemo(() => collisions(fixtures), [fixtures, library.value, show.value?.profiles]);
   const f = q.trim().toLowerCase();
@@ -50,12 +51,7 @@ export function Patch() {
       <PageHead title="Patch" sub={`${fixtures.length} fixtures · ${bad.size ? `${bad.size} with address conflicts` : "no conflicts"}`}>
         <input class="input" style={{ width: 160 }} placeholder="Filter…" aria-label="Filter fixtures" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         <Segmented value={view} onChange={setView} label="View" options={[{ value: "table", label: "Table" }, { value: "map", label: "Universe map" }]} />
-        <button class="btn tall" onClick={() => file.current?.click()} title="Import an Open Fixture Library JSON file">Import OFL…</button>
-        <input ref={file} type="file" accept=".json,application/json" multiple hidden onChange={async (e) => {
-          const files = Array.from((e.target as HTMLInputElement).files ?? []);
-          (e.target as HTMLInputElement).value = "";
-          for (const fl of files) await send({ type: "library_import_ofl", json: await fl.text() }).then(() => toast(`Imported ${fl.name}`, "ok", 1800)).catch(() => {});
-        }} />
+        <button class="btn tall" onClick={() => setImporting(true)} title="Import GDTF, QLC+ (.qxf) or Open Fixture Library (.json) fixture files">Import fixtures…</button>
         <button class="btn tall danger" disabled={!selection.value.length} onClick={del}>Delete{selection.value.length ? ` (${selection.value.length})` : ""}</button>
         <button class="btn tall primary" onClick={() => setAdding(true)}>+ Add fixtures</button>
       </PageHead>
@@ -86,6 +82,7 @@ export function Patch() {
           }} />}
       </>}
       {adding && <AddDialog onClose={() => setAdding(false)} />}
+      {importing && <ImportDialog onClose={() => setImporting(false)} />}
     </div>
   );
 }

@@ -28,6 +28,8 @@ pub enum EngineIn {
     Snapshot { reply: oneshot::Sender<Vec<String>> },
     GetShow { reply: oneshot::Sender<Show> },
     ImportShow { show: Box<Show>, reply: Reply },
+    /// Profiles parsed from uploaded GDTF/QLC+/OFL files (assets already on disk).
+    ImportProfiles { profiles: Vec<FixtureProfile>, reply: Reply },
 }
 
 #[derive(Clone)]
@@ -65,6 +67,13 @@ impl Handle {
         let (r, rx) = oneshot::channel();
         self.tx
             .send(EngineIn::ImportShow { show: Box::new(show), reply: r })
+            .map_err(|_| "Engine stopped".to_string())?;
+        rx.await.map_err(|_| "Engine stopped".to_string())?
+    }
+    pub async fn import_profiles(&self, profiles: Vec<FixtureProfile>) -> Result<(), String> {
+        let (r, rx) = oneshot::channel();
+        self.tx
+            .send(EngineIn::ImportProfiles { profiles, reply: r })
             .map_err(|_| "Engine stopped".to_string())?;
         rx.await.map_err(|_| "Engine stopped".to_string())?
     }
@@ -298,6 +307,17 @@ impl Engine {
                 self.set_show(*show);
                 let _ = reply.send(Ok(()));
             }
+            EngineIn::ImportProfiles { profiles, reply } => {
+                for p in profiles {
+                    match self.show.profiles.iter_mut().find(|x| x.id == p.id) {
+                        Some(x) => *x = p,
+                        None => self.show.profiles.push(p),
+                    }
+                }
+                self.library_dirty = true;
+                self.touch_patch();
+                let _ = reply.send(Ok(()));
+            }
         }
     }
 
@@ -495,6 +515,19 @@ impl Engine {
                     Some(x) => *x = p,
                     None => self.show.profiles.push(p),
                 }
+                self.library_dirty = true;
+                self.touch_patch();
+            }
+            LibraryRemove { id } => {
+                if self.show.fixtures.iter().any(|f| f.profile == id) {
+                    return Err(format!("Profile '{id}' is used by patched fixtures"));
+                }
+                let before = self.show.profiles.len();
+                self.show.profiles.retain(|p| p.id != id);
+                if self.show.profiles.len() == before {
+                    return Err("Only imported profiles can be removed (built-in ones are read-only)".into());
+                }
+                self.store.remove_library_dir(&crate::gdtf::asset_dir(&id));
                 self.library_dirty = true;
                 self.touch_patch();
             }
@@ -737,8 +770,6 @@ impl Engine {
             VcPress { widget, down } => self.vc_press(widget, down)?,
             VcValue { widget, value } => self.vc_set_value(widget, value)?,
             VcXy { widget, x, y } => self.vc_xy(widget, x, y)?,
-            // TODO(be-lib): implemented by the library work.
-            LibraryRemove { .. } => {}
         }
         Ok(())
     }

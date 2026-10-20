@@ -31,11 +31,42 @@ impl Store {
     pub fn new(dir: PathBuf) -> std::io::Result<Self> {
         std::fs::create_dir_all(dir.join("shows"))?;
         std::fs::create_dir_all(dir.join("media"))?;
+        std::fs::create_dir_all(dir.join("library"))?;
         Ok(Store { dir })
     }
 
     pub fn media_dir(&self) -> PathBuf {
         self.dir.join("media")
+    }
+
+    /// Extracted fixture-library assets (GDTF models, gobo images): `<data>/library/<profile dir>/…`.
+    pub fn library_dir(&self) -> PathBuf {
+        self.dir.join("library")
+    }
+
+    /// Write import assets under `<library>/<dir>/`, rejecting any path that escapes it.
+    pub fn write_library_files(&self, dir: &str, files: &[(String, Vec<u8>)]) -> Result<(), String> {
+        use std::path::Component;
+        let base = self.library_dir().join(dir);
+        for (rel, data) in files {
+            let rp = Path::new(rel);
+            if rp.components().any(|c| !matches!(c, Component::Normal(_))) {
+                return Err(format!("unsafe asset path '{rel}'"));
+            }
+            let dest = base.join(rp);
+            if let Some(parent) = dest.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            }
+            std::fs::write(&dest, data).map_err(|e| e.to_string())?;
+        }
+        Ok(())
+    }
+
+    pub fn remove_library_dir(&self, dir: &str) {
+        let d = self.library_dir().join(dir);
+        if !dir.is_empty() && !dir.contains(['/', '\\']) && !dir.starts_with('.') {
+            let _ = std::fs::remove_dir_all(d);
+        }
     }
 
     fn show_path(&self, name: &str) -> Result<PathBuf, String> {

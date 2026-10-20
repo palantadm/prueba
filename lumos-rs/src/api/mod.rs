@@ -20,13 +20,16 @@ struct Assets;
 
 pub fn router(h: Handle) -> Router {
     let media = h.store.media_dir();
+    let library = h.store.library_dir();
     Router::new()
         .route("/ws", get(ws_handler))
         .route("/api/ports", get(ports))
         .route("/api/net", get(net))
         .route("/api/media", post(upload).layer(DefaultBodyLimit::max(512 * 1024 * 1024)))
         .route("/api/show", get(get_show).put(put_show).layer(DefaultBodyLimit::max(64 * 1024 * 1024)))
+        .route("/api/library/import", post(library_import).layer(DefaultBodyLimit::max(256 * 1024 * 1024)))
         .nest_service("/media", ServeDir::new(media))
+        .nest_service("/library", ServeDir::new(library))
         .fallback(static_handler)
         .layer(CorsLayer::permissive())
         .with_state(h)
@@ -105,6 +108,71 @@ async fn upload(State(h): State<Handle>, mut mp: Multipart) -> Response {
         }
         return Json(serde_json::json!({ "url": format!("/media/{name}") })).into_response();
     }
+}
+
+/// Parse one uploaded library file. Returns the profile plus asset files to extract.
+fn import_one(fname: &str, data: &[u8]) -> Result<(FixtureProfile, Vec<(String, Vec<u8>)>), String> {
+    let lower = fname.to_lowercase();
+    if lower.ends_with(".gdtf") {
+        let i = crate::gdtf::import_gdtf(data)?;
+        Ok((i.profile, i.files))
+    } else if lower.ends_with(".qxf") {
+        let xml = String::from_utf8_lossy(data).into_owned();
+        Ok((crate::qxf::import_qxf(&xml)?, vec![]))
+    } else if lower.ends_with(".json") {
+        let txt = String::from_utf8_lossy(data).into_owned();
+        Ok((crate::library::import_ofl(&txt)?, vec![]))
+    } else {
+        Err("Unsupported file type (use .gdtf, .qxf or Open Fixture Library .json)".into())
+    }
+}
+
+async fn library_import(State(h): State<Handle>, mut mp: Multipart) -> Response {
+    let mut imported = Vec::new();
+    let mut errors = Vec::new();
+    let mut profiles = Vec::new();
+    loop {
+        let field = match mp.next_field().await {
+            Ok(Some(f)) => f,
+            Ok(None) => break,
+            Err(e) => return (StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        };
+        let Some(fname) = field.file_name().map(|s| s.to_string()) else { continue };
+        let data = match field.bytes().await {
+            Ok(b) => b,
+            Err(e) => {
+                errors.push(serde_json::json!({ "file": fname, "error": e.to_string() }));
+                continue;
+            }
+        };
+        let name_for_task = fname.clone();
+        let parsed = tokio::task::spawn_blocking(move || import_one(&name_for_task, &data))
+            .await
+            .unwrap_or_else(|e| Err(format!("import crashed: {e}")));
+        match parsed {
+            Ok((profile, files)) => {
+                let store = h.store.clone();
+                let dir = crate::gdtf::asset_dir(&profile.id);
+                let w = tokio::task::spawn_blocking(move || store.write_library_files(&dir, &files))
+                    .await
+                    .unwrap_or_else(|e| Err(e.to_string()));
+                match w {
+                    Ok(()) => {
+                        imported.push(serde_json::json!({ "id": profile.id, "name": format!("{} {}", profile.manufacturer, profile.model) }));
+                        profiles.push(profile);
+                    }
+                    Err(e) => errors.push(serde_json::json!({ "file": fname, "error": e })),
+                }
+            }
+            Err(e) => errors.push(serde_json::json!({ "file": fname, "error": e })),
+        }
+    }
+    if !profiles.is_empty() {
+        if let Err(e) = h.import_profiles(profiles).await {
+            return (StatusCode::INTERNAL_SERVER_ERROR, e).into_response();
+        }
+    }
+    Json(serde_json::json!({ "imported": imported, "errors": errors })).into_response()
 }
 
 // ───────────── static UI ─────────────
