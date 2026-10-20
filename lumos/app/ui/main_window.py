@@ -32,6 +32,8 @@ from app.ui.panels.patch_panel import PatchPanel
 from app.ui.panels.programmer import Programmer
 from app.ui.panels.fixture_pool import FixturePool
 from app.ui.panels.executor_bank import ExecutorBank
+from app.ui.panels.cuelist_panel import CuelistPanel
+from app.ui.panels.show_panel import ShowPanel
 from app.ui.screens import ScreenManager
 from app.ui import theme as T
 
@@ -40,6 +42,8 @@ _MODE_LIVE    = 0
 _MODE_DESK    = 1
 _MODE_PATCH   = 2
 _MODE_MONITOR = 3
+_MODE_CUELIST = 4
+_MODE_SHOW    = 5
 
 
 # ─── Mode button ─────────────────────────────────────────────────────────────
@@ -170,11 +174,15 @@ class MainWindow(QMainWindow):
         self._desk = SimpleDesk(self.engine)
         self._patch = PatchPanel(self.engine)
         self._monitor = DMXMonitor(self.engine)
+        self._cuelist_panel = CuelistPanel(self.engine)
+        self._show_panel = ShowPanel(self.engine)
 
-        self._stack.addWidget(self._programmer)  # 0 = LIVE
-        self._stack.addWidget(self._desk)         # 1 = DESK
-        self._stack.addWidget(self._patch)        # 2 = PATCH
-        self._stack.addWidget(self._monitor)      # 3 = MONITOR
+        self._stack.addWidget(self._programmer)      # 0 = LIVE
+        self._stack.addWidget(self._desk)             # 1 = DESK
+        self._stack.addWidget(self._patch)            # 2 = PATCH
+        self._stack.addWidget(self._monitor)          # 3 = MONITOR
+        self._stack.addWidget(self._cuelist_panel)    # 4 = CUELIST
+        self._stack.addWidget(self._show_panel)       # 5 = SHOW
 
         body.addWidget(self._stack)
 
@@ -197,7 +205,10 @@ class MainWindow(QMainWindow):
         # ── Wire signals ──────────────────────────────────────────────
         self._fixture_pool.selection_changed.connect(self._on_selection_changed)
         self._patch.fixtures_changed.connect(self._fixture_pool.refresh_fixtures)
+        self._patch.fixtures_changed.connect(self._on_fixtures_changed_for_show)
         self._programmer.scene_recorded.connect(self._on_scene_saved)
+        self._cuelist_panel.go_pressed.connect(self._on_cuelist_go)
+        self._cuelist_panel.back_pressed.connect(self._on_cuelist_back)
 
     def _build_header(self) -> QWidget:
         bar = QWidget()
@@ -222,6 +233,8 @@ class MainWindow(QMainWindow):
             ("🎚  DESK",    _MODE_DESK),
             ("🔌  PATCH",   _MODE_PATCH),
             ("📊  MONITOR", _MODE_MONITOR),
+            ("📋  CUES",    _MODE_CUELIST),
+            ("💾  SHOW",    _MODE_SHOW),
         ]
         self._mode_btns: list[_ModeBtn] = []
         for label, idx in modes:
@@ -304,6 +317,8 @@ class MainWindow(QMainWindow):
             ("2",       lambda: self._select_mode(_MODE_DESK)),
             ("3",       lambda: self._select_mode(_MODE_PATCH)),
             ("4",       lambda: self._select_mode(_MODE_MONITOR)),
+            ("5",       lambda: self._select_mode(_MODE_CUELIST)),
+            ("6",       lambda: self._select_mode(_MODE_SHOW)),
             ("F11",     self._toggle_fullscreen),
         ]
         for key, slot in pairs:
@@ -329,6 +344,19 @@ class MainWindow(QMainWindow):
             if fx.name in names
         ]
         self._programmer.set_fixtures([f.to_dict() for f in selected])
+
+    @Slot(list)
+    def _on_fixtures_changed_for_show(self, fx_dicts: list) -> None:
+        # Forward current patched fixtures to show panel for save
+        self._show_panel.set_fixtures(fx_dicts)
+
+    @Slot(int)
+    def _on_cuelist_go(self, cuelist_id: int) -> None:
+        self.statusBar().showMessage(f"GO — cuelist {cuelist_id}", 2000)
+
+    @Slot(int)
+    def _on_cuelist_back(self, cuelist_id: int) -> None:
+        self.statusBar().showMessage(f"BACK — cuelist {cuelist_id}", 2000)
 
     @Slot(str)
     def _on_scene_saved(self, name: str) -> None:
@@ -387,6 +415,8 @@ class MainWindow(QMainWindow):
             "2  →  DESK mode (direct faders)\n"
             "3  →  PATCH (fixture patching)\n"
             "4  →  DMX MONITOR\n"
+            "5  →  CUES (cuelist editor)\n"
+            "6  →  SHOW (save / load)\n"
             "Ctrl+B  →  Toggle Blackout\n"
             "F11     →  Toggle fullscreen\n"
             "F1      →  This help\n\n"
