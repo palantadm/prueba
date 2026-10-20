@@ -20,11 +20,25 @@ export interface FxState {
   zoom: number; iris: number;
   strobeHz: number;
   closed: boolean;
+  /** selected gobo capability (null = open / none) */
+  goboCap: Capability | null;
+  /** gobo_rot channel: 0..1 raw value and whether it behaves as a speed (continuous spin) or a position */
+  goboRot: number;
+  goboRotSpeed: boolean;
+  frost: number; focus: number;
+  prism: boolean;
+  /** colour-wheel slot colour when a wheel is in the path (rgb 0..1) */
+  wheel: [number, number, number] | null;
 }
 
 export function newState(): FxState {
-  return { bright: 0, r: 1, g: 1, b: 1, pan: 0.5, tilt: 0.5, zoom: 0.5, iris: 0, strobeHz: 0, closed: false };
+  return {
+    bright: 0, r: 1, g: 1, b: 1, pan: 0.5, tilt: 0.5, zoom: 0.5, iris: 0, strobeHz: 0, closed: false,
+    goboCap: null, goboRot: 0, goboRotSpeed: false, frost: 0, focus: 0.5, prism: false, wheel: null,
+  };
 }
+
+export const isOpenCap = (c: Capability | null | undefined) => !c || /open|none|empty|blank|white|off/i.test(c.label);
 
 export function makePlan(fx: Fixture, prof: FixtureProfile | undefined): Plan | null {
   if (!prof) return null;
@@ -68,6 +82,7 @@ export function decode(plan: Plan, fx: Fixture, frame: Uint8Array | undefined, t
   let wheel: [number, number, number] | null = null;
   let strobeHz = 0, closed = false, goboDim = 1;
   let hasShutter = false;
+  let goboCap: Capability | null = null, goboRot = 0, goboRotSpeed = false, frost = 0, focus = 0.5, prism = false;
   const base = fx.address - 1;
   for (const c of plan.channels) {
     const i = base + c.o;
@@ -99,9 +114,18 @@ export function decode(plan: Plan, fx: Fixture, frame: Uint8Array | undefined, t
       }
       case "gobo": {
         const cap = capAt(c.caps, v8);
-        if (v8 > 4 && cap && !/open|none|empty/i.test(cap.label)) goboDim = 0.75;
+        if (v8 > 4 && cap && !isOpenCap(cap)) { goboDim = 0.75; goboCap = cap; }
         break;
       }
+      case "gobo_rot": {
+        goboRot = v;
+        const cap = capAt(c.caps, v8);
+        goboRotSpeed = !!cap && /rot|spin|cw|ccw|slow|fast|speed/i.test(cap.label);
+        break;
+      }
+      case "frost": frost = v; break;
+      case "focus": focus = v; break;
+      case "prism": prism = v8 > 4; break;
       case "shutter": {
         hasShutter = true;
         const cap = capAt(c.caps, v8);
@@ -138,6 +162,8 @@ export function decode(plan: Plan, fx: Fixture, frame: Uint8Array | undefined, t
   out.bright = bright;
   out.pan = pan; out.tilt = tilt; out.zoom = zoom; out.iris = iris;
   out.strobeHz = strobeHz; out.closed = closed;
+  out.goboCap = goboCap; out.goboRot = goboRot; out.goboRotSpeed = goboRotSpeed;
+  out.frost = frost; out.focus = focus; out.prism = prism; out.wheel = wheel;
 }
 
 /** Beam full-angle in degrees. */
@@ -162,4 +188,34 @@ export function aimPanTilt(plan: Plan, dx: number, dy: number, dz: number): { pa
   }
   const clamp = (v: number) => Math.max(0, Math.min(1, v));
   return { pan: clamp(0.5 + (P * deg) / plan.panRange), tilt: clamp(0.5 + (tl * deg) / plan.tiltRange) };
+}
+
+// ── additive: extra look data for the 2D visualiser (gobo slot, prism, frost) ──
+export interface FxExtras {
+  /** Selected gobo slot (null = open / none). `image` is a gobo image URL when the profile provides one. */
+  gobo: { label: string; index: number; image: string | null } | null;
+  prism: boolean;
+  frost: number;
+}
+
+export function decodeExtras(plan: Plan, fx: Fixture, frame: Uint8Array | undefined): FxExtras {
+  const out: FxExtras = { gobo: null, prism: false, frost: 0 };
+  if (!frame) return out;
+  const base = fx.address - 1;
+  for (const c of plan.channels) {
+    const i = base + c.o;
+    if (i < 0 || i >= 512) continue;
+    const v8 = frame[i];
+    if (c.attr === "gobo") {
+      const cap = capAt(c.caps, v8);
+      if (cap && v8 > 4 && !/open|none|empty/i.test(cap.label)) {
+        out.gobo = { label: cap.label, index: c.caps.indexOf(cap), image: cap.image ?? null };
+      }
+    } else if (c.attr === "prism") {
+      out.prism = v8 > 8;
+    } else if (c.attr === "frost") {
+      out.frost = v8 / 255;
+    }
+  }
+  return out;
 }

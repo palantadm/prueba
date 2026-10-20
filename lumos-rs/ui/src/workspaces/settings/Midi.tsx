@@ -1,5 +1,5 @@
 import { EmptyState, PageHead, StatusDot, Toggle } from "../../ui";
-import { initMidi, midiActivity, midiEnabled, midiError, midiPorts, midiState, setMidiEnabled } from "../../midi";
+import { initMidi, midiActivity, midiEnabled, midiError, midiOutEnabled, midiOutputs, midiPorts, midiRelay, midiState, sendMidi, setMidiEnabled, setMidiOutEnabled, setMidiRelay } from "../../midi";
 
 export function MidiPage() {
   const st = midiState.value;
@@ -20,6 +20,22 @@ export function MidiPage() {
                 <StatusDot state={p.connected ? "ok" : "off"} title={p.connected ? "connected" : "disconnected"} />
                 <span class="grow">{p.name} <span class="faint">{p.manufacturer}</span></span>
                 <Toggle checked={midiEnabled.value.includes(p.name)} onChange={(on) => setMidiEnabled(p.name, on)} label="Forward to engine" />
+              </div>
+            ))}
+          </div>
+        )}
+        {st === "ready" && (
+          <div class="panel">
+            <div class="panel-head">Output ports · controller feedback <span class="sp" />
+              <Toggle checked={midiRelay.value} onChange={setMidiRelay} label="Relay engine feedback from this browser" title="Turn off on all but one browser to avoid duplicate messages" />
+            </div>
+            {midiOutputs.value.length === 0 && <div class="panel-body dim">No MIDI outputs detected.</div>}
+            {midiOutputs.value.map((p) => (
+              <div class="vrow" key={p.id}>
+                <StatusDot state={p.connected ? "ok" : "off"} title={p.connected ? "connected" : "disconnected"} />
+                <span class="grow">{p.name} <span class="faint">{p.manufacturer}</span></span>
+                <button class="btn sm" title="Sends note 60 on/off on channel 1" onClick={() => { sendMidi(p.name, [0x90, 60, 127], true); setTimeout(() => sendMidi(p.name, [0x80, 60, 0], true), 250); }}>Test</button>
+                <Toggle checked={midiOutEnabled.value.includes(p.name)} onChange={(on) => setMidiOutEnabled(p.name, on)} label="Send feedback" />
               </div>
             ))}
           </div>

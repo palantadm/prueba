@@ -34,6 +34,9 @@ const pending = new Map<string, { ok: () => void; err: (e: Error) => void }>();
 const learnedListeners = new Set<(s: Source) => void>();
 let dmxSub: number[] | null | undefined = undefined; // remembered for reconnects
 
+/** Late-bound hooks so modules that import the store can receive server events without import cycles. */
+export const hooks: { midiOut?: (port: string | null, bytes: number[]) => void } = {};
+
 export function onLearned(cb: (s: Source) => void) {
   learnedListeners.add(cb);
   return () => learnedListeners.delete(cb);
@@ -88,6 +91,7 @@ function onMessage(ev: MessageEvent) {
     case "library": library.value = m.profiles; break;
     case "shows": shows.value = m.shows; break;
     case "learned": learnedListeners.forEach((f) => f(m.source)); break;
+    case "midi_out": hooks.midiOut?.(m.port, m.bytes); break;
     case "log":
       serverLog.value = [{ level: m.level, msg: m.msg, at: Date.now() }, ...serverLog.value].slice(0, 200);
       if (m.level === "error") toast(m.msg, "err");
