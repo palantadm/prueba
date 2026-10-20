@@ -38,7 +38,7 @@ export function newState(): FxState {
   };
 }
 
-export const isOpenCap = (c: Capability | null | undefined) => !c || /open|none|empty|blank|white|off/i.test(c.label);
+export const isOpenCap = (c: Capability | null | undefined) => !c || /open|none|empty|blank|white|off|hole|flat field/i.test(c.label);
 
 export function makePlan(fx: Fixture, prof: FixtureProfile | undefined): Plan | null {
   if (!prof) return null;
@@ -83,6 +83,7 @@ export function decode(plan: Plan, fx: Fixture, frame: Uint8Array | undefined, t
   let strobeHz = 0, closed = false, goboDim = 1;
   let hasShutter = false;
   let goboCap: Capability | null = null, goboRot = 0, goboRotSpeed = false, frost = 0, focus = 0.5, prism = false;
+  let cy = 0, mg = 0, ye = 0, hasCmy = false;
   const base = fx.address - 1;
   for (const c of plan.channels) {
     const i = base + c.o;
@@ -112,12 +113,17 @@ export function decode(plan: Plan, fx: Fixture, frame: Uint8Array | undefined, t
         if (cap?.color) wheel = hex(cap.color);
         break;
       }
-      case "gobo": {
+      case "gobo":
+      case "gobo2": {
         const cap = capAt(c.caps, v8);
-        if (v8 > 4 && cap && !isOpenCap(cap)) { goboDim = 0.75; goboCap = cap; }
+        if (v8 > 0 && cap && !isOpenCap(cap)) { goboDim = 0.75; goboCap = cap; }
         break;
       }
-      case "gobo_rot": {
+      case "colorsub_c": cy = v; hasCmy = true; break;
+      case "colorsub_m": mg = v; hasCmy = true; break;
+      case "colorsub_y": ye = v; hasCmy = true; break;
+      case "gobo_rot":
+      case "gobo2_rot": {
         goboRot = v;
         const cap = capAt(c.caps, v8);
         goboRotSpeed = !!cap && /rot|spin|cw|ccw|slow|fast|speed/i.test(cap.label);
@@ -125,7 +131,7 @@ export function decode(plan: Plan, fx: Fixture, frame: Uint8Array | undefined, t
       }
       case "frost": frost = v; break;
       case "focus": focus = v; break;
-      case "prism": prism = v8 > 4; break;
+      case "prism": { const cap = capAt(c.caps, v8); prism = cap ? !isOpenCap(cap) && !/raw/i.test(cap.label) : v8 > 4; break; }
       case "shutter": {
         hasShutter = true;
         const cap = capAt(c.caps, v8);
@@ -153,8 +159,9 @@ export function decode(plan: Plan, fx: Fixture, frame: Uint8Array | undefined, t
   const colourless = !plan.hasRgb && w === 0 && am === 0 && uv === 0 && lime === 0;
   if (colourless) { cr = wheel ? wheel[0] : 1; cg = wheel ? wheel[1] : 1; cb = wheel ? wheel[2] : 1; }
   if (cto > 0) { cr *= 1; cg *= 1 - cto * 0.25; cb *= 1 - cto * 0.6; }
+  if (hasCmy) { cr *= 1 - cy; cg *= 1 - mg; cb *= 1 - ye; }
   const m = Math.max(cr, cg, cb);
-  let inten = colourless ? 1 : Math.min(1, m);
+  const inten = Math.min(1, m);
   if (m > 1e-5) { out.r = cr / m; out.g = cg / m; out.b = cb / m; } else { out.r = out.g = out.b = 1; }
   let bright = (plan.hasDimmer ? dimmer : 1) * inten * goboDim;
   if (closed) bright = 0;

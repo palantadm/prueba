@@ -118,6 +118,15 @@ export function computeFixture(fx: Fixture, prof: FixtureProfile | undefined, fr
   const st = newState();
   let ex: FxExtras = { gobo: null, prism: false, frost: 0 };
   if (plan) { decode(plan, fx, frame, time, st); ex = decodeExtras(plan, fx, frame); }
+  // Fixtures with neither a dimmer nor colour channels (strobes, blinders) are "on" only if any channel is driven.
+  if (plan && !plan.hasDimmer && !plan.hasRgb) {
+    let any = false;
+    for (const c of plan.channels) {
+      const i = fx.address - 1 + c.o;
+      if (frame && i >= 0 && i < 512 && frame[i] > 0) { any = true; break; }
+    }
+    if (!any) st.bright = 0;
+  }
   const R = eulerYXZ([fx.rot[0], fx.rot[1], fx.rot[2]]);
   const pos: V3 = [fx.pos[0], fx.pos[1], fx.pos[2]];
   const moving = !!plan?.moving;
@@ -136,6 +145,7 @@ export function computeFixture(fx: Fixture, prof: FixtureProfile | undefined, fr
     localPivot = [0, -0.1, 0];
   }
   const origin = add(pos, apply(R, localOrigin));
+  if (origin[1] < 0.02) origin[1] = 0.02;
   const dir = norm(apply(R, localDir));
   const pivot = add(pos, apply(R, localPivot));
   const lit = st.bright > 0.004;

@@ -231,7 +231,7 @@ export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
   rig.beam.mesh.visible = env.beams;
   if (env.beams) {
     const gain = Math.min(2.4, Math.sqrt(32 / Math.max(3, angle))) * env.crowd * (gtex ? 1.25 : 1);
-    const k = st.bright * gain * 1.15;
+    const k = st.bright * gain * 0.5;
     tmpC.setRGB(st.r * k, st.g * k, st.b * k);
     rig.beam.update({
       apex: rig.origin, axis: rig.dir, length: L, beamAngle: angle, fieldAngle: field,
@@ -251,7 +251,7 @@ export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
     rig.poolMesh.scale.set(diam, 1, diam * stretch);
     rig.poolMat.map = gtex ?? radialTexture();
     rig.poolMesh.rotation.y = gtex ? -rig.goboAngle : 0;
-    const k = Math.min(1, 0.55 * st.bright * Math.min(1.8, 25 / Math.max(2, angle))) * Math.sqrt(env.crowd);
+    const k = Math.min(1, 0.36 * st.bright * Math.min(1.8, 25 / Math.max(2, angle))) * Math.sqrt(env.crowd);
     tmpC.setRGB(st.r * k, st.g * k, st.b * k);
     rig.poolMat.color.copy(tmpC);
   }

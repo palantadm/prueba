@@ -29,8 +29,8 @@ const N_LIGHTS = 12;
 type Q = "low" | "med" | "high";
 const QCFG: Record<Q, { pr: number; bloom: number; reflect: boolean; shadows: number; shadowRes: number; fxaa: boolean; audience: boolean }> = {
   low: { pr: 1, bloom: 0, reflect: false, shadows: 0, shadowRes: 512, fxaa: false, audience: false },
-  med: { pr: 1.5, bloom: 0.5, reflect: false, shadows: 3, shadowRes: 512, fxaa: true, audience: true },
-  high: { pr: 2, bloom: 0.7, reflect: true, shadows: 6, shadowRes: 1024, fxaa: true, audience: true },
+  med: { pr: 1.5, bloom: 0.32, reflect: false, shadows: 3, shadowRes: 512, fxaa: true, audience: true },
+  high: { pr: 2, bloom: 0.42, reflect: true, shadows: 6, shadowRes: 1024, fxaa: true, audience: true },
 };
 
 export type Target = { type: "fixture" | "object"; id: number };
@@ -147,7 +147,7 @@ export class StageScene {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.beamPass = new BeamPass(this.camera);
     this.composer.addPass(this.beamPass);
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(4, 4), 0.6, 0.55, 0.9);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(4, 4), 0.4, 0.5, 1.0);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.fxaa = new ShaderPass(FXAAShader);

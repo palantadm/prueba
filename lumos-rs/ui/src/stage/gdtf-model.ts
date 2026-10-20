@@ -11,12 +11,17 @@ const modelCache = new Map<string, Promise<THREE.Object3D | null>>();
 
 function fixMaterial(m: THREE.Material | THREE.Material[]): THREE.Material | THREE.Material[] {
   const one = (x: THREE.Material) => {
+    if ((x as THREE.MeshStandardMaterial).isMeshStandardMaterial) {
+      const st = x as THREE.MeshStandardMaterial;
+      st.side = THREE.DoubleSide;
+      return st;
+    }
     const old = x as THREE.MeshPhongMaterial;
     const col = old.color ? old.color.clone() : new THREE.Color("#2a2d33");
-    // GDTF vendors ship near-black plastics; keep their hue but make sure the form is readable.
+    // 3DS vendors ship near-black plastics; keep the hue but make sure the form stays readable.
     const hsl = { h: 0, s: 0, l: 0 };
     col.getHSL(hsl);
-    col.setHSL(hsl.h, hsl.s, Math.max(0.1, Math.min(0.75, hsl.l)));
+    col.setHSL(hsl.h, hsl.s, Math.max(0.12, Math.min(0.75, hsl.l)));
     return new THREE.MeshStandardMaterial({ color: col, roughness: 0.48, metalness: 0.45, side: THREE.DoubleSide });
   };
   return Array.isArray(m) ? m.map(one) : one(m);

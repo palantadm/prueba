@@ -16,7 +16,7 @@
 }
 .pl-pop .label { color: var(--accent); }
 .pl-num { display: grid; grid-template-columns: 90px 1fr; align-items: center; gap: var(--s-2); font-size: var(--fs-sm); color: var(--text-dim); }
-.pl-num .input { min-height: 34px; }
+.pl-num .input { min-height: 40px; }
 .pl-check { min-height: 40px; }
 .pl-banner { position: absolute; left: 50%; top: 66px; transform: translateX(-50%); padding: 6px 14px; background: var(--accent-dim); border: 1px solid var(--accent); border-radius: var(--r-md); font-size: var(--fs-sm); z-index: 4; pointer-events: none; }
 .pl-banner-b { top: auto; bottom: 44px; background: var(--bg-2); border-color: var(--line-strong); }
@@ -27,7 +27,7 @@
 .pl-leg-grid b { display: inline-block; width: 20px; color: var(--text); font-size: var(--fs-md); }
 .pl-leg-note { margin-top: 6px; line-height: 1.35; }
 .pl-menu { position: absolute; z-index: 9; min-width: 220px; padding: 4px; background: var(--bg-1); border: 1px solid var(--line-strong); border-radius: var(--r-md); box-shadow: var(--shadow-2); display: flex; flex-direction: column; }
-.pl-item { text-align: left; min-height: 36px; padding: 0 var(--s-3); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-sm); color: var(--text); }
+.pl-item { text-align: left; min-height: 40px; padding: 0 var(--s-3); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-sm); color: var(--text); }
 .pl-item:hover:not(:disabled) { background: var(--accent-dim); }
 .pl-item:disabled { color: var(--text-faint); cursor: default; }
 .pl-sep { height: 1px; margin: 4px 0; background: var(--line); }

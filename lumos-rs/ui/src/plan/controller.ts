@@ -43,6 +43,7 @@ export class PlanController {
   private fpsT = performance.now();
   private profCache: { src: FixtureProfile[]; map: Map<string, FixtureProfile> } | null = null;
   private longPress = 0;
+  private pendingObj: number | null = null;
   private downAt = { x: 0, y: 0, t: 0 };
   private ro: ResizeObserver;
   geoOf(id: number) { return this.last.geos.get(id) ?? null; }
@@ -270,17 +271,17 @@ export class PlanController {
       return;
     }
     const oid = this.hitObject(x, y);
-    if (oid !== null) {
-      selObj.value = oid;
-      if (!additive) selection.value = [];
+    // Objects move only once selected (click first); dragging an unselected object rubber-bands fixtures instead.
+    if (oid !== null && oid === selObj.value) {
       const o = effStage()?.objects.find((q) => q.id === oid);
       if (o && editLayout.value) {
         const [u0, v0] = this.world(x, y);
         this.drag = { kind: "obj", id: oid, start: [o.pos[0], o.pos[1], o.pos[2]], u0, v0, moved: false };
+        return;
       }
-      return;
     }
-    selObj.value = null;
+    this.pendingObj = oid;
+    if (oid === null) selObj.value = null;
     this.drag = { kind: "rubber", x0: x, y0: y, add: additive, base: additive ? selection.value.slice() : [] };
     this.rubber = { x0: x, y0: y, x1: x, y1: y };
     this.armLongPress(e, x, y);
@@ -394,7 +395,12 @@ export class PlanController {
       if (view.value === "plan") T[1] = 0;
       this.aimSelectionAt(T);
     }
-    if (dr?.kind === "rubber") { this.rubber = null; if (click && !dr.add) selection.value = []; }
+    if (dr?.kind === "rubber") {
+      this.rubber = null;
+      if (click && this.pendingObj !== null) { selObj.value = this.pendingObj; if (!dr.add) selection.value = []; }
+      else if (click && !dr.add) selection.value = [];
+      this.pendingObj = null;
+    }
     if (dr?.kind === "move" && !dr.moved && click && !(e.shiftKey || e.ctrlKey || e.metaKey)) {
       const fid = this.hitFixture(x, y);
       if (fid !== null && selection.value.length > 1) selection.value = [fid];
