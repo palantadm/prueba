@@ -1407,7 +1407,13 @@ impl Engine {
         }
         let gm = if self.blackout { 0.0 } else { self.grand_master };
         for pf in &self.patch.fixtures {
-            let fct = factor.get(&pf.id).copied().unwrap_or(1.0) * gm;
+            let mut fct = factor.get(&pf.id).copied().unwrap_or(1.0) * gm;
+            // Virtual dimmer: fixtures without a dimmer channel (RGB pars…) are dimmed by scaling colour.
+            if !pf.has_dimmer {
+                if let Some(d) = merged.get_mut(&pf.id).and_then(|a| a.remove("dimmer")) {
+                    fct *= d;
+                }
+            }
             if fct >= 1.0 {
                 continue;
             }
@@ -1734,6 +1740,20 @@ mod tests {
         assert_eq!(frame(&mut e)[0], 128);
         e.handle(Command::Blackout { on: true }).unwrap();
         assert_eq!(frame(&mut e)[0], 0);
+    }
+
+    #[test]
+    fn dimmer_attr_is_virtual_dimmer_on_rgb_only_fixture() {
+        let mut e = engine();
+        add(&mut e, "generic/rgb-par", "3ch", 1);
+        set(&mut e, 1, "red", 1.0);
+        set(&mut e, 1, "dimmer", 0.5);
+        assert_eq!(frame(&mut e)[0], 128);
+        set(&mut e, 1, "dimmer", 0.0);
+        assert_eq!(frame(&mut e)[0], 0);
+        e.handle(Command::GrandMaster { level: 0.5 }).unwrap();
+        set(&mut e, 1, "dimmer", 1.0);
+        assert_eq!(frame(&mut e)[0], 128);
     }
 
     #[test]

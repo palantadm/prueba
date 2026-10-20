@@ -884,5 +884,25 @@ mod tests {
             Command::CueSave { cue, .. } => assert_eq!(cue.changes[&3]["dimmer"], 1.0),
             _ => panic!(),
         }
+        let c: ClientMsg = serde_json::from_str(
+            r#"{"t":"cmd","id":"3","cmd":{"type":"cuelist_save","cuelist":{"id":1,"name":"L","cues":[{"number":1,"label":"","fade_in":2,"fade_out":2,"delay":0,"follow":null,"timecode":null,"block":false,"changes":{"1":{"dimmer":1},"12":{"red":0.5}}}],"looped":false,"tracking":true,"priority":0}}}"#,
+        )
+        .unwrap();
+        match c.cmd {
+            Command::CuelistSave { cuelist } => assert_eq!(cuelist.cues[0].changes[&12]["red"], 0.5),
+            _ => panic!(),
+        }
+        let c: ClientMsg = serde_json::from_str(
+            r#"{"t":"cmd","id":"4","cmd":{"type":"palette_save","palette":{"id":0,"name":"P","kind":"color","values":{"red":1},"per_fixture":{"2":{"green":0.6}}}}}"#,
+        )
+        .unwrap();
+        match c.cmd {
+            Command::PaletteSave { palette } => assert_eq!(palette.per_fixture[&2]["green"], 0.6),
+            _ => panic!(),
+        }
+        assert!(serde_json::from_str::<ClientMsg>(
+            r#"{"t":"cmd","id":"5","cmd":{"type":"palette_save","palette":{"id":0,"name":"P","kind":"color","per_fixture":{"x":{}}}}}"#
+        )
+        .is_err());
     }
 }
