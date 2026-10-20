@@ -18,6 +18,15 @@ use ts_rs::TS;
 pub type Attrs = BTreeMap<String, f32>;
 pub type PerFixture = BTreeMap<u32, Attrs>;
 
+/// JSON object keys are strings; serde's internally-tagged enums (`Command`) buffer input and
+/// cannot coerce them to `u32`, so integer-keyed maps are parsed explicitly.
+pub fn de_per_fixture<'de, D: serde::Deserializer<'de>>(d: D) -> Result<PerFixture, D::Error> {
+    let raw = BTreeMap::<String, Attrs>::deserialize(d)?;
+    raw.into_iter()
+        .map(|(k, v)| k.parse::<u32>().map(|k| (k, v)).map_err(|_| serde::de::Error::custom(format!("bad fixture id '{k}'"))))
+        .collect()
+}
+
 /// Canonical attribute vocabulary: (name, group, label).
 pub const ATTRS: &[(&str, &str, &str)] = &[
     ("dimmer", "intensity", "Dimmer"),
@@ -168,7 +177,7 @@ pub struct Palette {
     #[serde(default)]
     pub values: Attrs,
     /// Optional per-fixture overrides (take precedence over `values`).
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_per_fixture")]
     pub per_fixture: PerFixture,
 }
 
@@ -193,7 +202,7 @@ pub struct Cue {
     #[serde(default)]
     pub timecode: Option<String>,
     /// Recorded values. In tracking lists only *changes* are stored.
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_per_fixture")]
     pub changes: PerFixture,
     /// Block: stop tracking from earlier cues (stores full state).
     #[serde(default)]
@@ -866,5 +875,14 @@ mod tests {
         let c: ClientMsg =
             serde_json::from_str(r#"{"t":"cmd","id":"1","cmd":{"type":"go","cuelist":1}}"#).unwrap();
         assert!(matches!(c.cmd, Command::Go { cuelist: 1 }));
+        // integer-keyed maps inside internally-tagged enums
+        let c: ClientMsg = serde_json::from_str(
+            r#"{"t":"cmd","id":"2","cmd":{"type":"cue_save","cuelist":1,"cue":{"number":1,"changes":{"3":{"dimmer":1.0}}}}}"#,
+        )
+        .unwrap();
+        match c.cmd {
+            Command::CueSave { cue, .. } => assert_eq!(cue.changes[&3]["dimmer"], 1.0),
+            _ => panic!(),
+        }
     }
 }

@@ -59,6 +59,7 @@ export class StageScene {
   private lastPreset: CamPreset | null = null;
   private aiming = false;
   private interacting = false;
+  private activeBeams = 0;
   private camMoved = false;
   private disposed = false;
 
@@ -434,8 +435,10 @@ export class StageScene {
     this.ambient.intensity = workLight.value ? 2.6 : 0.75;
     this.applyGizmoModeIfChanged();
 
-    const env = { haze: hz, beams: showBeams.value, pools: showPools.value, labels: showLabels.value, time: tSec };
-    for (const rig of this.rigs.values()) updateRig(rig, dmx.get(rig.fx.universe), env);
+    const env = { crowd: Math.max(0.3, Math.min(1, Math.sqrt(16 / Math.max(1, this.activeBeams)))), haze: hz, beams: showBeams.value, pools: showPools.value, labels: showLabels.value, time: tSec };
+    let active = 0;
+    for (const rig of this.rigs.values()) { updateRig(rig, dmx.get(rig.fx.universe), env); if (rig.score > 0.02) active++; }
+    this.activeBeams = active;
 
     if (this.frameN % 2 === 0) this.assignLights();
     this.media.tick(now);

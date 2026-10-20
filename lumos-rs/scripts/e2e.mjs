@@ -31,7 +31,7 @@ ws.onmessage = (e) => {
     const m = JSON.parse(e.data);
     if (m.t === "show") state.show = m.show; else if (m.t === "rt") state.rt = m.rt; else if (m.t === "library") state.library = m.profiles;
     else if (m.t === "hello") state.hello = m; else if (m.t === "shows") state.shows = m.shows; else if (m.t === "learned") state.learned.push(m.source);
-    else if (m.t === "ack") { acks.get(m.id)?.(m); acks.delete(m.id); }
+    else if (m.t === "ack") { if (m.id === "") console.log("  unmatched ack:", m.err); acks.get(m.id)?.(m); acks.delete(m.id); }
   }
   waiters.forEach((w) => w());
 };
@@ -40,7 +40,10 @@ const until = async (pred, what, ms = 5000) => {
   while (Date.now() - t0 < ms) { if (pred()) return true; await new Promise((r) => { waiters.push(r); setTimeout(r, 50); }); }
   console.log("  timeout waiting for", what); return false;
 };
-const cmd = (c) => new Promise((res) => { const id = String(seq++); acks.set(id, res); ws.send(JSON.stringify({ t: "cmd", id, cmd: c })); });
+const cmd = (c) => new Promise((res) => {
+  const id = String(seq++); acks.set(id, res); ws.send(JSON.stringify({ t: "cmd", id, cmd: c }));
+  setTimeout(() => { if (acks.delete(id)) { console.log("  no ack for", JSON.stringify(c).slice(0, 120)); res({ ok: false, err: "timeout" }); } }, 5000);
+});
 await new Promise((r) => (ws.onopen = r));
 
 console.log("snapshot");

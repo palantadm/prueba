@@ -8,8 +8,8 @@ const D2R = Math.PI / 180;
 const NOOP = () => undefined;
 
 // ── shared resources ────────────────────────────────────
-const bodyMat = new THREE.MeshStandardMaterial({ color: "#4a505c", roughness: 0.55, metalness: 0.15 });
-const bodyMat2 = new THREE.MeshStandardMaterial({ color: "#5a606c", roughness: 0.5, metalness: 0.15 });
+const bodyMat = new THREE.MeshStandardMaterial({ color: "#4a505c", roughness: 0.55, metalness: 0.15, emissive: "#14171d" });
+const bodyMat2 = new THREE.MeshStandardMaterial({ color: "#5a606c", roughness: 0.5, metalness: 0.15, emissive: "#181b22" });
 const stroboMat = new THREE.MeshStandardMaterial({ color: "#c8ccd2", roughness: 0.4, metalness: 0.3 });
 const GEO = {
   base: new THREE.BoxGeometry(0.3, 0.09, 0.22),
@@ -142,7 +142,7 @@ export function buildRig(fx: Fixture, prof: FixtureProfile | undefined): Rig {
     add(GEO.other, bodyMat, tiltG, -0.07);
     lensR = 0.06;
   }
-  const lensY = moving ? -0.295 : cat === "bar" ? -0.082 : cat === "strobe" ? -0.122 : cat === "par" || cat === "wash" || cat === "spot" || cat === "beam" || cat === "effect" ? -0.21 : -0.142;
+  const lensY = moving ? -0.3 : cat === "bar" ? -0.082 : cat === "strobe" ? -0.122 : cat === "par" || cat === "wash" || cat === "spot" || cat === "beam" || cat === "effect" ? -0.214 : -0.142;
 
   const lensMat = new THREE.MeshBasicMaterial({ color: "#ffffff", toneMapped: false });
   const lens = new THREE.Mesh(GEO.lens, lensMat);
@@ -157,7 +157,7 @@ export function buildRig(fx: Fixture, prof: FixtureProfile | undefined): Rig {
     transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending,
   });
   const beam = new THREE.Mesh(GEO.beam, beamMat);
-  beam.position.y = lensY;
+  beam.position.y = lensY - 0.012;
   beam.raycast = NOOP;
   beam.frustumCulled = false;
   beam.visible = false;
@@ -204,7 +204,7 @@ const _q = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const tmpC = new THREE.Color();
 
-export interface Env { haze: number; beams: boolean; pools: boolean; labels: boolean; time: number }
+export interface Env { crowd: number; haze: number; beams: boolean; pools: boolean; labels: boolean; time: number }
 
 /** Decode DMX, pose the head, size the beam and the floor pool. */
 export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
@@ -245,7 +245,7 @@ export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
     u.intensity.value = st.bright * 0.9;
     u.haze.value = env.haze;
     // narrow beams read brighter
-    u.gain.value = Math.min(2.2, Math.sqrt(30 / Math.max(2, angle)));
+    u.gain.value = Math.min(2.2, Math.sqrt(30 / Math.max(2, angle))) * env.crowd;
   }
 
   const hitsFloor = dy < -0.05 && rig.origin.y > 0.02;
@@ -259,7 +259,7 @@ export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
     const stretch = Math.min(6, 1 / Math.max(0.17, -dy)); // 1/cos(incidence)
     void horiz;
     rig.poolMesh.scale.set(diam, 1, diam * stretch);
-    const k = Math.min(1, 0.55 * st.bright * Math.min(1.8, 25 / Math.max(2, angle)));
+    const k = Math.min(1, 0.55 * st.bright * Math.min(1.8, 25 / Math.max(2, angle))) * Math.sqrt(env.crowd);
     tmpC.setRGB(st.r * k, st.g * k, st.b * k);
     rig.poolMat.color.copy(tmpC);
   }
