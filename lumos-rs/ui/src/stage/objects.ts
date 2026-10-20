@@ -21,7 +21,7 @@ const matCache = new Map<string, THREE.MeshStandardMaterial>();
 function std(color: string, rough = 0.7, metal = 0.1, side: THREE.Side = THREE.FrontSide): THREE.MeshStandardMaterial {
   const key = `${color}|${rough}|${metal}|${side}`;
   let m = matCache.get(key);
-  if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, side }); matCache.set(key, m); }
+  if (!m) { m = new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, side, envMapIntensity: metal > 0.5 ? 1 : 0.15 }); matCache.set(key, m); }
   return m;
 }
 

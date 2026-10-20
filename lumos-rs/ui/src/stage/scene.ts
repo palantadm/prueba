@@ -116,7 +116,7 @@ export class StageScene {
       const pm = new THREE.PMREMGenerator(this.renderer);
       const envTex = pm.fromScene(new RoomEnvironment(), 0.04).texture;
       this.scene.environment = envTex;
-      this.scene.environmentIntensity = 0.14;
+      this.scene.environmentIntensity = 0.24;
       pm.dispose();
     }
 
@@ -283,6 +283,7 @@ export class StageScene {
     this.pickRoot.remove(rig.root);
     this.poolRoot.remove(rig.pool);
     this.beamPass.scene.remove(rig.beam.mesh);
+    for (const x of rig.extra) this.beamPass.scene.remove(x.mesh);
     disposeRig(rig);
     this.rigs.delete(id);
     if (this.target?.type === "fixture" && this.target.id === id) this.refreshGizmo();
@@ -540,18 +541,19 @@ export class StageScene {
     beamShared.uHaze.value = 0.1 + hz * 0.95;
     beamShared.uTime.value = tSec;
     this.grid.visible = showGrid.value;
-    this.ambient.intensity = workLight.value ? 2.4 : 0.08;
-    this.hemi.intensity = workLight.value ? 1.2 : 0.22;
+    this.ambient.intensity = workLight.value ? 2.4 : 0.05;
+    this.hemi.intensity = workLight.value ? 1.2 : 0.05;
     this.applyGizmoModeIfChanged();
 
     const env = {
-      crowd: Math.max(0.35, Math.min(1, Math.sqrt(14 / Math.max(1, this.activeBeams)))), haze: hz, beams: showBeams.value,
+      crowd: Math.max(0.2, Math.min(1, Math.sqrt(10 / Math.max(1, this.activeBeams)))), haze: hz, beams: showBeams.value,
       pools: showPools.value, labels: showLabels.value, time: tSec, dt, camPos: this.camera.position,
     };
     let active = 0;
     for (const rig of this.rigs.values()) { updateRig(rig, dmx.get(rig.fx.universe), env); if (rig.score > 0.02) active++; }
     this.activeBeams = active;
     this.beamPass.enabled = showBeams.value;
+    for (const rig of this.rigs.values()) for (const x of rig.extra) if (!x.mesh.parent) this.beamPass.scene.add(x.mesh);
 
     if (this.frameN % 2 === 0) this.assignLights(qc.shadows);
     this.media.tick(now);

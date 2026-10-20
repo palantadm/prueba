@@ -110,7 +110,7 @@ export class Venue {
     const wood = this.own(woodTexture().clone());
     wood.needsUpdate = true;
     wood.repeat.set(Math.max(1, W / 2.4), Math.max(1, D / 2.4));
-    const deckMat = this.own(new THREE.MeshStandardMaterial({ map: wood, color: "#a89478", roughness: 0.46, metalness: 0.0, envMapIntensity: 0.5 }));
+    const deckMat = this.own(new THREE.MeshStandardMaterial({ map: wood, color: "#a89478", roughness: 0.46, metalness: 0.0, envMapIntensity: 0.12 }));
     const deck = new THREE.Mesh(new THREE.PlaneGeometry(W, D).rotateX(-Math.PI / 2), deckMat);
     deck.receiveShadow = true;
     deck.raycast = () => undefined;
@@ -124,7 +124,7 @@ export class Venue {
     root.add(lip);
 
     // house floor
-    const houseMat = this.own(new THREE.MeshStandardMaterial({ color: "#0d0e11", roughness: 0.8, metalness: 0.05 }));
+    const houseMat = this.own(new THREE.MeshStandardMaterial({ color: "#0d0e11", roughness: 0.8, metalness: 0.05, envMapIntensity: 0.1 }));
     const house = new THREE.Mesh(this.own(new THREE.PlaneGeometry(W + 24, 40).rotateX(-Math.PI / 2)), houseMat);
     house.position.set(0, -0.12, D / 2 + 20);
     house.receiveShadow = true;
@@ -150,14 +150,14 @@ export class Venue {
       m.transparent = true;
       m.blending = THREE.AdditiveBlending;
       m.depthWrite = false;
-      m.uniforms.uStrength.value = 0.26;
+      m.uniforms.uStrength.value = 0.15;
       refl.raycast = () => undefined;
       this.reflector = refl;
       root.add(refl);
     }
 
     // ── walls / drapes ──
-    const black = this.own(new THREE.MeshStandardMaterial({ color: "#09090b", roughness: 1, metalness: 0, side: THREE.DoubleSide }));
+    const black = this.own(new THREE.MeshStandardMaterial({ color: "#09090b", roughness: 1, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0 }));
     const wallH = H + 1.5;
     const ex = W / 2 + 2.5;                      // room half width
     const backZ = -D / 2 - 0.6;
@@ -176,7 +176,7 @@ export class Venue {
     }
     if (o.mode === "theatre") {
       const folds = this.own(curtainGeometry(1.8, H + 0.6));
-      const vel = this.own(new THREE.MeshStandardMaterial({ color: "#07070a", roughness: 0.96, metalness: 0, side: THREE.DoubleSide }));
+      const vel = this.own(new THREE.MeshStandardMaterial({ color: "#07070a", roughness: 0.96, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0 }));
       for (const z of [-D / 2 + 0.5, -D / 6, D / 6 + 0.2]) {
         for (const sx of [-1, 1]) {
           for (let k = 0; k < 2; k++) {
@@ -195,7 +195,7 @@ export class Venue {
       }
     }
     if (o.mode === "cyc") {
-      const cyc = new THREE.Mesh(this.own(cycGeometry(W + 1, D, H)), this.own(new THREE.MeshStandardMaterial({ color: "#d8d6d0", roughness: 0.92, metalness: 0, side: THREE.DoubleSide })));
+      const cyc = new THREE.Mesh(this.own(cycGeometry(W + 1, D, H)), this.own(new THREE.MeshStandardMaterial({ color: "#d8d6d0", roughness: 0.92, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.05 })));
       cyc.position.set(0, 0, -D / 2 - 0.5);
       cyc.receiveShadow = true; cyc.raycast = () => undefined;
       root.add(cyc);
@@ -228,7 +228,7 @@ export class Venue {
       for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
         const x = (c - (cols - 1) / 2) * 0.62;
         if (Math.abs(x) < 0.5) continue;           // centre aisle
-        mtx.makeTranslation(x, r * 0.16 - 0.1, D / 2 + 4.2 + r * 1.0);
+        mtx.makeTranslation(x, r * 0.16 - 0.1, D / 2 + 5.6 + r * 1.0);
         inst.setMatrixAt(n++, mtx);
       }
       inst.count = n;

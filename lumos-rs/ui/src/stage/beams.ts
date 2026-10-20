@@ -5,7 +5,7 @@ import { FullScreenQuad, Pass } from "three/examples/jsm/postprocessing/Pass.js"
 
 export interface BeamQuality { steps: number; scale: number; noise: number }
 export const BEAM_Q: Record<"low" | "med" | "high", BeamQuality> = {
-  low: { steps: 8, scale: 0.4, noise: 0 },
+  low: { steps: 10, scale: 0.4, noise: 0 },
   med: { steps: 14, scale: 0.55, noise: 1 },
   high: { steps: 22, scale: 0.75, noise: 2 },
 };

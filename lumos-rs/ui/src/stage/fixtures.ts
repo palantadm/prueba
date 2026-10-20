@@ -45,6 +45,8 @@ export interface Rig {
   panG: THREE.Object3D | null;
   tiltG: THREE.Object3D | null;
   beam: BeamVisual;
+  /** extra beams produced by a prism (created on demand) */
+  extra: BeamVisual[];
   lensMat: THREE.MeshBasicMaterial;
   glow: THREE.Sprite;
   pool: THREE.Group;
@@ -138,7 +140,7 @@ export function buildRig(fx: Fixture, prof: FixtureProfile | undefined): Rig {
 
   const rig: Rig = {
     fx, plan, prof, sig: fxSig(fx, prof), kind, model, info, assets, root, panG: model.pan, tiltG: model.tilt,
-    beam, lensMat, glow, pool, poolMesh, poolMat, label, sel,
+    beam, extra: [], lensMat, glow, pool, poolMesh, poolMat, label, sel,
     state: newState(), goboAngle: 0, origin: new THREE.Vector3(), dir: new THREE.Vector3(0, -1, 0), dist: 10, halfAngle: 0.2, score: 0, mapped: false,
   };
   applyTransform(rig, fx);
@@ -154,6 +156,9 @@ export function applyTransform(rig: Rig, fx: Fixture) {
 const _q = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const tmpC = new THREE.Color();
+const _q2 = new THREE.Quaternion();
+const _ax = new THREE.Vector3();
+const _d2 = new THREE.Vector3();
 
 export interface Env {
   crowd: number;
@@ -211,7 +216,7 @@ export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
 
   rig.score = on ? st.bright : 0;
   rig.glow.visible = on;
-  if (!on) { rig.beam.mesh.visible = false; rig.pool.visible = false; return; }
+  if (!on) { rig.beam.mesh.visible = false; rig.pool.visible = false; rig.extra.forEach((x) => (x.mesh.visible = false)); return; }
 
   const gs = Math.max(0.1, rig.model.lensRadius) * 5.5 * (0.5 + st.bright);
   rig.glow.scale.set(gs, gs, 1);
@@ -239,6 +244,20 @@ export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
     }, env.camPos);
   }
 
+  // prism: two additional beams fanned around the lens X axis
+  const wantExtra = env.beams && st.prism;
+  if (wantExtra && rig.extra.length === 0) rig.extra = [new BeamVisual(whiteTexture()), new BeamVisual(whiteTexture())];
+  rig.extra.forEach((x, i) => {
+    x.mesh.visible = wantExtra;
+    if (!wantExtra) return;
+    const sep = Math.max(3.5, field * 0.55) * D2R * (i === 0 ? 1 : -1);
+    _q2.setFromAxisAngle(_ax.set(1, 0, 0).applyQuaternion(_q), sep);
+    _d2.copy(rig.dir).applyQuaternion(_q2);
+    const k2 = st.bright * Math.min(2.4, Math.sqrt(32 / Math.max(3, angle))) * env.crowd * 0.32;
+    tmpC.setRGB(st.r * k2, st.g * k2, st.b * k2);
+    x.update({ apex: rig.origin, axis: _d2, length: L, beamAngle: angle, fieldAngle: field, color: tmpC, soft: softness(rig, st), gobo: gtex, goboRot: rig.goboAngle }, env.camPos);
+  });
+
   const hitsFloor = dy < -0.05 && rig.origin.y > 0.02;
   rig.pool.visible = env.pools && hitsFloor && !rig.mapped;
   if (rig.pool.visible) {
@@ -259,6 +278,7 @@ export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
 
 export function disposeRig(rig: Rig) {
   rig.beam.mat.dispose();
+  rig.extra.forEach((x) => x.mat.dispose());
   rig.model.dispose();
   rig.poolMat.dispose();
   (rig.glow.material as THREE.SpriteMaterial).dispose();
