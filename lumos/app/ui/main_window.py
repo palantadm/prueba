@@ -36,6 +36,7 @@ from app.ui.panels.cuelist_panel import CuelistPanel
 from app.ui.panels.show_panel import ShowPanel
 from app.ui.panels.output_panel import OutputPanel
 from app.ui.panels.visualizer_panel import VisualizerPanel
+from app.ui.panels.osc_panel import OSCPanel
 from app.ui.screens import ScreenManager
 from app.ui import theme as T
 
@@ -48,6 +49,7 @@ _MODE_CUELIST    = 4
 _MODE_SHOW       = 5
 _MODE_OUTPUT     = 6
 _MODE_VISUALIZER = 7
+_MODE_OSC        = 8
 
 
 # ─── Mode button ─────────────────────────────────────────────────────────────
@@ -182,6 +184,7 @@ class MainWindow(QMainWindow):
         self._show_panel = ShowPanel(self.engine)
         self._output_panel = OutputPanel(self.engine)
         self._visualizer = VisualizerPanel(self.engine)
+        self._osc_panel = OSCPanel(self.engine)
 
         self._stack.addWidget(self._programmer)      # 0 = LIVE
         self._stack.addWidget(self._desk)             # 1 = DESK
@@ -191,6 +194,7 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._show_panel)       # 5 = SHOW
         self._stack.addWidget(self._output_panel)     # 6 = OUTPUT
         self._stack.addWidget(self._visualizer)       # 7 = VISUALIZER
+        self._stack.addWidget(self._osc_panel)        # 8 = OSC
 
         body.addWidget(self._stack)
 
@@ -246,6 +250,7 @@ class MainWindow(QMainWindow):
             ("💾  SHOW",    _MODE_SHOW),
             ("🔊  OUTPUT",  _MODE_OUTPUT),
             ("🎭  3D",      _MODE_VISUALIZER),
+            ("🎵  OSC",     _MODE_OSC),
         ]
         self._mode_btns: list[_ModeBtn] = []
         for label, idx in modes:
@@ -332,6 +337,7 @@ class MainWindow(QMainWindow):
             ("6",       lambda: self._select_mode(_MODE_SHOW)),
             ("7",       lambda: self._select_mode(_MODE_OUTPUT)),
             ("8",       lambda: self._select_mode(_MODE_VISUALIZER)),
+            ("9",       lambda: self._select_mode(_MODE_OSC)),
             ("F11",     self._toggle_fullscreen),
         ]
         for key, slot in pairs:
@@ -345,7 +351,7 @@ class MainWindow(QMainWindow):
             btn.setChecked(i == idx)
         # Fixture pool and executor bank only visible in LIVE/DESK modes
         self._fixture_pool.setVisible(idx in (_MODE_LIVE, _MODE_DESK))
-        self._exec_bank.setVisible(idx in (_MODE_LIVE, _MODE_DESK))
+        self._exec_bank.setVisible(idx in (_MODE_LIVE, _MODE_DESK, _MODE_CUELIST))
 
     # ── Slots ────────────────────────────────────────────────────────────────
 
@@ -430,6 +436,9 @@ class MainWindow(QMainWindow):
             "4  →  DMX MONITOR\n"
             "5  →  CUES (cuelist editor)\n"
             "6  →  SHOW (save / load)\n"
+            "7  →  OUTPUT (universe routing)\n"
+            "8  →  3D VISUALIZER\n"
+            "9  →  OSC (custom command mapper)\n"
             "Ctrl+B  →  Toggle Blackout\n"
             "F11     →  Toggle fullscreen\n"
             "F1      →  This help\n\n"

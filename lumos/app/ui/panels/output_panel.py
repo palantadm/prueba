@@ -29,6 +29,7 @@ from app.outputs import (
     ChamsysMagicDMXBackend,
     FTDIRawBackend,
     DMXkingBackend,
+    OSCBackend,
     OutputManager,
 )
 
@@ -43,6 +44,7 @@ _BACKEND_LABELS = [
     "Chamsys MagicDMX",        # 6
     "DMXking ultraDMX",        # 7
     "FTDI Raw (Open DMX)",     # 8
+    "OSC (UDP)",               # 9  — requires: pip install python-osc
 ]
 
 _STATUS_STYLE = {
@@ -154,6 +156,9 @@ class _UniverseCard(QFrame):
         # Page 8: FTDI Raw
         self._ftdi_port, page8 = self._make_serial_page("FTDI port:", "/dev/ttyUSB0")
         self._stack.addWidget(page8)
+        # Page 9: OSC
+        self._osc_host, self._osc_port_spin, self._osc_pattern, self._osc_mode, page9 = self._make_osc_page()
+        self._stack.addWidget(page9)
 
         outer.addWidget(self._stack)
 
@@ -309,6 +314,42 @@ class _UniverseCard(QFrame):
         lay.addStretch(1)
         return port, mode, w
 
+    def _make_osc_page(self):
+        w = QWidget()
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
+
+        lay.addWidget(self._lbl("Host:"))
+        host = QLineEdit("127.0.0.1")
+        host.setFixedWidth(130)
+        host.setStyleSheet(self._field_style())
+        lay.addWidget(host)
+
+        lay.addWidget(self._lbl("Port:"))
+        port = QSpinBox(); port.setRange(1, 65535); port.setValue(8000)
+        port.setFixedWidth(75)
+        port.setStyleSheet(f"QSpinBox {{ {self._field_style()} }}")
+        lay.addWidget(port)
+
+        lay.addWidget(self._lbl("Pattern:"))
+        pattern = QLineEdit("/dmx/{universe}/{channel}")
+        pattern.setFixedWidth(190)
+        pattern.setStyleSheet(self._field_style())
+        lay.addWidget(pattern)
+
+        lay.addWidget(self._lbl("Mode:"))
+        mode = QComboBox()
+        mode.addItems(["per_channel", "blob", "both"])
+        mode.setFixedWidth(100)
+        mode.setStyleSheet(
+            f"QComboBox {{ background:{T.C_WIDGET}; color:{T.C_TEXT};"
+            f" border:1px solid {T.C_BORDER_LT}; border-radius:3px; padding:2px 6px; }}"
+        )
+        lay.addWidget(mode)
+        lay.addStretch(1)
+        return host, port, pattern, mode, w
+
     def _lbl(self, text: str) -> QLabel:
         l = QLabel(text)
         l.setStyleSheet(self._label_style())
@@ -360,6 +401,12 @@ class _UniverseCard(QFrame):
             self._combo.setCurrentIndex(6)
             self._chamsys_port.setText(backend.port)
             self._chamsys_mode.setCurrentIndex(0 if backend.mode == "basic" else 1)
+        elif isinstance(backend, OSCBackend):
+            self._combo.setCurrentIndex(9)
+            self._osc_host.setText(backend.host)
+            self._osc_port_spin.setValue(backend.port)
+            self._osc_pattern.setText(backend.address_pattern)
+            self._osc_mode.setCurrentText(backend.mode)
         self._set_status("ok" if backend.is_open else "error")
 
     def _apply(self) -> None:
@@ -407,6 +454,13 @@ class _UniverseCard(QFrame):
         elif idx == 8:
             backend = FTDIRawBackend(
                 port=self._ftdi_port.text().strip() or "/dev/ttyUSB0",
+            )
+        elif idx == 9:
+            backend = OSCBackend(
+                host=self._osc_host.text().strip() or "127.0.0.1",
+                port=self._osc_port_spin.value(),
+                address_pattern=self._osc_pattern.text().strip() or "/dmx/{universe}/{channel}",
+                mode=self._osc_mode.currentText(),
             )
         else:
             return

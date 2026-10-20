@@ -12,6 +12,7 @@ from .enttec import EnttecOpenBackend, EnttecProBackend
 from .udmx import UDMXBackend
 from .chamsys import ChamsysMagicDMXBackend
 from .ftdi_raw import FTDIRawBackend, DMXkingBackend
+from .osc import OSCBackend
 from .manager import OutputManager
 
 __all__ = [
@@ -24,5 +25,6 @@ __all__ = [
     "ChamsysMagicDMXBackend",
     "FTDIRawBackend",
     "DMXkingBackend",
+    "OSCBackend",
     "OutputManager",
 ]
