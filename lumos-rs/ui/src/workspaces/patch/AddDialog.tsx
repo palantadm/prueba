@@ -45,13 +45,18 @@ export function AddDialog(props: { onClose: () => void }) {
                 <div key={"h" + it.h} style={{ height: 34, display: "flex", alignItems: "center", padding: "0 12px", background: "var(--bg-2)", fontSize: "var(--fs-xs)", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text-dim)" }}>{it.h}</div> :
                 <div key={it.p.id} role="listitem" class={`vrow ${sel?.id === it.p.id ? "sel" : ""}`} style={{ height: 34, cursor: "pointer" }} tabIndex={0}
                   onClick={() => { setSel(it.p); setModeName(""); }} onKeyDown={(e) => e.key === "Enter" && setSel(it.p)}>
-                  <span class="grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.p.model}</span><span class="faint">{it.p.category}</span>
+                  <span class="grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.p.model}</span>
+                  {it.p.model3d && <span class="chip ok" title="Real 3D model and optics (GDTF)">3D</span>}
+                  <span class="chip" title={`Source: ${it.p.source ?? "builtin"}`}>{it.p.source ?? "builtin"}</span>
                 </div>} />}
           </div>
         </div>
         <div class="col grow" style={{ gap: 12 }}>
           {sel && mode ? <>
-            <div><b style={{ fontSize: "var(--fs-lg)" }}>{sel.manufacturer} {sel.model}</b> <span class="dim">· {sel.category}{sel.power_w ? ` · ${sel.power_w} W` : ""}</span></div>
+            <div><b style={{ fontSize: "var(--fs-lg)" }}>{sel.manufacturer} {sel.model}</b> <span class="dim">· {sel.category}{sel.power_w ? ` · ${sel.power_w} W` : ""}</span>
+              <span class="chip" style={{ marginLeft: 8 }}>{sel.source ?? "builtin"}</span>{sel.model3d && <span class="chip ok" style={{ marginLeft: 4 }}>3D model · {sel.model3d.wheels.reduce((n, w) => n + w.slots.length, 0)} wheel slots</span>}
+              {sel.source && sel.source !== "builtin" && show.value?.profiles.some((p) => p.id === sel.id) && !show.value?.fixtures.some((f) => f.profile === sel.id) &&
+                <button class="btn sm ghost" style={{ marginLeft: 8 }} onClick={() => send({ type: "library_remove", id: sel.id }).then(() => setSel(null)).catch(() => {})}>Remove from show</button>}</div>
             <Select label="Mode" value={mode.name} options={sel.modes.map((m) => ({ value: m.name, label: `${m.name} (${footprint(m)} ch)` }))} onChange={setModeName} />
             <div class="panel scroll" style={{ maxHeight: 150 }}>
               <table class="tbl"><thead><tr><th style={{ width: 50 }}>Ch</th><th>Attribute</th><th>Notes</th></tr></thead><tbody>

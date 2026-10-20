@@ -20,7 +20,7 @@ Show/Library are resent whole (coalesced ≤10/s); `Rt` ≤20/s on change + 1/s 
 (faders, encoders) send commands without waiting for ack.
 
 REST (small): `GET /api/ports` serial ports · `GET /api/net` local IPs · `POST /api/media` multipart upload → `{url}` ·
-`GET /media/<file>` · `GET /api/show` download current show JSON · `PUT /api/show` import. Everything else is WebSocket.
+`GET /media/<file>` · `POST /api/library/import` multipart (.gdtf/.qxf/OFL .json → `{imported,errors}`, assets extracted to `<data>/library/<dir>/`) · `GET /library/<dir>/…` · `GET /api/show` download current show JSON · `PUT /api/show` import. Everything else is WebSocket.
 Static UI is embedded (`rust-embed` of `ui/dist`), falling back to disk in debug builds.
 
 ## Engine semantics (per tick, default 44 Hz)
