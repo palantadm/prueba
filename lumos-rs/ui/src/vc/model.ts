@@ -4,7 +4,7 @@ import { ATTR_META } from "../lib/attrs";
 
 export const KINDS: { kind: VcKind; label: string; icon: string; w: number; h: number }[] = [
   { kind: "button", label: "Button", icon: "▣", w: 2, h: 2 },
-  { kind: "slider", label: "Slider", icon: "⇕", w: 1, h: 5 },
+  { kind: "slider", label: "Slider", icon: "⇕", w: 2, h: 6 },
   { kind: "knob", label: "Knob", icon: "◉", w: 2, h: 2 },
   { kind: "xy_pad", label: "XY pad", icon: "✛", w: 4, h: 4 },
   { kind: "cue_list", label: "Cue list", icon: "▶", w: 4, h: 3 },
@@ -137,3 +137,26 @@ export const MODE_LABEL: Record<VcMode, string> = { momentary: "Momentary (while
 export function defaultInput(source: Source): VcInput { return { source, invert: false, in_min: 0, in_max: 1 }; }
 
 export function clone<T>(x: T): T { return structuredClone(x); }
+
+const DEFAULT_LABELS = new Set(["", "Button", "Level", "Speed", "Slider", "Knob", "XY pad", "Cue list", "Speed dial", "Clock"]);
+/** Short human label for an action, used to name widgets that still carry a default label. */
+export function autoLabel(a: VcAction, show: Show | null): string | null {
+  const nm = (list: { id: number; name: string }[] | undefined, id: number) => list?.find((x) => x.id === id)?.name;
+  const op = (o: VcOp) => ({ go: "GO", back: "BACK", flash: "FLASH", toggle: "", release: "RELEASE", level: "" }[o]);
+  switch (a.type) {
+    case "exec": { const e = show?.executors.find((x) => x.id === a.exec); const n = e ? e.label || `Exec ${e.slot + 1}` : null; return n ? `${op(a.op)} ${n}`.trim() : null; }
+    case "cuelist": { const n = nm(show?.cuelists, a.cuelist); return n ? `${op(a.op)} ${n}`.trim() : null; }
+    case "grand_master": return "Grand master";
+    case "blackout": return "BLACKOUT";
+    case "group_attr": { const g = nm(show?.groups, a.group); return g ? `${g} ${ATTR_META[a.attr]?.label ?? a.attr}` : null; }
+    case "fixture_attr": return ATTR_META[a.attr]?.label ?? a.attr;
+    case "effect_toggle": case "effect_rate": return nm(show?.effects, a.effect) ?? null;
+    case "palette_apply": return nm(show?.palettes, a.palette) ?? null;
+    case "prog_clear": return "CLEAR";
+    case "page": return show?.vconsole.find((p) => p.id === a.page)?.name ?? null;
+    case "xy": return nm(show?.groups, a.group) ?? null;
+    case "dmx": return `DMX ${a.universe}/${a.channel}`;
+    default: return null;
+  }
+}
+export const isDefaultLabel = (l: string) => DEFAULT_LABELS.has(l);

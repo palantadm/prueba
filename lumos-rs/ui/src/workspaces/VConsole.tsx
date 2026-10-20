@@ -56,8 +56,10 @@ async function importLayout(file: File) {
 function autoBuild() {
   const s = show.value; if (!s) return;
   const { page: pg } = autoBuildFromExecutors(s, nextWidgetId(draft.value), nextPageId(draft.value));
-  edit((ps) => { ps.push(pg); });
-  pageId.value = pg.id; sel.value = [];
+  const cur = page.value;
+  if (cur && cur.widgets.length === 0 && draft.value.length === 1) { pg.id = cur.id; pg.name = "Executors"; edit((ps) => { ps[0] = pg; }); }
+  else { edit((ps) => { ps.push(pg); }); pageId.value = pg.id; }
+  sel.value = [];
 }
 
 function Activity() {

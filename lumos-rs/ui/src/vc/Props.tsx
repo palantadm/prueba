@@ -6,7 +6,7 @@ import type { FeedbackTarget, Source, VcAction, VcInput, VcKind, VcMode, VcOp, V
 import { ALL_ATTRS, ATTR_META } from "../lib/attrs";
 import { NumberField, Segmented, Select, TextField, Toggle, confirmDialog } from "../ui";
 import { Picker, type PickOpt } from "./Picker";
-import { ACTION_TYPES, KINDS, MODE_LABEL, OPS, PALETTE_COLORS, actionTypesFor, defaultAction, defaultInput, describeFeedback, describeSource, hasAction, isContinuous } from "./model";
+import { ACTION_TYPES, KINDS, autoLabel, isDefaultLabel, MODE_LABEL, OPS, PALETTE_COLORS, actionTypesFor, defaultAction, defaultInput, describeFeedback, describeSource, hasAction, isContinuous } from "./model";
 import { FB_PRESETS, type FbPreset } from "./presets";
 import { alignSelected, deletePage, patchWidget, patchSelected, renamePage, resizePage, selected, page, deleteSelected, duplicateSelected, type Align } from "./editor";
 
@@ -46,7 +46,12 @@ function useLearn(onSource: (s: Source) => void) {
 function ActionEditor({ w }: { w: VcWidget }) {
   const L = useLists();
   const a = w.action;
-  const set = (na: VcAction) => patchWidget(w.id, (x) => { x.action = na; }, false);
+  const set = (na: VcAction) => patchWidget(w.id, (x) => {
+    const prevAuto = autoLabel(x.action, show.value);
+    x.action = na;
+    const nl = autoLabel(na, show.value);
+    if (nl && (isDefaultLabel(x.label) || x.label === prevAuto)) x.label = nl;
+  }, false);
   const types = ACTION_TYPES.filter((t) => actionTypesFor(w.kind).includes(t.type));
   const attrOpts = ALL_ATTRS.map((k) => ({ value: k, label: ATTR_META[k].label }));
   const opOpts = (w.kind === "button" ? OPS.filter((o) => o.value !== "level") : OPS.filter((o) => o.value === "level")).map((o) => ({ value: o.value, label: o.label }));

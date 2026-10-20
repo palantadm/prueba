@@ -106,7 +106,11 @@
 .vc-act-col.in .vc-act-line:first-child { color: var(--go); }
 .vc-act-col.out .vc-act-line:first-child { color: var(--live); }
 
-@media (max-width: 900px) {
-  .vc-props { width: 300px; }
-  .vc-palette { width: 108px; }
+@media (max-width: 1000px) {
+  .vc-body { flex-direction: column; }
+  .vc-palette { width: auto; flex-direction: row; align-items: center; border-right: 0; border-bottom: 1px solid var(--line); overflow-x: auto; padding: 6px var(--s-2); }
+  .vc-palette > .vc-cap, .vc-palette > .vc-hint { display: none; }
+  .vc-pal { flex: none; }
+  .vc-props { width: auto; max-height: 46%; border-left: 0; border-top: 1px solid var(--line); }
+  .vc-stage { padding: 6px; }
 }
