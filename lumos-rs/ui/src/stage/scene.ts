@@ -2,18 +2,36 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader.js";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { dmx } from "../store";
 import type { Fixture, FixtureProfile, Stage } from "../types";
 import { aimPanTilt } from "../lib/stage-dmx";
 import { MediaCache } from "./media";
 import { buildStageObject, objSig, type StageObj } from "./objects";
 import { applyTransform, buildRig, disposeRig, fxSig, updateRig, type Rig } from "./fixtures";
+import { BEAM_Q, BeamPass, shared as beamShared } from "./beams";
+import { whiteTexture, goboTexture } from "./gobos";
+import { Venue } from "./venue";
 import {
-  camPreset, gizmoMode, haze, showBeams, showGrid, showLabels, showPools, snapOn, stats, workLight, type CamPreset,
+  bloomOn, camPreset, gizmoMode, haze, quality, showAudience, showBeams, showGrid, showLabels, showMannequin, showPools, snapOn, stats,
+  venueMode, workLight, type CamPreset,
 } from "./state";
 
 const D2R = Math.PI / 180;
 const N_LIGHTS = 12;
+
+type Q = "low" | "med" | "high";
+const QCFG: Record<Q, { pr: number; bloom: number; reflect: boolean; shadows: number; shadowRes: number; fxaa: boolean; audience: boolean }> = {
+  low: { pr: 1, bloom: 0, reflect: false, shadows: 0, shadowRes: 512, fxaa: false, audience: false },
+  med: { pr: 1.5, bloom: 0.5, reflect: false, shadows: 3, shadowRes: 512, fxaa: true, audience: true },
+  high: { pr: 2, bloom: 0.7, reflect: true, shadows: 6, shadowRes: 1024, fxaa: true, audience: true },
+};
 
 export type Target = { type: "fixture" | "object"; id: number };
 export interface Callbacks {
@@ -33,11 +51,20 @@ export class StageScene {
   private ro: ResizeObserver;
   private media = new MediaCache();
 
-  private ambient = new THREE.AmbientLight(0x9aa4c0, 0.75);
+  private ambient = new THREE.AmbientLight(0x9aa4c0, 0.08);
+  private hemi = new THREE.HemisphereLight(0x4a5878, 0x101014, 0.22);
   private pickRoot = new THREE.Group();
   private poolRoot = new THREE.Group();
-  private floor!: THREE.Mesh;
-  private outside!: THREE.Mesh;
+  private venue = new Venue();
+  private composer!: EffectComposer;
+  private beamPass!: BeamPass;
+  private bloom!: UnrealBloomPass;
+  private fxaa!: ShaderPass;
+  private q: Q = "med";
+  private qActive: Q | null = null;
+  private software = false;
+  private qTimer = { low: 0, high: 0 };
+  private lastNow = 0;
   private grid = new THREE.LineSegments();
   private stageEdge = new THREE.LineSegments();
   private rigs = new Map<number, Rig>();
@@ -66,20 +93,34 @@ export class StageScene {
   constructor(host: HTMLElement, cb: Callbacks) {
     this.host = host;
     this.cb = cb;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.info.autoReset = false;
+    try {
+      const gl = this.renderer.getContext();
+      const ext = gl.getExtension("WEBGL_debug_renderer_info");
+      const name = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : "";
+      this.software = /swiftshader|llvmpipe|software|softpipe/i.test(name);
+    } catch { /* ignore */ }
     host.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.touchAction = "none";
     this.renderer.domElement.style.display = "block";
 
-    this.scene.background = new THREE.Color("#05060a");
-    this.scene.fog = new THREE.FogExp2(0x080a10, 0.0);
-    this.scene.add(this.ambient);
-    this.scene.add(new THREE.HemisphereLight(0x4a5878, 0x101014, 0.6));
+    this.scene.background = new THREE.Color("#020204");
+    this.scene.fog = new THREE.FogExp2(0x05060a, 0.0);
+    this.scene.add(this.ambient, this.hemi);
+    {
+      const pm = new THREE.PMREMGenerator(this.renderer);
+      const envTex = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+      this.scene.environment = envTex;
+      this.scene.environmentIntensity = 0.14;
+      pm.dispose();
+    }
 
-    this.scene.add(this.pickRoot, this.poolRoot);
+    this.scene.add(this.venue.group, this.pickRoot, this.poolRoot);
     this.buildFloor([12, 8, 6]);
     this.grid.raycast = () => undefined;
     this.stageEdge.raycast = () => undefined;
@@ -87,9 +128,30 @@ export class StageScene {
 
     for (let i = 0; i < N_LIGHTS; i++) {
       const l = new THREE.SpotLight(0xffffff, 0, 0, 0.3, 0.5, 2);
+      if (i < 6) {
+        l.castShadow = true;
+        l.map = whiteTexture();
+        l.shadow.bias = -0.0004;
+        l.shadow.normalBias = 0.02;
+        l.shadow.radius = 4;
+        l.shadow.camera.near = 0.25;
+        l.shadow.camera.far = 60;
+      }
       this.scene.add(l, l.target);
       this.lights.push(l);
     }
+
+    // HDR pipeline: scene → volumetric beams → bloom → tone-map/sRGB → FXAA
+    const rt = new THREE.WebGLRenderTarget(4, 4, { type: THREE.HalfFloatType, depthTexture: new THREE.DepthTexture(4, 4) });
+    this.composer = new EffectComposer(this.renderer, rt);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    this.beamPass = new BeamPass(this.camera);
+    this.composer.addPass(this.beamPass);
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(4, 4), 0.6, 0.55, 0.9);
+    this.composer.addPass(this.bloom);
+    this.composer.addPass(new OutputPass());
+    this.fxaa = new ShaderPass(FXAAShader);
+    this.composer.addPass(this.fxaa);
 
     this.objHelper.visible = false;
     this.objHelper.raycast = () => undefined;
@@ -134,22 +196,6 @@ export class StageScene {
   private buildFloor(size: [number, number, number]) {
     const [w, d] = size;
     this.stageSize = size;
-    if (this.floor) { this.floor.geometry.dispose(); this.scene.remove(this.floor); }
-    this.floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, d).rotateX(-Math.PI / 2),
-      new THREE.MeshStandardMaterial({ color: "#1a1c22", roughness: 0.82, metalness: 0.05 }),
-    );
-    this.floor.raycast = () => undefined;
-    this.scene.add(this.floor);
-    if (!this.outside) {
-      this.outside = new THREE.Mesh(
-        new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2),
-        new THREE.MeshStandardMaterial({ color: "#0b0c0f", roughness: 0.95, metalness: 0 }),
-      );
-      this.outside.position.y = -0.02;
-      this.outside.raycast = () => undefined;
-      this.scene.add(this.outside);
-    }
     const pts: number[] = [];
     for (let x = Math.ceil(-w / 2); x <= w / 2; x++) pts.push(x, 0.004, -d / 2, x, 0.004, d / 2);
     for (let z = Math.ceil(-d / 2); z <= d / 2; z++) pts.push(-w / 2, 0.004, z, w / 2, 0.004, z);
@@ -220,6 +266,7 @@ export class StageScene {
         this.rigs.set(fx.id, rig);
         this.pickRoot.add(rig.root);
         this.poolRoot.add(rig.pool);
+        this.beamPass.scene.add(rig.beam.mesh);
         rig.sel.visible = this.selFixtures.includes(fx.id);
         if (this.selFixtures.length === 1 && this.selFixtures[0] === fx.id) this.refreshGizmo();
       } else {
@@ -235,6 +282,7 @@ export class StageScene {
     if (!rig) return;
     this.pickRoot.remove(rig.root);
     this.poolRoot.remove(rig.pool);
+    this.beamPass.scene.remove(rig.beam.mesh);
     disposeRig(rig);
     this.rigs.delete(id);
     if (this.target?.type === "fixture" && this.target.id === id) this.refreshGizmo();
@@ -340,9 +388,22 @@ export class StageScene {
 
   private resize() {
     const w = Math.max(1, this.host.clientWidth), h = Math.max(1, this.host.clientHeight);
+    this.size = [w, h];
+    this.applySize();
+  }
+
+  private size: [number, number] = [1, 1];
+  private applySize() {
+    const [w, h] = this.size;
+    const pr = QCFG[this.qActive ?? "med"].pr;
+    const ratio = Math.min(window.devicePixelRatio || 1, pr);
+    this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(w, h, false);
+    this.composer.setPixelRatio(ratio);
+    this.composer.setSize(w, h);
     this.renderer.domElement.style.width = "100%";
     this.renderer.domElement.style.height = "100%";
+    this.fxaa.material.uniforms["resolution"].value.set(1 / (w * ratio), 1 / (h * ratio));
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -369,7 +430,7 @@ export class StageScene {
       return true;
     });
     if (this.aiming) {
-      const hit = hits.find((h) => h.object.userData.fixtureId === undefined);
+      const hit = hits.find((h) => { for (let n: THREE.Object3D | null = h.object; n; n = n.parent) if (n.userData.fixtureId !== undefined) return false; return true; });
       let pt: THREE.Vector3 | null = hit ? hit.point.clone() : null;
       if (!pt) {
         const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -379,8 +440,11 @@ export class StageScene {
       return;
     }
     for (const h of hits) {
-      const f = h.object.userData.fixtureId as number | undefined;
-      const o = h.object.userData.objectId as number | undefined;
+      let f: number | undefined, o: number | undefined;
+      for (let n: THREE.Object3D | null = h.object; n && f === undefined && o === undefined; n = n.parent) {
+        f = n.userData.fixtureId as number | undefined;
+        o = n.userData.objectId as number | undefined;
+      }
       if (f !== undefined) return this.cb.onPick({ fixture: f }, d.shift);
       if (o !== undefined) return this.cb.onPick({ object: o }, d.shift);
     }
@@ -410,13 +474,42 @@ export class StageScene {
   }
 
   /** Screenshot helper for tests. */
-  snapshot(): string { this.renderer.render(this.scene, this.camera); return this.renderer.domElement.toDataURL("image/png"); }
+  snapshot(): string { this.composer.render(); return this.renderer.domElement.toDataURL("image/png"); }
+
+  // ── quality ───────────────────────────────────────────
+  private effectiveQuality(): Q {
+    const pref = quality.value;
+    if (pref !== "auto") return pref;
+    return this.q;
+  }
+
+  private applyQuality(q: Q) {
+    if (this.qActive === q) return;
+    const c = QCFG[q];
+    this.qActive = q;
+    this.q = q;
+    this.beamPass.setQuality(BEAM_Q[q]);
+    this.bloom.enabled = bloomOn.value && c.bloom > 0;
+    this.bloom.strength = c.bloom;
+    this.fxaa.enabled = c.fxaa;
+    this.lights.forEach((l, i) => {
+      if (i < 6) {
+        const on = i < c.shadows;
+        l.castShadow = on;
+        if (l.shadow.mapSize.x !== c.shadowRes) { l.shadow.mapSize.set(c.shadowRes, c.shadowRes); l.shadow.map?.dispose(); l.shadow.map = null; }
+      }
+    });
+    this.applySize();
+  }
 
   // ── frame loop ────────────────────────────────────────
   private frame = (now: number) => {
     if (this.disposed) return;
     this.frameN++;
     const tSec = now / 1000;
+    const dt = Math.min(0.1, Math.max(0.001, (now - (this.lastNow || now - 16)) / 1000));
+    this.lastNow = now;
+    this.renderer.info.reset();
 
     if (this.anim) {
       const k = Math.min(1, (now - this.anim.t0) / this.anim.dur);
@@ -428,30 +521,59 @@ export class StageScene {
     const preset = camPreset.value;
     if (preset !== this.lastPreset) { this.lastPreset = preset; if (preset !== "free") this.goPreset(preset); }
     this.controls.update();
+    this.camera.updateMatrixWorld();
+
+    // quality + venue
+    const pref = quality.value;
+    if (pref === "auto" && this.qActive === null) this.q = this.software ? "med" : "high";
+    const q = pref === "auto" ? this.q : pref;
+    this.applyQuality(q);
+    this.bloom.enabled = bloomOn.value && QCFG[q].bloom > 0;
+    const qc = QCFG[q];
+    this.venue.build({
+      size: this.stageSize, mode: venueMode.value, audience: showAudience.value && qc.audience, mannequin: showMannequin.value,
+      reflect: qc.reflect, reflectRes: 512,
+    });
 
     const hz = haze.value;
-    (this.scene.fog as THREE.FogExp2).density = hz * 0.014;
+    (this.scene.fog as THREE.FogExp2).density = hz * 0.006;
+    beamShared.uHaze.value = 0.1 + hz * 0.95;
+    beamShared.uTime.value = tSec;
     this.grid.visible = showGrid.value;
-    this.ambient.intensity = workLight.value ? 2.6 : 0.75;
+    this.ambient.intensity = workLight.value ? 2.4 : 0.08;
+    this.hemi.intensity = workLight.value ? 1.2 : 0.22;
     this.applyGizmoModeIfChanged();
 
-    const env = { crowd: Math.max(0.3, Math.min(1, Math.sqrt(16 / Math.max(1, this.activeBeams)))), haze: hz, beams: showBeams.value, pools: showPools.value, labels: showLabels.value, time: tSec };
+    const env = {
+      crowd: Math.max(0.35, Math.min(1, Math.sqrt(14 / Math.max(1, this.activeBeams)))), haze: hz, beams: showBeams.value,
+      pools: showPools.value, labels: showLabels.value, time: tSec, dt, camPos: this.camera.position,
+    };
     let active = 0;
     for (const rig of this.rigs.values()) { updateRig(rig, dmx.get(rig.fx.universe), env); if (rig.score > 0.02) active++; }
     this.activeBeams = active;
+    this.beamPass.enabled = showBeams.value;
 
-    if (this.frameN % 2 === 0) this.assignLights();
+    if (this.frameN % 2 === 0) this.assignLights(qc.shadows);
     this.media.tick(now);
     for (const so of this.objs.values()) so.tick?.(now, this.media);
     if (this.objHelper.visible) this.updateHelper();
 
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render(dt);
 
     this.fpsAcc.n++;
     if (now - this.fpsAcc.t > 500) {
+      const fps = Math.round((this.fpsAcc.n * 1000) / (now - this.fpsAcc.t));
       const lit = this.lights.filter((l) => l.intensity > 0).length;
-      stats.value = { fps: Math.round((this.fpsAcc.n * 1000) / (now - this.fpsAcc.t)), calls: this.renderer.info.render.calls, lights: lit };
+      stats.value = { fps, calls: this.renderer.info.render.calls, lights: lit, q };
       this.fpsAcc = { t: now, n: 0 };
+      // adaptive quality (not on software renderers — their fps says nothing about real hardware)
+      if (pref === "auto" && !this.software && document.visibilityState === "visible") {
+        if (fps < 28) { this.qTimer.low++; this.qTimer.high = 0; }
+        else if (fps > 56) { this.qTimer.high++; this.qTimer.low = 0; }
+        else { this.qTimer.low = 0; this.qTimer.high = 0; }
+        if (this.qTimer.low >= 4) { this.q = q === "high" ? "med" : "low"; this.qTimer.low = 0; }
+        if (this.qTimer.high >= 24) { this.q = q === "low" ? "med" : "high"; this.qTimer.high = 0; }
+      }
     }
   };
 
@@ -461,19 +583,33 @@ export class StageScene {
     if (k !== this.lastGizmo) { this.lastGizmo = k; this.applyGizmoMode(); }
   }
 
-  private assignLights() {
+  private assignLights(shadowCount: number) {
     const lit = [...this.rigs.values()].filter((r) => r.score > 0.02).sort((a, b) => b.score - a.score);
+    // moving heads with gobos are the best candidates for the shadow/gobo-mapped lights
+    const mappedPool = lit.filter((r) => r.state.goboCap || r.plan?.moving).concat(lit.filter((r) => !(r.state.goboCap || r.plan?.moving)));
+    const order: typeof lit = [];
+    const taken = new Set<number>();
+    for (const r of mappedPool.slice(0, shadowCount)) { order.push(r); taken.add(r.fx.id); }
+    for (const r of lit) { if (order.length >= N_LIGHTS) break; if (!taken.has(r.fx.id)) order.push(r); }
+    for (const r of this.rigs.values()) r.mapped = false;
     for (let i = 0; i < N_LIGHTS; i++) {
       const l = this.lights[i];
-      const r = lit[i];
+      const r = order[i];
       if (!r) { l.intensity = 0; continue; }
+      const mapped = i < shadowCount;
       l.position.copy(r.origin);
       l.target.position.copy(r.origin).addScaledVector(r.dir, Math.min(r.dist, 40));
       l.target.updateMatrixWorld();
       l.angle = Math.min(1.3, r.halfAngle * 1.02);
-      l.penumbra = 0.55;
+      l.penumbra = r.state.goboCap ? 0.12 : 0.5;
       l.color.setRGB(r.state.r, r.state.g, r.state.b);
-      l.intensity = r.state.bright * 260 * Math.min(2.5, 30 / Math.max(6, r.halfAngle / D2R * 2));
+      const spread = Math.max(6, (r.halfAngle / D2R) * 2);
+      l.intensity = r.state.bright * 230 * Math.min(2.5, 30 / spread) * (mapped ? 1 : 0.7);
+      if (i < 6) {
+        const tex = goboTexture(r.state.goboCap, r.assets);
+        l.map = tex ?? whiteTexture();
+        r.mapped = mapped;
+      }
     }
   }
 
@@ -489,6 +625,9 @@ export class StageScene {
     for (const r of this.rigs.values()) disposeRig(r);
     for (const o of this.objs.values()) o.dispose();
     this.media.dispose();
+    this.venue.dispose();
+    this.beamPass.dispose();
+    this.composer.dispose();
     this.renderer.dispose();
     el.remove();
   }

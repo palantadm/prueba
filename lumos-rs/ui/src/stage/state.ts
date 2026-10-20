@@ -16,6 +16,8 @@ function persisted<T>(key: string, init: T) {
 
 export type GizmoMode = "translate" | "rotate" | "scale";
 export type CamPreset = "audience" | "top" | "side" | "iso" | "free";
+export type QualityPref = "auto" | "low" | "med" | "high";
+export type VenueMode = "blackbox" | "theatre" | "cyc" | "open";
 
 export const editMode = persisted("edit", true);
 export const gizmoMode = signal<GizmoMode>("translate");
@@ -28,9 +30,14 @@ export const showLabels = persisted("labels", false);
 export const workLight = persisted("work", false);
 export const haze = persisted("haze", 0.35);
 export const camPreset = persisted<CamPreset>("preset", "iso");
+export const quality = persisted<QualityPref>("quality", "auto");
+export const bloomOn = persisted("bloom", true);
+export const venueMode = persisted<VenueMode>("venue", "theatre");
+export const showAudience = persisted("audience", false);
+export const showMannequin = persisted("mannequin", false);
 export const selObject = signal<number | null>(null);
 export const hiddenObjs = persisted<number[]>("hidden", []);
-export const stats = signal({ fps: 0, calls: 0, lights: 0 });
+export const stats = signal({ fps: 0, calls: 0, lights: 0, q: "med" as string });
 export const draftVersion = signal(0);
 
 // ── drafts ──────────────────────────────────────────────

@@ -44,6 +44,7 @@ export interface FxGeo {
 
 const planCache = new Map<number, { sig: string; plan: Plan | null }>();
 const MAX_LEN = 30;
+const OPEN_LEN = 9;
 const RING = 28;
 
 export function planOf(fx: Fixture, prof: FixtureProfile | undefined): Plan | null {
@@ -107,6 +108,8 @@ function trace(o: V3, d: V3, obs: Obb[]): { t: number; kind: "floor" | "object" 
     const tb = rayObb(o, d, b);
     if (tb !== null && tb < t) { t = tb; kind = "object"; }
   }
+  // nothing hit within range: draw a short, fading open beam instead of a 30 m cone
+  if (kind === "open") t = OPEN_LEN;
   return { t, kind };
 }
 

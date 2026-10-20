@@ -5,6 +5,7 @@ import { Patch } from "./Patch";
 import { Cues } from "./Cues";
 import { Monitor } from "./Monitor";
 import { Stage3D } from "./Stage3D";
+import { Plan2D } from "./Plan2D";
 import { Settings } from "./Settings";
 import { VConsole } from "./VConsole";
 
@@ -17,6 +18,7 @@ export const workspaces: Workspace[] = [
   { id: "cues", key: "3", label: "Cues", component: Cues },
   { id: "patch", key: "4", label: "Patch", component: Patch },
   { id: "stage", key: "5", label: "3D", component: Stage3D },
+  { id: "plan", key: "8", label: "2D", component: Plan2D },
   { id: "monitor", key: "6", label: "Monitor", component: Monitor },
   { id: "settings", key: "7", label: "Settings", component: Settings },
   { id: "vc", key: "9", label: "Console", component: VConsole },

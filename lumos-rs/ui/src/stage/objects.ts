@@ -60,14 +60,14 @@ export function trussGeometry(length: number, side: number): THREE.BufferGeometr
   return g;
 }
 
-function curtainGeometry(w: number, h: number): THREE.BufferGeometry {
+export function curtainGeometry(w: number, h: number): THREE.BufferGeometry {
   const g = new THREE.PlaneGeometry(w, h, Math.max(24, Math.round(w * 14)), 1);
   const p = g.attributes.position as THREE.BufferAttribute;
   const folds = Math.max(4, Math.round(w * 2.2));
   for (let i = 0; i < p.count; i++) {
     const u = (p.getX(i) / w + 0.5) * folds * Math.PI * 2;
     const y = p.getY(i) / h + 0.5;
-    p.setZ(i, Math.sin(u) * 0.12 * (0.65 + 0.35 * y));
+    p.setZ(i, (Math.sin(u) * 0.11 + Math.sin(u * 2.7 + 1.3) * 0.025) * (0.6 + 0.4 * y));
   }
   g.computeVertexNormals();
   return g;
@@ -117,7 +117,7 @@ function buildScreen(o: StageObject, g: THREE.Group): StageObj["tick"] {
 
   const mkMat = (isLed: boolean) => new THREE.ShaderMaterial({
     uniforms: {
-      map: { value: null }, hasMap: { value: 0 }, tint: { value: new THREE.Color(1, 1, 1) }, brightness: { value: o.brightness },
+      map: { value: null }, hasMap: { value: 0 }, tint: { value: new THREE.Color(1, 1, 1) }, brightness: { value: o.brightness * (isLed ? 1.8 : 1) },
       cells: { value: new THREE.Vector2(Math.max(8, Math.round(w * 24)), Math.max(8, Math.round(h * 24))) },
       led: { value: isLed ? 1 : 0 }, soft: { value: isLed ? 0 : 1 },
     },
@@ -169,19 +169,36 @@ export function buildStageObject(o: StageObject): StageObj {
   switch (o.kind) {
     case "truss": {
       const side = Math.max(0.15, h || 0.3);
-      const m = new THREE.Mesh(trussGeometry(Math.max(0.3, w), side), std(col, 0.45, 0.35));
+      const m = new THREE.Mesh(trussGeometry(Math.max(0.3, w), side), std(col, 0.3, 0.92));
       g.add(m);
+      // end plates
+      const plate = new THREE.BoxGeometry(0.012, side * 1.04, side * 1.04);
+      for (const sx of [-1, 1]) { const p = new THREE.Mesh(plate, std("#7b8088", 0.35, 0.9)); p.position.x = (sx * Math.max(0.3, w)) / 2; g.add(p); }
       break;
     }
-    case "platform":
-    case "wall":
+    case "platform": {
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), std(col, 0.8, 0.05)));
+      const top = new THREE.Mesh(new THREE.BoxGeometry(w + 0.02, 0.025, d + 0.02), std("#15161a", 0.5, 0.15));
+      top.position.y = h / 2 + 0.004;
+      g.add(top);
+      const trim = new THREE.Mesh(new THREE.BoxGeometry(w + 0.03, 0.05, d + 0.03), std("#07080a", 0.6, 0.3));
+      trim.position.y = -h / 2 + 0.05;
+      g.add(trim);
+      break;
+    }
+    case "wall": {
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), std(col, 0.92, 0.0)));
+      break;
+    }
     case "box": {
-      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), std(col, o.kind === "platform" ? 0.85 : 0.75, 0.05));
-      g.add(m);
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(w, h, d), std(col, 0.55, 0.1)));
       break;
     }
     case "column": {
-      g.add(new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, h, 24), std(col, 0.7, 0.1)));
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(w / 2, w / 2, h, 32), std(col, 0.55, 0.12)));
+      const baseM = std("#25272d", 0.5, 0.2);
+      const b1 = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.62, w * 0.66, 0.12, 32), baseM); b1.position.y = -h / 2 + 0.06; g.add(b1);
+      const b2 = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.66, w * 0.62, 0.12, 32), baseM); b2.position.y = h / 2 - 0.06; g.add(b2);
       break;
     }
     case "curtain": {
@@ -203,7 +220,12 @@ export function buildStageObject(o: StageObject): StageObj {
       tick = buildScreen(o, g);
       break;
   }
-  g.traverse((c) => { c.userData.objectId = o.id; });
+  g.traverse((c) => {
+    c.userData.objectId = o.id;
+    const m = c as THREE.Mesh;
+    if (m.isMesh && o.kind !== "screen") { m.castShadow = o.kind !== "curtain"; m.receiveShadow = true; }
+    else if (m.isMesh && o.kind === "screen") { m.receiveShadow = false; }
+  });
   return {
     id: o.id, group: g, sig: objSig(o), tick,
     dispose() {

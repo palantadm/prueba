@@ -7,7 +7,7 @@ import type { Fixture, MediaKind, StageObject } from "../types";
 import {
   TEMPLATES, aimTool, camPreset, editFixture, editMode, editObject, editStage, effFixtures, effStage, gizmoMode,
   haze, hiddenObjs, nextObjectId, selObject, showBeams, showGrid, showLabels, showPools, snapOn, stats,
-  toggleHidden, workLight, type CamPreset,
+  toggleHidden, workLight, bloomOn, quality, showAudience, showMannequin, venueMode, type CamPreset, type QualityPref, type VenueMode,
 } from "./state";
 import { hasStream, startCapture, stopCapture, streamVersion, uploadMedia } from "./media";
 
@@ -81,6 +81,21 @@ export function Toolbar(props: { onFullscreen: () => void }) {
         <Tg on={showGrid.value} set={(v) => (showGrid.value = v)} label="Grid" />
         <Tg on={showLabels.value} set={(v) => (showLabels.value = v)} label="IDs" />
         <Tg on={workLight.value} set={(v) => (workLight.value = v)} label="Work light" title="Bright ambient light for editing" />
+        <Tg on={bloomOn.value} set={(v) => (bloomOn.value = v)} label="Bloom" title="HDR glow around bright lights and LED screens" />
+        <Tg on={showMannequin.value} set={(v) => (showMannequin.value = v)} label="Scale" title="1.75 m figure for scale" />
+        <Tg on={showAudience.value} set={(v) => (showAudience.value = v)} label="House" title="Audience seating" />
+        <select class="input st-sel" aria-label="Venue" title="Venue shell" value={venueMode.value} onChange={(e) => (venueMode.value = (e.target as HTMLSelectElement).value as VenueMode)}>
+          <option value="theatre">Theatre</option>
+          <option value="blackbox">Black box</option>
+          <option value="cyc">Cyclorama</option>
+          <option value="open">Open</option>
+        </select>
+        <select class="input st-sel" aria-label="Quality" title="Render quality" value={quality.value} onChange={(e) => (quality.value = (e.target as HTMLSelectElement).value as QualityPref)}>
+          <option value="auto">Quality: auto</option>
+          <option value="low">Low</option>
+          <option value="med">Medium</option>
+          <option value="high">High</option>
+        </select>
         <label class="st-haze" title="Haze: makes beams more visible">
           <span class="label">Haze</span>
           <input type="range" min="0" max="1" step="0.01" value={haze.value} onInput={(e) => (haze.value = parseFloat((e.target as HTMLInputElement).value))} />
@@ -93,7 +108,7 @@ export function Toolbar(props: { onFullscreen: () => void }) {
           <button class={`btn sm ${rightOpen.value ? "sel" : ""}`} onClick={() => (rightOpen.value = !rightOpen.value)}>Props</button>
         </div>
       )}
-      <span class="st-hud mono" title="fps · draw calls · real lights">{stats.value.fps} fps · {stats.value.calls} dc · {stats.value.lights} L</span>
+      <span class="st-hud mono" title="fps · draw calls · real lights">{stats.value.fps} fps · {stats.value.calls} dc · {stats.value.lights} L · {stats.value.q}</span>
       <button class="btn sm" onClick={props.onFullscreen} title="Fullscreen">⛶</button>
     </div>
   );
