@@ -58,6 +58,8 @@ export class StageScene {
   private anim: { t0: number; dur: number; p0: THREE.Vector3; p1: THREE.Vector3; t0v: THREE.Vector3; t1v: THREE.Vector3 } | null = null;
   private lastPreset: CamPreset | null = null;
   private aiming = false;
+  private interacting = false;
+  private camMoved = false;
   private disposed = false;
 
   constructor(host: HTMLElement, cb: Callbacks) {
@@ -100,7 +102,9 @@ export class StageScene {
     this.controls.minDistance = 0.8;
     this.controls.maxDistance = 90;
     this.controls.screenSpacePanning = true;
-    this.controls.addEventListener("end", () => this.saveCam(true));
+    this.controls.addEventListener("start", () => { this.interacting = true; this.camMoved = false; });
+    this.controls.addEventListener("change", () => { if (this.interacting) this.camMoved = true; });
+    this.controls.addEventListener("end", () => { this.interacting = false; if (this.camMoved) this.saveCam(true); });
 
     this.tc = new TransformControls(this.camera, this.renderer.domElement);
     this.tc.size = 0.8;

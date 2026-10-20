@@ -4,7 +4,7 @@ export type FaderProps = {
   value: number;
   onChange: (v: number) => void;
   onEnd?: () => void;
-  height?: number;
+  height?: number | string;
   width?: number | string;
   color?: string;
   held?: boolean;

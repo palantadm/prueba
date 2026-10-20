@@ -67,7 +67,7 @@ export function Desk() {
           return (
             <div key={ch} class={`lv-ch ${ov !== undefined ? "held" : ""}`}>
               <div class="lv-ch-n">{ch}</div>
-              <Fader value={v / 255} held={ov !== undefined} color={o ? attrColor(o.attr) : "var(--accent)"} width={36} height={260}
+              <Fader value={v / 255} held={ov !== undefined} color={o ? attrColor(o.attr) : "var(--accent)"} width={36} height="auto"
                 ariaLabel={`Channel ${ch}`} onChange={(x) => setOv(uni, ch, Math.round(x * 255))} />
               <div class="lv-ch-v" style={{ color: ov !== undefined ? "var(--live)" : undefined }}>{fmt(v)}</div>
               <button class="btn sm" aria-label={`Flash channel ${ch}`}

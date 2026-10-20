@@ -49,8 +49,8 @@
 .lv-col > .panel-body, .lv-scroll { flex: 1; min-height: 0; overflow: auto; }
 .lv-section { margin-bottom: var(--s-3); }
 @media (max-width: 1100px) {
-  .lv-live-main { grid-template-columns: 1fr; overflow: auto; grid-auto-rows: auto; align-content: start; }
-  .lv-col { min-height: 0; }
+  .lv-live-main { display: block; overflow: auto; }
+  .lv-col { min-height: 0; margin-bottom: var(--s-2); }
   .lv-col > .lv-scroll { overflow: visible; flex: none; }
   .lv-col.pool > .lv-scroll { overflow: auto; max-height: 240px; }
   .lv-col.pools > .lv-scroll { overflow: auto; max-height: 300px; }
@@ -114,7 +114,7 @@
 .lv-transport { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-3); }
 .lv-go { min-width: 120px; min-height: 56px; font-size: var(--fs-xl); font-weight: 800; letter-spacing: .1em; }
 .lv-big { font-family: var(--font-mono); font-size: 28px; font-weight: 700; line-height: 1; }
-.lv-prog { height: 8px; background: var(--bg-3); border-radius: 4px; overflow: hidden; min-width: 160px; flex: 1; }
+.lv-prog { flex: none; width: 100%; height: 8px; background: var(--bg-3); border-radius: 4px; overflow: hidden; min-width: 160px; flex: 1; }
 .lv-prog > i { display: block; height: 100%; background: var(--go); }
 .lv-cuetbl { flex: 1; min-height: 160px; overflow: auto; }
 .lv-cuetbl td { padding: 2px var(--s-2); }
@@ -131,3 +131,6 @@
 .lv-execs { padding: var(--s-2); }
 .lv-exrow { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
 @media (max-width: 900px) { .lv-cues { grid-template-columns: 1fr; grid-template-rows: auto 1fr; overflow: auto; } }
+
+.lv-ch .lv-fader { flex: 1 1 0; min-height: 160px; height: auto; }
+@media (max-width: 900px) { .lv-cuetbl { flex: none; max-height: 360px; } }

@@ -1,7 +1,7 @@
 // Throw-away harness: fake show + animated DMX to exercise the 3D workspace without a server.
 import { render } from "preact";
 import "../styles/base.css";
-import { dmx, library, show } from "../store";
+import { connect, dmx, library, show } from "../store";
 import { Toasts } from "../ui";
 import { Stage3D } from "../workspaces/Stage3D";
 import type { FixtureProfile, Fixture, Show } from "../types";
@@ -34,6 +34,12 @@ place("t/strobe", "1ch", [0, 5.6, 0], 1, "Strobe", 1);
 fixtures[fixtures.length - 1].pos = [3, 5.6, 0];
 for (let i = 0; i < 3; i++) { fixtures[fixtures.length - 2 - i].pos[0] = -3 + i * 3; fixtures[fixtures.length - 2 - i].pos[2] = 3; }
 
+if (new URLSearchParams(location.search).has("many")) {
+  for (let i = 0; i < 150; i++) {
+    const row = Math.floor(i / 30), col = i % 30;
+    fixtures.push({ id: id++, name: `Many ${i}`, profile: i % 3 === 0 ? "t/mh" : "t/par", mode: i % 3 === 0 ? "9ch" : "4ch", universe: 1, address: 1 + (i % 50) * 9, pos: [-5.5 + col * 0.38, 5.4 - (row % 2) * 0.1, -2.5 + row * 1.2], rot: [0, 0, 0] });
+  }
+}
 const s: Show = {
   name: "Harness", universes: [{ id: 1, name: "U1", outputs: [] }], fixtures, groups: [], palettes: [], cuelists: [], executors: [], effects: [], bindings: [], profiles: [],
   settings: undefined as never,
@@ -68,4 +74,21 @@ setInterval(() => {
     if (fx.profile === "t/strobe") f[a] = 0;
   }
 }, 25);
+class FakeWS {
+  readyState = 1; binaryType = ""; onopen: any; onmessage: any; onclose: any; onerror: any;
+  static OPEN = 1;
+  constructor() { setTimeout(() => this.onopen?.(), 0); }
+  close() { /* */ }
+  send(data: string) {
+    const m = JSON.parse(data);
+    const c = m.cmd;
+    const cur = show.value!;
+    if (c.type === "stage_save") show.value = { ...cur, stage: c.stage };
+    if (c.type === "fixture_update") show.value = { ...cur, fixtures: cur.fixtures.map((f) => (f.id === c.fixture.id ? c.fixture : f)) };
+    (window as any).__cmds = [...((window as any).__cmds ?? []), c];
+    if (m.id) setTimeout(() => this.onmessage?.({ data: JSON.stringify({ t: "ack", id: m.id, ok: true, err: null }) }), 5);
+  }
+}
+(window as any).WebSocket = FakeWS;
+connect();
 render(<><Stage3D /><Toasts /></>, document.getElementById("app")!);

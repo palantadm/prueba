@@ -91,7 +91,7 @@ function RecordCue({ onClose }: { onClose: () => void }) {
         <button class="btn" style={{ alignSelf: "flex-end" }} onClick={createList}>+ New</button>
       </div>
       <div class="row">
-        <div class="field grow"><label>Cue number (blank = append)</label>
+        <div class="field grow"><label>Cue # (blank = next)</label>
           <input class="input num" placeholder={cl ? String(Math.floor(Math.max(0, ...cl.cues.map((c) => c.number))) + 1) : "1"}
             value={number} onInput={(e) => setNumber((e.target as HTMLInputElement).value)} /></div>
         <div class="field grow"><label>Existing cue</label>
