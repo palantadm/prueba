@@ -37,6 +37,7 @@ from app.ui.panels.show_panel import ShowPanel
 from app.ui.panels.output_panel import OutputPanel
 from app.ui.panels.visualizer_panel import VisualizerPanel
 from app.ui.panels.osc_panel import OSCPanel
+from app.osc import OSCManager
 from app.ui.screens import ScreenManager
 from app.ui import theme as T
 
@@ -184,7 +185,8 @@ class MainWindow(QMainWindow):
         self._show_panel = ShowPanel(self.engine)
         self._output_panel = OutputPanel(self.engine)
         self._visualizer = VisualizerPanel(self.engine)
-        self._osc_panel = OSCPanel(self.engine)
+        self._osc_manager = OSCManager(self.engine)
+        self._osc_panel = OSCPanel(self._osc_manager)
 
         self._stack.addWidget(self._programmer)      # 0 = LIVE
         self._stack.addWidget(self._desk)             # 1 = DESK

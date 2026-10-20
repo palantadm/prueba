@@ -1,6 +1,6 @@
 """
 Lumos native desktop app launcher.
-Run from E:\claude\lumos\lumos\:
+Run from the lumos/ directory:
     python run_app.py
 """
 import sys
