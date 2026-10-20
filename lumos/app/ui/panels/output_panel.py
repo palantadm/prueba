@@ -25,16 +25,24 @@ from app.outputs import (
     SACNBackend,
     EnttecOpenBackend,
     EnttecProBackend,
+    UDMXBackend,
+    ChamsysMagicDMXBackend,
+    FTDIRawBackend,
+    DMXkingBackend,
     OutputManager,
 )
 
-# Backend options in combo order
+# Backend options in combo order (index must match _apply / _load_existing)
 _BACKEND_LABELS = [
-    "None",
-    "Art-Net (UDP)",
-    "sACN E1.31",
-    "Enttec Open DMX",
-    "Enttec Pro",
+    "None",                    # 0
+    "Art-Net (UDP)",           # 1
+    "sACN E1.31",              # 2
+    "Enttec Open DMX USB",     # 3
+    "Enttec Pro (USB)",        # 4
+    "uDMX (USB HID)",          # 5  — requires: pip install pyusb
+    "Chamsys MagicDMX",        # 6
+    "DMXking ultraDMX",        # 7
+    "FTDI Raw (Open DMX)",     # 8
 ]
 
 _STATUS_STYLE = {
@@ -130,11 +138,22 @@ class _UniverseCard(QFrame):
         self._sacn_ip, self._sacn_port, self._sacn_pri, self._sacn_src, page2 = self._make_sacn_page()
         self._stack.addWidget(page2)
         # Page 3: Enttec Open
-        self._open_port, page3 = self._make_enttec_page("Open DMX port (e.g. /dev/ttyUSB0):")
+        self._open_port, page3 = self._make_serial_page("Open DMX port:", "/dev/ttyUSB0")
         self._stack.addWidget(page3)
         # Page 4: Enttec Pro
-        self._pro_port, page4 = self._make_enttec_page("Pro port (e.g. /dev/ttyUSB0):")
+        self._pro_port, page4 = self._make_serial_page("Pro port:", "/dev/ttyUSB0")
         self._stack.addWidget(page4)
+        # Page 5: uDMX
+        self._stack.addWidget(self._make_udmx_page())
+        # Page 6: Chamsys MagicDMX
+        self._chamsys_port, self._chamsys_mode, page6 = self._make_chamsys_page()
+        self._stack.addWidget(page6)
+        # Page 7: DMXking
+        self._dmxking_port, page7 = self._make_serial_page("DMXking port:", "/dev/ttyUSB0")
+        self._stack.addWidget(page7)
+        # Page 8: FTDI Raw
+        self._ftdi_port, page8 = self._make_serial_page("FTDI port:", "/dev/ttyUSB0")
+        self._stack.addWidget(page8)
 
         outer.addWidget(self._stack)
 
@@ -238,7 +257,7 @@ class _UniverseCard(QFrame):
         lay.addStretch(1)
         return ip, port, pri, src, w
 
-    def _make_enttec_page(self, label_text: str):
+    def _make_serial_page(self, label_text: str, default_port: str = "/dev/ttyUSB0"):
         w = QWidget()
         lay = QHBoxLayout(w)
         lay.setContentsMargins(0, 0, 0, 0)
@@ -248,13 +267,52 @@ class _UniverseCard(QFrame):
         lbl.setStyleSheet(self._label_style())
         lay.addWidget(lbl)
 
-        port = QLineEdit("/dev/ttyUSB0")
+        port = QLineEdit(default_port)
         port.setFixedWidth(200)
         port.setStyleSheet(self._field_style())
         port.setPlaceholderText("/dev/ttyUSB0 or COM3")
         lay.addWidget(port)
         lay.addStretch(1)
         return port, w
+
+    def _make_udmx_page(self) -> QWidget:
+        w = QWidget()
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lbl = QLabel("uDMX — USB HID device (VID 0x16C0, PID 0x05DC).  Requires: pip install pyusb")
+        lbl.setStyleSheet(f"color:{T.C_TEXT_LABEL}; font-style:italic; font-size:11px;")
+        lay.addWidget(lbl)
+        return w
+
+    def _make_chamsys_page(self):
+        w = QWidget()
+        lay = QHBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(12)
+
+        lay.addWidget(self._lbl("Port:"))
+        port = QLineEdit("/dev/ttyACM0")
+        port.setFixedWidth(180)
+        port.setStyleSheet(self._field_style())
+        port.setPlaceholderText("/dev/ttyACM0-A or COM4-B")
+        lay.addWidget(port)
+
+        lay.addWidget(self._lbl("Model:"))
+        mode = QComboBox()
+        mode.addItems(["Basic (1 universe)", "Full (2 universes)"])
+        mode.setFixedWidth(160)
+        mode.setStyleSheet(
+            f"QComboBox {{ background:{T.C_WIDGET}; color:{T.C_TEXT};"
+            f" border:1px solid {T.C_BORDER_LT}; border-radius:3px; padding:2px 6px; }}"
+        )
+        lay.addWidget(mode)
+        lay.addStretch(1)
+        return port, mode, w
+
+    def _lbl(self, text: str) -> QLabel:
+        l = QLabel(text)
+        l.setStyleSheet(self._label_style())
+        return l
 
     # ------------------------------------------------------------------
     # Logic
@@ -284,12 +342,24 @@ class _UniverseCard(QFrame):
             self._sacn_port.setValue(backend.port)
             self._sacn_pri.setValue(backend.priority)
             self._sacn_src.setText(backend.source_name)
+        elif isinstance(backend, DMXkingBackend):
+            self._combo.setCurrentIndex(7)
+            self._dmxking_port.setText(backend.port)
+        elif isinstance(backend, FTDIRawBackend):
+            self._combo.setCurrentIndex(8)
+            self._ftdi_port.setText(backend.port)
         elif isinstance(backend, EnttecOpenBackend):
             self._combo.setCurrentIndex(3)
             self._open_port.setText(backend.port)
         elif isinstance(backend, EnttecProBackend):
             self._combo.setCurrentIndex(4)
             self._pro_port.setText(backend.port)
+        elif isinstance(backend, UDMXBackend):
+            self._combo.setCurrentIndex(5)
+        elif isinstance(backend, ChamsysMagicDMXBackend):
+            self._combo.setCurrentIndex(6)
+            self._chamsys_port.setText(backend.port)
+            self._chamsys_mode.setCurrentIndex(0 if backend.mode == "basic" else 1)
         self._set_status("ok" if backend.is_open else "error")
 
     def _apply(self) -> None:
@@ -321,6 +391,22 @@ class _UniverseCard(QFrame):
         elif idx == 4:
             backend = EnttecProBackend(
                 port=self._pro_port.text().strip() or "/dev/ttyUSB0",
+            )
+        elif idx == 5:
+            backend = UDMXBackend()
+        elif idx == 6:
+            mode_str = "full" if self._chamsys_mode.currentIndex() == 1 else "basic"
+            backend = ChamsysMagicDMXBackend(
+                port=self._chamsys_port.text().strip() or "/dev/ttyACM0",
+                mode=mode_str,
+            )
+        elif idx == 7:
+            backend = DMXkingBackend(
+                port=self._dmxking_port.text().strip() or "/dev/ttyUSB0",
+            )
+        elif idx == 8:
+            backend = FTDIRawBackend(
+                port=self._ftdi_port.text().strip() or "/dev/ttyUSB0",
             )
         else:
             return
