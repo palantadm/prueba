@@ -34,16 +34,20 @@ from app.ui.panels.fixture_pool import FixturePool
 from app.ui.panels.executor_bank import ExecutorBank
 from app.ui.panels.cuelist_panel import CuelistPanel
 from app.ui.panels.show_panel import ShowPanel
+from app.ui.panels.output_panel import OutputPanel
+from app.ui.panels.visualizer_panel import VisualizerPanel
 from app.ui.screens import ScreenManager
 from app.ui import theme as T
 
 # ─── Mode indices ────────────────────────────────────────────────────────────
-_MODE_LIVE    = 0
-_MODE_DESK    = 1
-_MODE_PATCH   = 2
-_MODE_MONITOR = 3
-_MODE_CUELIST = 4
-_MODE_SHOW    = 5
+_MODE_LIVE       = 0
+_MODE_DESK       = 1
+_MODE_PATCH      = 2
+_MODE_MONITOR    = 3
+_MODE_CUELIST    = 4
+_MODE_SHOW       = 5
+_MODE_OUTPUT     = 6
+_MODE_VISUALIZER = 7
 
 
 # ─── Mode button ─────────────────────────────────────────────────────────────
@@ -176,6 +180,8 @@ class MainWindow(QMainWindow):
         self._monitor = DMXMonitor(self.engine)
         self._cuelist_panel = CuelistPanel(self.engine)
         self._show_panel = ShowPanel(self.engine)
+        self._output_panel = OutputPanel(self.engine)
+        self._visualizer = VisualizerPanel(self.engine)
 
         self._stack.addWidget(self._programmer)      # 0 = LIVE
         self._stack.addWidget(self._desk)             # 1 = DESK
@@ -183,6 +189,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._monitor)          # 3 = MONITOR
         self._stack.addWidget(self._cuelist_panel)    # 4 = CUELIST
         self._stack.addWidget(self._show_panel)       # 5 = SHOW
+        self._stack.addWidget(self._output_panel)     # 6 = OUTPUT
+        self._stack.addWidget(self._visualizer)       # 7 = VISUALIZER
 
         body.addWidget(self._stack)
 
@@ -206,6 +214,7 @@ class MainWindow(QMainWindow):
         self._fixture_pool.selection_changed.connect(self._on_selection_changed)
         self._patch.fixtures_changed.connect(self._fixture_pool.refresh_fixtures)
         self._patch.fixtures_changed.connect(self._on_fixtures_changed_for_show)
+        self._patch.fixtures_changed.connect(self._visualizer.refresh_fixtures)
         self._programmer.scene_recorded.connect(self._on_scene_saved)
         self._cuelist_panel.go_pressed.connect(self._on_cuelist_go)
         self._cuelist_panel.back_pressed.connect(self._on_cuelist_back)
@@ -235,6 +244,8 @@ class MainWindow(QMainWindow):
             ("📊  MONITOR", _MODE_MONITOR),
             ("📋  CUES",    _MODE_CUELIST),
             ("💾  SHOW",    _MODE_SHOW),
+            ("🔊  OUTPUT",  _MODE_OUTPUT),
+            ("🎭  3D",      _MODE_VISUALIZER),
         ]
         self._mode_btns: list[_ModeBtn] = []
         for label, idx in modes:
@@ -319,6 +330,8 @@ class MainWindow(QMainWindow):
             ("4",       lambda: self._select_mode(_MODE_MONITOR)),
             ("5",       lambda: self._select_mode(_MODE_CUELIST)),
             ("6",       lambda: self._select_mode(_MODE_SHOW)),
+            ("7",       lambda: self._select_mode(_MODE_OUTPUT)),
+            ("8",       lambda: self._select_mode(_MODE_VISUALIZER)),
             ("F11",     self._toggle_fullscreen),
         ]
         for key, slot in pairs:
