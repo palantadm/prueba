@@ -74,6 +74,14 @@ pub struct Capability {
     /// `#rrggbb` swatch for colour-wheel slots.
     #[serde(default)]
     pub color: Option<String>,
+    /// Gobo / slot image URL (e.g. `/library/<profile>/wheels/gobo1.png`), when the source provides one.
+    #[serde(default)]
+    pub image: Option<String>,
+    /// Wheel name and 1-based slot index this capability selects (GDTF), for the visualiser.
+    #[serde(default)]
+    pub wheel: Option<String>,
+    #[serde(default)]
+    pub slot: Option<u32>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -121,6 +129,93 @@ pub struct FixtureProfile {
     pub tilt_range: f32,
     #[serde(default)]
     pub power_w: f32,
+    /// Where the profile came from: `builtin` | `gdtf` | `ofl` | `qxf`.
+    #[serde(default)]
+    pub source: Option<String>,
+    /// Real geometry (GDTF): 3D models, axes, beam optics, wheels — drives the realistic visualiser.
+    #[serde(default)]
+    pub model3d: Option<Model3d>,
+}
+
+/// Geometry + optics of a fixture, converted from GDTF. Units: metres, degrees.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Model3d {
+    /// Base URL of extracted assets, e.g. `/library/<profile id>/` (ends with `/`).
+    pub assets: String,
+    pub root: GeoNode,
+    pub wheels: Vec<Wheel>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum BeamType {
+    Wash,
+    Spot,
+    None,
+    Rectangle,
+    Pc,
+    Fresnel,
+    Glow,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct BeamInfo {
+    /// Beam angle (bright cone) and field angle (outer cone), degrees, at zoom min.
+    pub beam_angle: f32,
+    pub field_angle: f32,
+    /// Angles at zoom max (equal to the above if the fixture has no zoom).
+    pub beam_angle_max: f32,
+    pub field_angle_max: f32,
+    /// Lens radius in metres.
+    pub radius: f32,
+    pub beam_type: BeamType,
+    pub lamp: String,
+    pub power_w: f32,
+    pub luminous_flux: f32,
+    pub color_temp: f32,
+}
+
+/// One node of the GDTF geometry tree.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GeoNode {
+    pub name: String,
+    /// Attribute that rotates this node: `pan` | `tilt` (GDTF Axis geometries) or `None`.
+    #[serde(default)]
+    pub axis: Option<String>,
+    /// Model file relative to `assets` (`.glb`/`.gltf`/`.3ds`), when the geometry has one.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// Fallback primitive when no model file: `Cube` | `Cylinder` | `Sphere` | `Conventional`, with size w,h,d metres.
+    #[serde(default)]
+    pub primitive: Option<String>,
+    pub size: [f32; 3],
+    /// Local transform relative to parent, column-major 4×4 (three.js `Matrix4.fromArray`), metres.
+    pub matrix: [f32; 16],
+    #[serde(default)]
+    pub beam: Option<BeamInfo>,
+    pub children: Vec<GeoNode>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct WheelSlot {
+    pub name: String,
+    #[serde(default)]
+    pub color: Option<String>,
+    /// Gobo image, relative to `Model3d.assets`.
+    #[serde(default)]
+    pub image: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Wheel {
+    pub name: String,
+    pub slots: Vec<WheelSlot>,
 }
 
 fn default_beam() -> [f32; 2] {
@@ -601,6 +696,9 @@ pub struct Show {
     /// Profiles imported into / customised in this show (merged over the built-in library).
     #[serde(default)]
     pub profiles: Vec<FixtureProfile>,
+    /// Virtual console pages (button/slider/knob/XY widgets with input mapping and feedback).
+    #[serde(default)]
+    pub vconsole: Vec<VcPage>,
 }
 
 impl Default for Show {
@@ -620,6 +718,7 @@ impl Default for Show {
             stage: Stage::default(),
             settings: Settings::default(),
             profiles: vec![],
+            vconsole: vec![],
         }
     }
 }
@@ -630,6 +729,163 @@ pub struct ShowInfo {
     pub name: String,
     /// Unix seconds.
     pub modified: u32,
+}
+
+// ───────────────────────────── Virtual console ─────────────────────────────
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum VcKind {
+    Button,
+    Slider,
+    Knob,
+    /// Two-axis pad driving pan/tilt (or any two attributes) of a group.
+    XyPad,
+    /// GO / BACK / current cue display for one cuelist.
+    CueList,
+    /// Tap-tempo / rate dial for an effect.
+    SpeedDial,
+    Label,
+    /// Visual container; widgets drawn over it move with it in the editor.
+    Frame,
+    Clock,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum VcMode {
+    /// Active only while pressed (flash).
+    Momentary,
+    /// Each press toggles.
+    Toggle,
+    /// Fires once on press.
+    Trigger,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum VcOp {
+    Go,
+    Back,
+    Flash,
+    Toggle,
+    Release,
+    Level,
+}
+
+/// What a widget controls.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum VcAction {
+    None,
+    Exec { exec: u32, op: VcOp },
+    Cuelist { cuelist: u32, op: VcOp },
+    GrandMaster,
+    Blackout,
+    Dmx { universe: u16, channel: u16 },
+    FixtureAttr { fixtures: Vec<u32>, attr: String },
+    GroupAttr { group: u32, attr: String },
+    EffectToggle { effect: u32 },
+    /// Slider/dial scales an effect's `rate` (Hz) between `out_min..out_max` of the widget.
+    EffectRate { effect: u32 },
+    PaletteApply { palette: u32, group: Option<u32> },
+    ProgClear,
+    /// Jump to a virtual-console page.
+    Page { page: u32 },
+    /// XY pad: `group` moves `x_attr`/`y_attr` (typically pan/tilt).
+    Xy { group: u32, x_attr: String, y_attr: String },
+}
+
+/// One physical input mapped onto a widget.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct VcInput {
+    pub source: Source,
+    #[serde(default)]
+    pub invert: bool,
+    /// Normalised sub-range of the source mapped onto 0..1 (default 0..1).
+    #[serde(default)]
+    pub in_min: f32,
+    #[serde(default = "d_one")]
+    pub in_max: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum FeedbackTarget {
+    /// MIDI out (relayed through the browser's Web MIDI output). Buttons send `on`/`off`
+    /// (use controller-specific velocity as LED colour); sliders/knobs send `0..127` scaled value when `scale`.
+    Midi {
+        port: Option<String>,
+        kind: MidiKind,
+        channel: u8,
+        number: u8,
+        on: u8,
+        off: u8,
+        scale: bool,
+    },
+    /// OSC out: buttons send `on`/`off` floats, sliders send the 0..1 value.
+    Osc {
+        host: String,
+        port: u16,
+        address: String,
+        on: f32,
+        off: f32,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct VcWidget {
+    pub id: u32,
+    pub kind: VcKind,
+    pub label: String,
+    /// Grid position and size in cells.
+    pub x: u16,
+    pub y: u16,
+    pub w: u16,
+    pub h: u16,
+    /// Accent colour `#rrggbb`.
+    pub color: String,
+    pub action: VcAction,
+    pub mode: VcMode,
+    /// `vertical` | `horizontal` (sliders).
+    #[serde(default)]
+    pub orientation: String,
+    #[serde(default)]
+    pub inputs: Vec<VcInput>,
+    #[serde(default)]
+    pub feedback: Vec<FeedbackTarget>,
+    /// Output range for continuous widgets (normalised attribute / rate units).
+    #[serde(default)]
+    pub out_min: f32,
+    #[serde(default = "d_one")]
+    pub out_max: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct VcPage {
+    pub id: u32,
+    pub name: String,
+    pub cols: u16,
+    pub rows: u16,
+    pub widgets: Vec<VcWidget>,
+}
+
+/// Live state of a widget (what feedback reflects).
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct VcState {
+    pub id: u32,
+    /// 0..1 for continuous widgets.
+    pub value: f32,
+    pub active: bool,
 }
 
 // ───────────────────────────── Runtime (not persisted) ─────────────────────────────
@@ -725,6 +981,9 @@ pub struct Runtime {
     pub learn: Option<u32>,
     /// Measured engine rate.
     pub fps: f32,
+    /// Virtual console widget states.
+    #[serde(default)]
+    pub vc: Vec<VcState>,
 }
 
 // ───────────────────────────── Commands (client → server) ─────────────────────────────
@@ -823,6 +1082,17 @@ pub enum Command {
     ShowSave { name: Option<String> },
     ShowLoad { name: String },
     ShowRename { name: String },
+    // ── virtual console ──
+    /// Replace all virtual-console pages (editor saves the whole layout).
+    VcSave { pages: Vec<VcPage> },
+    /// Press/release of a button widget (from UI or touch).
+    VcPress { widget: u32, down: bool },
+    /// Continuous value 0..1 for slider/knob/dial widgets.
+    VcValue { widget: u32, value: f32 },
+    /// XY pad position, both 0..1.
+    VcXy { widget: u32, x: f32, y: f32 },
+    /// Remove an imported/custom profile from the show library.
+    LibraryRemove { id: String },
     // ── streaming ──
     /// Subscribe to binary DMX frames (`None` = all universes, `Some([])` = none).
     SubscribeDmx { universes: Option<Vec<u16>> },
@@ -853,6 +1123,8 @@ pub enum ServerMsg {
     Learned { source: Source },
     /// Saved shows list. Sent on connect and after save/delete.
     Shows { shows: Vec<ShowInfo> },
+    /// Feedback MIDI to relay to a hardware output (the browser forwards it through Web MIDI).
+    MidiOut { port: Option<String>, bytes: Vec<u8> },
     Log { level: String, msg: String },
 }
 

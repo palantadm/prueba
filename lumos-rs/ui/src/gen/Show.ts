@@ -10,9 +10,14 @@ import type { Palette } from "./Palette";
 import type { Settings } from "./Settings";
 import type { Stage } from "./Stage";
 import type { UniverseCfg } from "./UniverseCfg";
+import type { VcPage } from "./VcPage";
 
 export type Show = { name: string, universes: Array<UniverseCfg>, fixtures: Array<Fixture>, groups: Array<Group>, palettes: Array<Palette>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
 /**
  * Profiles imported into / customised in this show (merged over the built-in library).
  */
-profiles: Array<FixtureProfile>, };
+profiles: Array<FixtureProfile>, 
+/**
+ * Virtual console pages (button/slider/knob/XY widgets with input mapping and feedback).
+ */
+vconsole: Array<VcPage>, };

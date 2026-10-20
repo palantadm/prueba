@@ -5,4 +5,4 @@ import type { Show } from "./Show";
 import type { ShowInfo } from "./ShowInfo";
 import type { Source } from "./Source";
 
-export type ServerMsg = { "t": "hello", version: string, } | { "t": "show", rev: number, show: Show, } | { "t": "library", profiles: Array<FixtureProfile>, } | { "t": "rt", rt: Runtime, } | { "t": "ack", id: string, ok: boolean, err: string | null, } | { "t": "learned", source: Source, } | { "t": "shows", shows: Array<ShowInfo>, } | { "t": "log", level: string, msg: string, };
+export type ServerMsg = { "t": "hello", version: string, } | { "t": "show", rev: number, show: Show, } | { "t": "library", profiles: Array<FixtureProfile>, } | { "t": "rt", rt: Runtime, } | { "t": "ack", id: string, ok: boolean, err: string | null, } | { "t": "learned", source: Source, } | { "t": "shows", shows: Array<ShowInfo>, } | { "t": "midi_out", port: string | null, bytes: Array<number>, } | { "t": "log", level: string, msg: string, };

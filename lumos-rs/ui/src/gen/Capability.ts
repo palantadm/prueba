@@ -4,4 +4,12 @@ export type Capability = { min: number, max: number, label: string,
 /**
  * `#rrggbb` swatch for colour-wheel slots.
  */
-color: string | null, };
+color: string | null, 
+/**
+ * Gobo / slot image URL (e.g. `/library/<profile>/wheels/gobo1.png`), when the source provides one.
+ */
+image: string | null, 
+/**
+ * Wheel name and 1-based slot index this capability selects (GDTF), for the visualiser.
+ */
+wheel: string | null, slot: number | null, };

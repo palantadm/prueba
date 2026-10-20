@@ -33,6 +33,9 @@ fn cc(mut ch: ChannelDef, caps: &[(u8, u8, &str, Option<&str>)]) -> ChannelDef {
             max: *max,
             label: (*label).into(),
             color: color.map(|s| s.to_string()),
+            image: None,
+            wheel: None,
+            slot: None,
         })
         .collect();
     ch
@@ -63,6 +66,8 @@ fn prof(
         pan_range: pan,
         tilt_range: tilt,
         power_w: power,
+        source: Some("builtin".into()),
+        model3d: None,
     }
 }
 
@@ -692,7 +697,7 @@ fn capabilities_of(ch: &Value) -> Vec<Capability> {
                 .and_then(|a| a.first())
                 .and_then(|c| c.as_str())
                 .map(|s| s.to_string());
-            Some(Capability { min, max, label, color })
+            Some(Capability { min, max, label, color, image: None, wheel: None, slot: None })
         })
         .collect()
 }
@@ -880,6 +885,8 @@ pub fn import_ofl(json: &str) -> Result<FixtureProfile, String> {
         pan_range,
         tilt_range,
         power_w: power,
+        source: Some("ofl".into()),
+        model3d: None,
     })
 }
 

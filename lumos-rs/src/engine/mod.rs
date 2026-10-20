@@ -727,6 +727,8 @@ impl Engine {
                 self.touch();
             }
             SubscribeDmx { .. } => {}
+            // TODO(be-vc / be-lib): implemented by the virtual-console and library work.
+            VcSave { .. } | VcPress { .. } | VcValue { .. } | VcXy { .. } | LibraryRemove { .. } => {}
         }
         Ok(())
     }
@@ -1661,6 +1663,7 @@ impl Engine {
             timecode: TimecodeRt { running: self.tc.running, frames, text: fmt_tc(frames, fps) },
             learn: self.learn,
             fps: self.fps,
+            vc: vec![],
         }
     }
 }

@@ -4,6 +4,7 @@ import type { ExecRt } from "./ExecRt";
 import type { InputStatus } from "./InputStatus";
 import type { OutputStatus } from "./OutputStatus";
 import type { TimecodeRt } from "./TimecodeRt";
+import type { VcState } from "./VcState";
 
 export type Runtime = { grand_master: number, blackout: boolean, 
 /**
@@ -17,4 +18,8 @@ learn: number | null,
 /**
  * Measured engine rate.
  */
-fps: number, };
+fps: number, 
+/**
+ * Virtual console widget states.
+ */
+vc: Array<VcState>, };
