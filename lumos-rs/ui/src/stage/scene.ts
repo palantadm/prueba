@@ -466,7 +466,7 @@ export class StageScene {
       l.angle = Math.min(1.3, r.halfAngle * 1.02);
       l.penumbra = 0.55;
       l.color.setRGB(r.state.r, r.state.g, r.state.b);
-      l.intensity = r.state.bright * 520 * Math.min(2.5, 30 / Math.max(6, r.halfAngle / D2R * 2));
+      l.intensity = r.state.bright * 260 * Math.min(2.5, 30 / Math.max(6, r.halfAngle / D2R * 2));
     }
   }
 

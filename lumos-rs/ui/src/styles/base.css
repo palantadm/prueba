@@ -169,3 +169,5 @@ h2 { margin: 0; font-size: var(--fs-xl); font-weight: 700; }
   .app-head .sp { flex: 1; }
 }
 @media (max-width: 900px) { .hide-narrow { display: none !important; } }
+@media (max-width: 1360px) { .hide-mid { display: none !important; } }
+.page-body .empty { height: auto; padding: 48px; }

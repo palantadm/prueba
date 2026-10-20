@@ -179,7 +179,7 @@ export function App() {
           <span class="mono">{connected.value ? `${rt.value?.fps.toFixed(0) ?? "–"} fps` : "offline"}</span>
         </span>
         <button class={`btn tall ${bo ? "blink" : "danger"}`} aria-pressed={bo} onClick={() => send({ type: "blackout", on: !bo })} title="Blackout (Ctrl+B)">BLACKOUT</button>
-        <button class="btn tall ghost icon" aria-label="Keyboard shortcuts" onClick={() => setHelp(true)}>?</button>
+        <button class="btn tall ghost icon hide-mid" aria-label="Keyboard shortcuts" onClick={() => setHelp(true)}>?</button>
       </header>
       <main class="grow" style={{ minHeight: 0, overflow: "hidden" }}><Cur /></main>
       <StatusBar />

@@ -1815,7 +1815,7 @@ mod tests {
         assert_eq!(e.runs[&1].current, Some(2.0));
         assert!(e.handle(Command::GoTo { cuelist: 1, number: 9.0 }).is_err());
         e.handle(Command::ReleaseCuelist { cuelist: 1 }).unwrap();
-        assert_eq!(e.runs[&1].current, None);
+        assert_eq!(e.runs.get(&1).and_then(|r| r.current), None);
     }
 
     #[test]
@@ -1900,7 +1900,7 @@ mod tests {
             set(&mut e, f, "dimmer", 1.0);
         }
         e.handle(Command::EffectSave {
-            effect: Effect { id: 0, name: "pulse".into(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 180.0, fixtures: vec![1, 2] },
+            effect: Effect { id: 0, name: "pulse".into(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: vec![1, 2] },
         })
         .unwrap();
         e.handle(Command::EffectToggle { id: 1, on: true }).unwrap();

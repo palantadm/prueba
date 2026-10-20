@@ -2,6 +2,7 @@
 import { render } from "preact";
 import "../styles/base.css";
 import { dmx, library, show } from "../store";
+import { Toasts } from "../ui";
 import { Stage3D } from "../workspaces/Stage3D";
 import type { FixtureProfile, Fixture, Show } from "../types";
 
@@ -67,4 +68,4 @@ setInterval(() => {
     if (fx.profile === "t/strobe") f[a] = 0;
   }
 }, 25);
-render(<Stage3D />, document.getElementById("app")!);
+render(<><Stage3D /><Toasts /></>, document.getElementById("app")!);

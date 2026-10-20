@@ -8,8 +8,8 @@ const D2R = Math.PI / 180;
 const NOOP = () => undefined;
 
 // ── shared resources ────────────────────────────────────
-const bodyMat = new THREE.MeshStandardMaterial({ color: "#3a3e48", roughness: 0.5, metalness: 0.5 });
-const bodyMat2 = new THREE.MeshStandardMaterial({ color: "#4a4f5a", roughness: 0.45, metalness: 0.5 });
+const bodyMat = new THREE.MeshStandardMaterial({ color: "#4a505c", roughness: 0.55, metalness: 0.15 });
+const bodyMat2 = new THREE.MeshStandardMaterial({ color: "#5a606c", roughness: 0.5, metalness: 0.15 });
 const stroboMat = new THREE.MeshStandardMaterial({ color: "#c8ccd2", roughness: 0.4, metalness: 0.3 });
 const GEO = {
   base: new THREE.BoxGeometry(0.3, 0.09, 0.22),
@@ -42,7 +42,7 @@ varying vec3 vN; varying vec3 vV; varying float vT;
 void main(){
   float f = abs(dot(normalize(vN), normalize(vV)));
   float edge = pow(f, 1.6);
-  float along = pow(1.0 - vT, 1.4) * smoothstep(0.0, 0.025, vT);
+  float along = pow(1.0 - vT, 1.4) * smoothstep(0.0, 0.07, vT);
   float vis = mix(0.10, 1.0, haze);
   float a = intensity * edge * along * vis * gain;
   gl_FragColor = vec4(color, clamp(a, 0.0, 1.0));
