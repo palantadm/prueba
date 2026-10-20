@@ -109,6 +109,7 @@ export function Toolbar(props: { onFullscreen: () => void }) {
         </div>
       )}
       <span class="st-hud mono" title="fps · draw calls · real lights">{stats.value.fps} fps · {stats.value.calls} dc · {stats.value.lights} L · {stats.value.q}</span>
+      {stats.value.warn && <span class="st-warn" role="status" title="Pick a quality level to retry">⚠ {stats.value.warn}</span>}
       <button class="btn sm" onClick={props.onFullscreen} title="Fullscreen">⛶</button>
     </div>
   );

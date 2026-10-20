@@ -28,7 +28,7 @@ const N_LIGHTS = 12;
 
 type Q = "low" | "med" | "high";
 const QCFG: Record<Q, { pr: number; bloom: number; reflect: boolean; shadows: number; shadowRes: number; fxaa: boolean; audience: boolean }> = {
-  low: { pr: 1, bloom: 0, reflect: false, shadows: 0, shadowRes: 512, fxaa: false, audience: false },
+  low: { pr: 0.85, bloom: 0, reflect: false, shadows: 0, shadowRes: 512, fxaa: false, audience: false },
   med: { pr: 1.5, bloom: 0.32, reflect: false, shadows: 3, shadowRes: 512, fxaa: true, audience: true },
   high: { pr: 2, bloom: 0.42, reflect: true, shadows: 6, shadowRes: 1024, fxaa: true, audience: true },
 };
@@ -62,8 +62,16 @@ export class StageScene {
   private fxaa!: ShaderPass;
   private q: Q = "med";
   private qActive: Q | null = null;
+  private prevPref: string = "";
+  private startNow = 0;
+  private nLights = N_LIGHTS;
   private software = false;
   private qTimer = { low: 0, high: 0 };
+  /** 0 = full pipeline, 1 = no shadows/reflection/bloom/FXAA, 2 = direct render (no composer, no volumetric beams) */
+  private degrade = 0;
+  private slow = 0;
+  private warn = "";
+  private lastQuality: string = "";
   private lastNow = 0;
   private grid = new THREE.LineSegments();
   private stageEdge = new THREE.LineSegments();
@@ -99,6 +107,7 @@ export class StageScene {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.info.autoReset = false;
+    this.renderer.debug.onShaderError = (_gl, _p, _vs, _fs) => { this.raise(2, "shader compile error"); };
     try {
       const gl = this.renderer.getContext();
       const ext = gl.getExtension("WEBGL_debug_renderer_info");
@@ -353,7 +362,7 @@ export class StageScene {
       case "audience": return { pos: new THREE.Vector3(0, 1.8, d / 2 + Math.max(7, span * 0.75)), target: new THREE.Vector3(0, h * 0.3, 0) };
       case "top": return { pos: new THREE.Vector3(0, span * 1.3 + h, 0.01), target: new THREE.Vector3(0, 0, 0) };
       case "side": return { pos: new THREE.Vector3(w / 2 + Math.max(8, span * 0.8), h * 0.45, 0), target: new THREE.Vector3(0, h * 0.3, 0) };
-      default: return { pos: new THREE.Vector3(w * 0.75, h * 1.0, d / 2 + span * 0.55 + 3), target: new THREE.Vector3(0, h * 0.25, 0) };
+      default: return { pos: new THREE.Vector3(Math.min(w * 0.5, w / 2 + 1.5), h * 1.0, d / 2 + span * 0.55 + 3), target: new THREE.Vector3(0, h * 0.25, 0) };
     }
   }
 
@@ -396,8 +405,8 @@ export class StageScene {
   private size: [number, number] = [1, 1];
   private applySize() {
     const [w, h] = this.size;
-    const pr = QCFG[this.qActive ?? "med"].pr;
-    const ratio = Math.min(window.devicePixelRatio || 1, pr);
+    const pr = this.cfg(this.qActive ?? "med").pr;
+    const ratio = Math.min(window.devicePixelRatio || 1, pr) * (this.software ? 0.7 : 1);
     this.renderer.setPixelRatio(ratio);
     this.renderer.setSize(w, h, false);
     this.composer.setPixelRatio(ratio);
@@ -484,12 +493,30 @@ export class StageScene {
     return this.q;
   }
 
-  private applyQuality(q: Q) {
-    if (this.qActive === q) return;
+  private cfg(q: Q) {
     const c = QCFG[q];
+    return this.degrade >= 1 ? { ...c, bloom: 0, reflect: false, shadows: 0, fxaa: false, audience: false, pr: Math.min(c.pr, 1) } : c;
+  }
+
+  private raise(level: number, why: string) {
+    if (level <= this.degrade) return;
+    this.degrade = level;
+    this.warn = level >= 2 ? `safe mode: ${why} — post-processing & volumetric beams off` : `reduced quality: ${why}`;
+    console.warn("[stage]", this.warn);
+    this.qActive = null;
+  }
+
+  private applyQuality(q: Q) {
+    const key = `${q}|${this.degrade}`;
+    if (this.qActive === q && this.lastQuality === key) return;
+    const c = this.cfg(q);
     this.qActive = q;
+    this.lastQuality = key;
     this.q = q;
-    this.beamPass.setQuality(BEAM_Q[q]);
+    this.beamPass.setQuality(this.degrade >= 1 ? BEAM_Q.low : BEAM_Q[q]);
+    // every light costs per-pixel work in every lit material: scale the count with quality
+    this.nLights = this.degrade >= 2 ? 4 : q === "low" ? 4 : q === "med" ? 8 : N_LIGHTS;
+    this.lights.forEach((l, i) => { l.visible = i < this.nLights; if (!l.visible) l.intensity = 0; });
     this.bloom.enabled = bloomOn.value && c.bloom > 0;
     this.bloom.strength = c.bloom;
     this.fxaa.enabled = c.fxaa;
@@ -507,6 +534,7 @@ export class StageScene {
   private frame = (now: number) => {
     if (this.disposed) return;
     this.frameN++;
+    if (!this.startNow) this.startNow = now;
     const tSec = now / 1000;
     const dt = Math.min(0.1, Math.max(0.001, (now - (this.lastNow || now - 16)) / 1000));
     this.lastNow = now;
@@ -527,10 +555,11 @@ export class StageScene {
     // quality + venue
     const pref = quality.value;
     if (pref === "auto" && this.qActive === null) this.q = this.software ? "med" : "high";
+    if (pref !== this.prevPref) { this.prevPref = pref; if (this.degrade > 0) { this.degrade = 0; this.warn = ""; this.qActive = null; this.slow = 0; } }
     const q = pref === "auto" ? this.q : pref;
     this.applyQuality(q);
-    this.bloom.enabled = bloomOn.value && QCFG[q].bloom > 0;
-    const qc = QCFG[q];
+    const qc = this.cfg(q);
+    this.bloom.enabled = bloomOn.value && qc.bloom > 0;
     this.venue.build({
       size: this.stageSize, mode: venueMode.value, audience: showAudience.value && qc.audience, mannequin: showMannequin.value,
       reflect: qc.reflect, reflectRes: 512,
@@ -546,13 +575,13 @@ export class StageScene {
     this.applyGizmoModeIfChanged();
 
     const env = {
-      crowd: Math.max(0.2, Math.min(1, Math.sqrt(10 / Math.max(1, this.activeBeams)))), haze: hz, beams: showBeams.value,
+      crowd: Math.max(0.2, Math.min(1, Math.sqrt(10 / Math.max(1, this.activeBeams)))), haze: hz, beams: showBeams.value && this.degrade < 2,
       pools: showPools.value, labels: showLabels.value, time: tSec, dt, camPos: this.camera.position,
     };
     let active = 0;
     for (const rig of this.rigs.values()) { updateRig(rig, dmx.get(rig.fx.universe), env); if (rig.score > 0.02) active++; }
     this.activeBeams = active;
-    this.beamPass.enabled = showBeams.value;
+    this.beamPass.enabled = showBeams.value && this.degrade < 2;
     for (const rig of this.rigs.values()) for (const x of rig.extra) if (!x.mesh.parent) this.beamPass.scene.add(x.mesh);
 
     if (this.frameN % 2 === 0) this.assignLights(qc.shadows);
@@ -560,18 +589,35 @@ export class StageScene {
     for (const so of this.objs.values()) so.tick?.(now, this.media);
     if (this.objHelper.visible) this.updateHelper();
 
-    this.composer.render(dt);
+    const volumetric = this.degrade < 2;
+    try {
+      if (volumetric) this.composer.render(dt);
+      else this.renderer.render(this.scene, this.camera);
+      // Software GL queues frames faster than it can raster them; wait here so the backlog never grows
+      // (otherwise page screenshots / input stall for tens of seconds).
+      if (this.software) this.renderer.getContext().finish();
+    } catch (e) {
+      console.error("[stage] render failed", e);
+      this.raise(this.degrade + 1, "render error");
+      try { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); } catch { /* nothing left to try */ }
+    }
 
     this.fpsAcc.n++;
     if (now - this.fpsAcc.t > 500) {
       const fps = Math.round((this.fpsAcc.n * 1000) / (now - this.fpsAcc.t));
       const lit = this.lights.filter((l) => l.intensity > 0).length;
-      stats.value = { fps, calls: this.renderer.info.render.calls, lights: lit, q };
+      stats.value = { fps, calls: this.renderer.info.render.calls, lights: lit, q: this.degrade >= 2 ? "safe" : this.degrade === 1 ? q + "↓" : q, warn: this.warn };
+      // never stay stuck at a slideshow: step down the fallback ladder when frames take > 200 ms for 3 s
+      // first seconds include shader compilation — don't judge them
+      const warm = now - this.startNow > 8000;
+      const bad = this.software ? fps < 1 : fps < 5;
+      if (warm && bad) this.slow++; else this.slow = 0;
+      if (this.slow >= 6 && this.degrade < 2) { this.slow = 0; this.raise(this.degrade + 1, `${fps} fps`); }
       this.fpsAcc = { t: now, n: 0 };
       // adaptive quality (not on software renderers — their fps says nothing about real hardware)
-      if (pref === "auto" && !this.software && document.visibilityState === "visible") {
-        if (fps < 28) { this.qTimer.low++; this.qTimer.high = 0; }
-        else if (fps > 56) { this.qTimer.high++; this.qTimer.low = 0; }
+      if (pref === "auto" && warm && document.visibilityState === "visible") {
+        if (fps < (this.software ? 8 : 28)) { this.qTimer.low++; this.qTimer.high = 0; }
+        else if (fps > (this.software ? 1e9 : 56)) { this.qTimer.high++; this.qTimer.low = 0; }
         else { this.qTimer.low = 0; this.qTimer.high = 0; }
         if (this.qTimer.low >= 4) { this.q = q === "high" ? "med" : "low"; this.qTimer.low = 0; }
         if (this.qTimer.high >= 24) { this.q = q === "low" ? "med" : "high"; this.qTimer.high = 0; }
@@ -592,9 +638,9 @@ export class StageScene {
     const order: typeof lit = [];
     const taken = new Set<number>();
     for (const r of mappedPool.slice(0, shadowCount)) { order.push(r); taken.add(r.fx.id); }
-    for (const r of lit) { if (order.length >= N_LIGHTS) break; if (!taken.has(r.fx.id)) order.push(r); }
+    for (const r of lit) { if (order.length >= this.nLights) break; if (!taken.has(r.fx.id)) order.push(r); }
     for (const r of this.rigs.values()) r.mapped = false;
-    for (let i = 0; i < N_LIGHTS; i++) {
+    for (let i = 0; i < this.nLights; i++) {
       const l = this.lights[i];
       const r = order[i];
       if (!r) { l.intensity = 0; continue; }

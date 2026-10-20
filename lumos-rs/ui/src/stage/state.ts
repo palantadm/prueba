@@ -37,7 +37,7 @@ export const showAudience = persisted("audience", false);
 export const showMannequin = persisted("mannequin", false);
 export const selObject = signal<number | null>(null);
 export const hiddenObjs = persisted<number[]>("hidden", []);
-export const stats = signal({ fps: 0, calls: 0, lights: 0, q: "med" as string });
+export const stats = signal({ fps: 0, calls: 0, lights: 0, q: "med" as string, warn: "" });
 export const draftVersion = signal(0);
 
 // ── drafts ──────────────────────────────────────────────

@@ -157,7 +157,7 @@ export class Venue {
     }
 
     // ── walls / drapes ──
-    const black = this.own(new THREE.MeshStandardMaterial({ color: "#09090b", roughness: 1, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0 }));
+    const black = this.own(new THREE.MeshStandardMaterial({ color: "#09090b", roughness: 1, metalness: 0, side: THREE.FrontSide, envMapIntensity: 0 }));
     const wallH = H + 1.5;
     const ex = W / 2 + 2.5;                      // room half width
     const backZ = -D / 2 - 0.6;
@@ -195,7 +195,7 @@ export class Venue {
       }
     }
     if (o.mode === "cyc") {
-      const cyc = new THREE.Mesh(this.own(cycGeometry(W + 1, D, H)), this.own(new THREE.MeshStandardMaterial({ color: "#d8d6d0", roughness: 0.92, metalness: 0, side: THREE.DoubleSide, envMapIntensity: 0.05 })));
+      const cyc = new THREE.Mesh(this.own(cycGeometry(W + 1, D, H)), this.own(new THREE.MeshStandardMaterial({ color: "#d8d6d0", roughness: 0.92, metalness: 0, side: THREE.FrontSide, envMapIntensity: 0.05 })));
       cyc.position.set(0, 0, -D / 2 - 0.5);
       cyc.receiveShadow = true; cyc.raycast = () => undefined;
       root.add(cyc);
