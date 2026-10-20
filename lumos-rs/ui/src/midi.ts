@@ -1,0 +1,79 @@
+// Web MIDI → server bridge. Every message from enabled input ports is forwarded as `midi_in`.
+import { signal } from "@preact/signals";
+import { fire } from "./store";
+
+export type MidiPort = { id: string; name: string; manufacturer: string; connected: boolean };
+export type MidiState = "idle" | "ready" | "denied" | "unsupported";
+
+export const midiState = signal<MidiState>("idle");
+export const midiError = signal("");
+export const midiPorts = signal<MidiPort[]>([]);
+export const midiEnabled = signal<string[]>(load()); // by port name
+export const midiActivity = signal<{ at: number; port: string; text: string }[]>([]);
+
+function load(): string[] {
+  try { return JSON.parse(localStorage.getItem("midi.enabled") ?? "[]"); } catch { return []; }
+}
+let access: MIDIAccess | null = null;
+
+export function describe(b: number[]): string {
+  const [s, d1 = 0, d2 = 0] = b;
+  const ch = (s & 0x0f) + 1, t = s & 0xf0;
+  if (t === 0x90) return d2 ? `Note On  ch${ch}  #${d1}  vel ${d2}` : `Note Off  ch${ch}  #${d1}`;
+  if (t === 0x80) return `Note Off  ch${ch}  #${d1}`;
+  if (t === 0xb0) return `CC  ch${ch}  #${d1}  = ${d2}`;
+  if (t === 0xc0) return `Program  ch${ch}  #${d1}`;
+  if (t === 0xe0) return `Pitch  ch${ch}  ${(d2 << 7) | d1}`;
+  if (s === 0xf1) return `MTC quarter-frame ${d1.toString(16)}`;
+  return b.map((x) => x.toString(16).padStart(2, "0")).join(" ");
+}
+
+function refresh() {
+  if (!access) return;
+  const list: MidiPort[] = [];
+  access.inputs.forEach((i) => list.push({ id: i.id, name: i.name ?? i.id, manufacturer: i.manufacturer ?? "", connected: i.state === "connected" }));
+  midiPorts.value = list;
+  access.inputs.forEach((i) => {
+    const on = midiEnabled.value.includes(i.name ?? i.id);
+    i.onmidimessage = on ? (ev) => handle(i.name ?? i.id, ev) : null;
+  });
+}
+
+function handle(port: string, ev: MIDIMessageEvent) {
+  const data = ev.data ? Array.from(ev.data) : [];
+  if (!data.length || data[0] === 0xf8 || data[0] === 0xfe) return; // clock / active sensing
+  fire({ type: "midi_in", port, bytes: data });
+  if (data[0] !== 0xf1) midiActivity.value = [{ at: Date.now(), port, text: describe(data) }, ...midiActivity.value].slice(0, 60);
+}
+
+export async function initMidi() {
+  if (access) return;
+  if (!("requestMIDIAccess" in navigator)) {
+    midiState.value = "unsupported";
+    midiError.value = "This browser has no Web MIDI support. Use Chrome, Edge or Firefox (Safari is not supported).";
+    return;
+  }
+  try {
+    access = await navigator.requestMIDIAccess({ sysex: false });
+    midiState.value = "ready";
+    access.onstatechange = refresh;
+    refresh();
+  } catch (e) {
+    midiState.value = "denied";
+    midiError.value = `MIDI access was denied or unavailable (${(e as Error).message || "permission"}). Allow MIDI for this site in the browser's site settings.`;
+  }
+}
+
+export function setMidiEnabled(name: string, on: boolean) {
+  const set = new Set(midiEnabled.value);
+  on ? set.add(name) : set.delete(name);
+  midiEnabled.value = [...set];
+  localStorage.setItem("midi.enabled", JSON.stringify(midiEnabled.value));
+  localStorage.setItem("midi.on", "1");
+  refresh();
+}
+
+/** Called once from App: re-attach previously enabled ports without prompting users who never used MIDI. */
+export function autoInitMidi() {
+  if (localStorage.getItem("midi.on") === "1") void initMidi();
+}
