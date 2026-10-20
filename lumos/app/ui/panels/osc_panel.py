@@ -336,10 +336,10 @@ class _RouteEditor(QWidget):
         tx_lay.addRow("Out:", out_row)
 
         str_row = QHBoxLayout()
-        self._on_edit = QLineEdit("on")
+        self._str_on = QLineEdit("on")
         self._off_edit = QLineEdit("off")
         str_row.addWidget(QLabel("On:"))
-        str_row.addWidget(self._on_edit)
+        str_row.addWidget(self._str_on)
         str_row.addWidget(QLabel("Off:"))
         str_row.addWidget(self._off_edit)
         tx_lay.addRow("String:", str_row)
@@ -409,7 +409,7 @@ class _RouteEditor(QWidget):
         self._in_max_spin.valueChanged.connect(self._on_edit)
         self._out_min_spin.valueChanged.connect(self._on_edit)
         self._out_max_spin.valueChanged.connect(self._on_edit)
-        self._on_edit.connect(self._off_edit)
+        self._str_on.textChanged.connect(self._on_edit)
         self._off_edit.textChanged.connect(self._on_edit)
         self._mode_group.idToggled.connect(self._on_edit)
         self._threshold_spin.valueChanged.connect(self._on_edit)
@@ -435,16 +435,12 @@ class _RouteEditor(QWidget):
         r.in_max = self._in_max_spin.value()
         r.out_min = self._out_min_spin.value()
         r.out_max = self._out_max_spin.value()
-        r.out_string_on = self._on_edit_widget().text()
+        r.out_string_on = self._str_on.text()
         r.out_string_off = self._off_edit.text()
         btn = self._mode_group.checkedButton()
         if btn is not None:
             r.mode = btn.property("mode_key")
         r.threshold = self._threshold_spin.value()
-
-    def _on_edit_widget(self) -> QLineEdit:
-        """Return the 'on' string QLineEdit (avoid name collision with signal)."""
-        return self._on_edit
 
     def load(self, route: OSCRoute) -> None:
         self._route = None
@@ -467,7 +463,7 @@ class _RouteEditor(QWidget):
         self._in_max_spin.setValue(route.in_max)
         self._out_min_spin.setValue(route.out_min)
         self._out_max_spin.setValue(route.out_max)
-        self._on_edit.setText(route.out_string_on)
+        self._str_on.setText(route.out_string_on)
         self._off_edit.setText(route.out_string_off)
 
         for btn in self._mode_group.buttons():
