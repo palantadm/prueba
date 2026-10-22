@@ -14,9 +14,9 @@ export const live: Record<string, string> = {
   "CTO": "CTO",
   "Color wheel": "Rueda de color",
   "Gobo": "Gobo",
-  "Gobo rot": "Rotación gobo",
+  "Gobo rot": "Rotación de gobo",
   "Prism": "Prisma",
-  "Prism rot": "Rotación prisma",
+  "Prism rot": "Rotación de prisma",
   "Frost": "Frost",
   "Zoom": "Zoom",
   "Focus": "Focus",
@@ -41,10 +41,6 @@ export const live: Record<string, string> = {
   "Insert": "Insertar",
   "Create": "Crear",
   "Cue": "Cue",
-  "idle": "Parado",
-  "running": "En marcha",
-  "paused": "En pausa",
-
   // ── Desk
   "Universe": "Universo",
   "Channel page": "Página de canales",
@@ -260,7 +256,6 @@ export const live: Record<string, string> = {
 export const capLabelsEs: Record<string, string> = {
   "Open": "Abierto",
   "Closed": "Cerrado",
-  "Off": "Apagado",
   "White": "Blanco",
   "Red": "Rojo",
   "Orange": "Naranja",
