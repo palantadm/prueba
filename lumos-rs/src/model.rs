@@ -327,6 +327,29 @@ fn d_true() -> bool {
     true
 }
 
+/// A recorded look (snapshot of attribute values) that can be recalled with a fade,
+/// layered with a level master, or morphed into another scene.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Scene {
+    pub id: u32,
+    pub name: String,
+    #[serde(default)]
+    pub values: PerFixture,
+    /// Seconds to fade in when activated / out when released.
+    #[serde(default = "d_scene_fade")]
+    pub fade_in: f32,
+    #[serde(default = "d_scene_fade")]
+    pub fade_out: f32,
+    /// Accent colour `#rrggbb` for pool buttons.
+    #[serde(default)]
+    pub color: String,
+}
+
+fn d_scene_fade() -> f32 {
+    1.0
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
 #[ts(export)]
@@ -343,6 +366,8 @@ pub enum ExecKind {
     Cuelist { cuelist: u32 },
     /// Fader = dimmer master for the group's fixtures.
     Group { group: u32 },
+    /// Fader = scene level, button toggles the scene with its fade times.
+    Scene { scene: u32 },
     /// Button toggles the effect, fader = effect depth multiplier.
     Effect { effect: u32 },
     Master { master: MasterKind },
@@ -687,6 +712,8 @@ pub struct Show {
     pub fixtures: Vec<Fixture>,
     pub groups: Vec<Group>,
     pub palettes: Vec<Palette>,
+    #[serde(default)]
+    pub scenes: Vec<Scene>,
     pub cuelists: Vec<Cuelist>,
     pub executors: Vec<Executor>,
     pub effects: Vec<Effect>,
@@ -711,6 +738,7 @@ impl Default for Show {
             fixtures: vec![],
             groups: vec![],
             palettes: vec![],
+            scenes: vec![],
             cuelists: vec![],
             executors: vec![],
             effects: vec![],
@@ -796,6 +824,10 @@ pub enum VcAction {
     ProgClear,
     /// Jump to a virtual-console page.
     Page { page: u32 },
+    /// Scene button (Go/Toggle/Flash/Release) or level slider (Level).
+    Scene { scene: u32, op: VcOp },
+    /// Slider crossfades (morphs) scene `a` → `b`.
+    SceneMorph { a: u32, b: u32 },
     /// XY pad: `group` moves `x_attr`/`y_attr` (typically pan/tilt).
     Xy { group: u32, x_attr: String, y_attr: String },
 }
@@ -916,6 +948,15 @@ pub struct CuelistRt {
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
+pub struct SceneRt {
+    pub id: u32,
+    /// Effective level 0..1 (follows the fade).
+    pub level: f32,
+    pub active: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
 pub struct ExecRt {
     pub id: u32,
     pub level: f32,
@@ -984,6 +1025,38 @@ pub struct Runtime {
     /// Virtual console widget states.
     #[serde(default)]
     pub vc: Vec<VcState>,
+    #[serde(default)]
+    pub scenes: Vec<SceneRt>,
+    /// Active scene morph (a, b, t) if any.
+    #[serde(default)]
+    pub morph: Option<(u32, u32, f32)>,
+}
+
+// ───────────────────────────── Fixture morph (exchange) ─────────────────────────────
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MorphMap {
+    pub from: String,
+    pub to: String,
+    /// `direct` | `emulated` (e.g. rgb→rgbw, rgb→cmy, rgb→colorwheel slot) | `approx`.
+    pub kind: String,
+    pub note: String,
+}
+
+/// Result of `POST /api/morph/preview` `{ids, profile, mode}`.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MorphPreview {
+    /// 0..1 share of the source's used attributes that survive in the target.
+    pub coverage: f32,
+    pub maps: Vec<MorphMap>,
+    /// Source attributes that the target cannot reproduce (values will be ignored).
+    pub dropped: Vec<String>,
+    /// Target attributes nobody drives (they'll sit at their defaults).
+    pub unset: Vec<String>,
+    pub warnings: Vec<String>,
+    pub footprint: u16,
 }
 
 // ───────────────────────────── Commands (client → server) ─────────────────────────────
@@ -1041,6 +1114,26 @@ pub enum Command {
     EffectSave { effect: Effect },
     EffectRemove { id: u32 },
     EffectToggle { id: u32, on: bool },
+    // ── scenes ──
+    /// Record a scene. `from_output`: snapshot what is currently rendered (cuelists + programmer + scenes);
+    /// otherwise record the programmer. `fixtures: None` = every fixture that has values.
+    /// `id: Some(n)` updates scene n (`merge`: keep untouched fixtures, otherwise replace).
+    SceneRecord { id: Option<u32>, name: String, from_output: bool, fixtures: Option<Vec<u32>>, merge: bool },
+    SceneSave { scene: Scene },
+    SceneRemove { id: u32 },
+    /// Activate (`on`) with `fade_in` or release with `fade_out`.
+    SceneGo { id: u32, on: bool },
+    /// Activate this scene and release every other scene.
+    SceneSolo { id: u32 },
+    /// Manual level 0..1 (no timing); level > 0 activates, 0 releases.
+    SceneLevel { id: u32, level: f32 },
+    /// Crossfade A→B (`t` 0..1). `t: None` releases the morph.
+    SceneMorph { a: u32, b: u32, t: Option<f32> },
+    ScenesRelease,
+    // ── fixture exchange (morph) ──
+    /// Replace the profile/mode of `ids`, keeping fixture ids so cues/scenes/palettes/groups survive.
+    /// `repack`: re-address the fixtures consecutively from the first one's address.
+    FixtureMorph { ids: Vec<u32>, profile: String, mode: String, repack: bool },
     // ── cuelists ──
     CuelistSave { cuelist: Cuelist },
     CuelistRemove { id: u32 },
