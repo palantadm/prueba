@@ -239,4 +239,10 @@ export const vc: Record<string, string> = {
   "disconnected": "desconectado",
   "Sends note 60 on/off on channel 1": "Envía nota 60 on/off por el canal 1",
   "Send feedback": "Enviar feedback",
+  "Scene {name} · {op}": "Escena {name} · {op}",
+  "Morph {a} → {b}": "Morph {a} → {b}",
+  "Scene morph (A→B)": "Morph de escenas (A→B)",
+  "fade {i}s / {o}s": "fundido {i}s / {o}s",
+  "Scene A (slider at 0)": "Escena A (deslizador a 0)",
+  "Scene B (slider at 1)": "Escena B (deslizador a 1)",
 };

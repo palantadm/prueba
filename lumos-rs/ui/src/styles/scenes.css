@@ -1,0 +1,41 @@
+/* Scenes pool, morph crossfader (touch-first: every control ≥ 44 px, no hover-only affordances) */
+.sc-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: var(--s-2); border-bottom: 1px solid var(--line); align-items: center; }
+.sc-bar .btn { min-height: 44px; padding: 0 var(--s-3); }
+.sc-scope { font-size: var(--fs-xs); color: var(--text-dim); padding: 0 var(--s-2) var(--s-1); }
+.sc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; padding: var(--s-2); align-content: start; }
+.sc-tile { position: relative; min-height: 72px; display: flex; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--bg-2); overflow: hidden; }
+.sc-tile.on { border-color: var(--sc, var(--accent)); box-shadow: 0 0 0 1px var(--sc, var(--accent)) inset; }
+.sc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; text-align: left; background: transparent; border: 0; padding: 8px 10px; cursor: pointer; color: var(--text); }
+.sc-name { font-weight: 700; font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-sub { font-size: var(--fs-xs); color: var(--text-dim); }
+.sc-bar-lvl { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: var(--bg-0); }
+.sc-bar-lvl > i { display: block; height: 100%; background: var(--sc, var(--accent)); }
+.sc-led { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--sc, var(--accent)); opacity: .35; }
+.sc-tile.on .sc-led { opacity: 1; }
+.sc-menu { width: 44px; min-height: 44px; align-self: flex-start; background: transparent; border: 0; color: var(--text-dim); font-size: 20px; cursor: pointer; }
+.sc-faders { display: flex; gap: 8px; padding: var(--s-2); overflow-x: auto; }
+.sc-fader { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 76px; flex: none; }
+.sc-fader .btn { width: 100%; min-height: 44px; }
+.sc-fader .nm { font-size: var(--fs-xs); max-width: 76px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-morph { border-top: 1px solid var(--line); padding: var(--s-2); display: flex; flex-direction: column; gap: 8px; }
+.sc-morph h4 { margin: 0; font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.sc-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.sc-chips .lbl { width: 20px; font-weight: 800; color: var(--text-dim); }
+.sc-chips .btn { min-height: 44px; }
+.sc-readout { font-family: var(--font-mono); font-size: var(--fs-lg); min-width: 56px; text-align: right; }
+.sc-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.sc-colors button { width: 44px; height: 44px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
+.sc-colors button.sel { border-color: var(--text); }
+.sc-step { display: flex; align-items: center; gap: 6px; }
+.sc-step .btn { width: 48px; min-height: 48px; font-size: 20px; }
+.sc-step .val { flex: 1; text-align: center; font-family: var(--font-mono); font-size: var(--fs-lg); }
+.sc-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.sc-actions .btn { min-height: 48px; white-space: normal; text-align: center; }
+
+.xfader { position: relative; height: 64px; border-radius: var(--r-md); background: var(--bg-3); border: 1px solid var(--line-strong); touch-action: none; cursor: ew-resize; overflow: hidden; }
+.xfader.drag, .xfader:focus-visible { border-color: var(--accent); }
+.xfader.disabled { opacity: .45; pointer-events: none; }
+.xfader-fill { position: absolute; left: 0; top: 0; bottom: 0; pointer-events: none; }
+.xfader-knob { position: absolute; top: 6px; bottom: 6px; width: 28px; margin-left: -14px; border-radius: 8px; background: var(--text); border: 3px solid var(--accent); pointer-events: none; box-shadow: var(--shadow-1); }
+.xfader-end { position: absolute; top: 50%; transform: translateY(-50%); font-weight: 800; color: var(--text-dim); pointer-events: none; font-size: var(--fs-lg); }
+.xfader-end.l { left: 12px; } .xfader-end.r { right: 12px; }

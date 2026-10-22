@@ -356,11 +356,19 @@ impl Engine {
                     *b = true;
                 }
             }
-            let overlaps = ids.iter().filter_map(|id| self.show.fixtures.iter().find(|f| f.id == *id)).any(|f| {
+            let mut moved: Vec<&Fixture> = ids.iter().filter_map(|id| self.show.fixtures.iter().find(|f| f.id == *id)).collect();
+            moved.sort_by_key(|f| (f.universe, f.address));
+            let mut overlaps = false;
+            for f in moved {
                 let a = f.address.max(1) as usize - 1;
-                a + new_fp as usize > 512
-                    || others.get(&f.universe).map_or(false, |o| o.iter().skip(a).take(new_fp as usize).any(|b| *b))
-            });
+                let occ = others.entry(f.universe).or_insert([false; 512]);
+                if a + new_fp as usize > 512 || occ.iter().skip(a).take(new_fp as usize).any(|b| *b) {
+                    overlaps = true;
+                }
+                for b in occ.iter_mut().skip(a).take(new_fp as usize) {
+                    *b = true;
+                }
+            }
             if overlaps {
                 warnings.push(format!(
                     "Footprint grows from {old_max} to {new_fp} channels and overlaps neighbouring fixtures — use re-address (repack)."
@@ -728,6 +736,11 @@ mod tests {
         let p = e.morph_preview(&[1], "generic/rgbw-par", "4ch").unwrap();
         assert!(p.warnings.iter().any(|w| w.contains("overlaps")), "{:?}", p.warnings);
         assert_eq!(p.coverage, 1.0);
+        // morphing a whole row to a bigger footprint makes the fixtures overlap each other
+        let mut e4 = engine();
+        add(&mut e4, "generic/rgb-par", "3ch", 3);
+        let p = e4.morph_preview(&[1, 2, 3], "generic/rgbw-par", "4ch").unwrap();
+        assert!(p.warnings.iter().any(|w| w.contains("overlaps")), "{:?}", p.warnings);
         let j = serde_json::to_value(&p).unwrap();
         assert!(j["maps"].is_array() && j["unset"].is_array() && j["footprint"] == 4);
         assert!(e.morph_preview(&[], "generic/rgbw-par", "4ch").is_err());

@@ -93,6 +93,8 @@ export function describeAction(a: VcAction, show: Show | null): string {
     case "effect_toggle": return t("Effect {name}", { name: nm(show?.effects, a.effect) });
     case "effect_rate": return t("Rate of {name}", { name: nm(show?.effects, a.effect) });
     case "palette_apply": return t("Palette {name}", { name: nm(show?.palettes, a.palette) });
+    case "scene": return t("Scene {name} · {op}", { name: nm(show?.scenes, a.scene), op: opLabel(a.op) });
+    case "scene_morph": return t("Morph {a} → {b}", { a: nm(show?.scenes, a.a), b: nm(show?.scenes, a.b) });
     case "prog_clear": return t("Clear programmer");
     case "page": return t("Page {name}", { name: show?.vconsole.find((p) => p.id === a.page)?.name ?? `#${a.page}` });
     case "xy": return `${nm(show?.groups, a.group)} ${a.x_attr}/${a.y_attr}`;
@@ -112,14 +114,16 @@ export const ACTION_TYPES: { type: VcAction["type"]; label: string }[] = [
   { type: "effect_toggle", label: "Effect on/off" },
   { type: "effect_rate", label: "Effect rate" },
   { type: "palette_apply", label: "Apply palette" },
+  { type: "scene", label: "Scene" },
+  { type: "scene_morph", label: "Scene morph (A→B)" },
   { type: "prog_clear", label: "Clear programmer" },
   { type: "page", label: "Go to page" },
   { type: "xy", label: "XY (group)" },
 ];
 export function actionTypesFor(k: VcKind): VcAction["type"][] {
   switch (k) {
-    case "button": return ["none", "exec", "cuelist", "blackout", "grand_master", "effect_toggle", "palette_apply", "prog_clear", "page", "dmx"];
-    case "slider": case "knob": return ["none", "exec", "cuelist", "grand_master", "group_attr", "fixture_attr", "dmx", "effect_rate"];
+    case "button": return ["none", "exec", "cuelist", "scene", "blackout", "grand_master", "effect_toggle", "palette_apply", "prog_clear", "page", "dmx"];
+    case "slider": case "knob": return ["none", "exec", "cuelist", "scene", "scene_morph", "grand_master", "group_attr", "fixture_attr", "dmx", "effect_rate"];
     case "xy_pad": return ["xy", "none"];
     case "cue_list": return ["cuelist", "none"];
     case "speed_dial": return ["effect_rate", "none"];
@@ -137,6 +141,8 @@ export function defaultAction(type: VcAction["type"], show: Show | null, kind: V
     case "effect_toggle": return { type, effect: show?.effects[0]?.id ?? 0 };
     case "effect_rate": return { type, effect: show?.effects[0]?.id ?? 0 };
     case "palette_apply": return { type, palette: show?.palettes[0]?.id ?? 0, group: null };
+    case "scene": return { type, scene: show?.scenes?.[0]?.id ?? 0, op: isContinuous(kind) ? "level" : "toggle" };
+    case "scene_morph": return { type, a: show?.scenes?.[0]?.id ?? 0, b: show?.scenes?.[1]?.id ?? show?.scenes?.[0]?.id ?? 0 };
     case "page": return { type, page: show?.vconsole[0]?.id ?? 0 };
     case "xy": return { type, group: show?.groups[0]?.id ?? 0, x_attr: "pan", y_attr: "tilt" };
     default: return { type } as VcAction;
@@ -164,6 +170,8 @@ export function autoLabel(a: VcAction, show: Show | null): string | null {
     case "fixture_attr": return attrLabel(a.attr);
     case "effect_toggle": case "effect_rate": return nm(show?.effects, a.effect) ?? null;
     case "palette_apply": return nm(show?.palettes, a.palette) ?? null;
+    case "scene": { const n = nm(show?.scenes, a.scene); return n ? `${op(a.op)} ${n}`.trim() : null; }
+    case "scene_morph": { const x = nm(show?.scenes, a.a), y = nm(show?.scenes, a.b); return x && y ? `${x} → ${y}` : null; }
     case "prog_clear": return t("CLEAR");
     case "page": return show?.vconsole.find((p) => p.id === a.page)?.name ?? null;
     case "xy": return nm(show?.groups, a.group) ?? null;

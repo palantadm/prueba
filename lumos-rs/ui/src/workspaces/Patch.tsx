@@ -5,6 +5,7 @@ import { EmptyState, NumberField, PageHead, Segmented, Select, TextField, Virtua
 import { collisions, footprint, modeOf, profileById } from "../lib/fixtures";
 import { AddDialog } from "./patch/AddDialog";
 import { ImportDialog } from "./patch/ImportDialog";
+import { MorphDialog } from "./patch/MorphDialog";
 import { UniverseMap } from "./patch/UniverseMap";
 import { t, tp } from "../i18n";
 
@@ -22,6 +23,7 @@ export function Patch() {
   const [view, setView] = useState<"table" | "map">("table");
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [morphing, setMorphing] = useState(false);
   const [q, setQ] = useState("");
   const anchor = useRef<number | null>(null);
   const sorted = useMemo(() => [...fixtures].sort((a, b) => a.id - b.id), [fixtures]);
@@ -53,6 +55,8 @@ export function Patch() {
         <input class="input" style={{ width: 160 }} placeholder={t("Filter…")} aria-label={t("Filter fixtures")} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         <Segmented value={view} onChange={setView} label={t("View")} options={[{ value: "table", label: t("Table") }, { value: "map", label: t("Universe map") }]} />
         <button class="btn tall" onClick={() => setImporting(true)} title={t("Import GDTF, QLC+ (.qxf) or Open Fixture Library (.json) fixture files")}>{t("Import fixtures…")}</button>
+        <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setMorphing(true)}
+          title={t("Replace the selected fixtures with another model keeping cues, scenes and groups")}>{t("Swap (Morph)")}</button>
         <button class="btn tall danger" disabled={!selection.value.length} onClick={del}>{t("Delete")}{selection.value.length ? ` (${selection.value.length})` : ""}</button>
         <button class="btn tall primary" onClick={() => setAdding(true)}>{t("+ Add fixtures")}</button>
       </PageHead>
@@ -84,6 +88,7 @@ export function Patch() {
       </>}
       {adding && <AddDialog onClose={() => setAdding(false)} />}
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
+      {morphing && <MorphDialog ids={selection.value} onClose={() => setMorphing(false)} />}
     </div>
   );
 }

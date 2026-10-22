@@ -26,7 +26,9 @@ export function ExecutorStrip(p: {
   }
   const level = p.rt?.level ?? 0;
   const isMaster = e.kind.type === "master";
-  const canGo = e.kind.type === "cuelist" || e.kind.type === "effect";
+  const isScene = e.kind.type === "scene";
+  const canGo = e.kind.type === "cuelist" || e.kind.type === "effect" || isScene;
+  const toggled = isScene ? !!p.rt?.active : !!p.effectOn;
   return (
     <div class={`lv-ex ${p.rt?.active || p.effectOn ? "active" : ""}`}>
       <div class="row" style={{ gap: 4 }}>
@@ -38,7 +40,7 @@ export function ExecutorStrip(p: {
         ariaLabel={t("Executor {n} level", { n: p.slot + 1 })}
         onChange={(v) => fire({ type: "exec_level", id: e.id, level: v })} />
       <div class="mono lv-ex-lvl">{Math.round(level * 100)}%</div>
-      {canGo && <button class={`btn go sm lv-ex-btn`} onClick={p.onGo} aria-label={t("Go executor {n}", { n: p.slot + 1 })}>{e.kind.type === "effect" ? (p.effectOn ? "OFF" : "ON") : "GO"}</button>}
+      {canGo && <button class={`btn go sm lv-ex-btn`} onClick={p.onGo} aria-label={t("Go executor {n}", { n: p.slot + 1 })}>{e.kind.type === "effect" || isScene ? (toggled ? "OFF" : "ON") : "GO"}</button>}
       {!isMaster && (
         <button class={`btn sm lv-ex-btn ${down || p.rt?.flash ? "on" : ""}`}
           onPointerDown={(ev) => { (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId); setDown(true); fire({ type: "exec_flash", id: e.id, down: true }); }}

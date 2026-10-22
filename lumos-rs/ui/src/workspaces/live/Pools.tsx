@@ -5,6 +5,7 @@ import { ALL_ATTRS, attrLabel, fixtureById, rgbToHex } from "../../lib/attrs";
 import { useClock, useLongPress } from "../../lib/hooks";
 import { Modal } from "../../ui";
 import { ConfirmDialog, PromptDialog } from "./dialogs";
+import { ScenePool } from "./Scenes";
 import { t, tp } from "../../i18n";
 
 const KINDS: { id: PaletteKind; label: string }[] = [
@@ -13,14 +14,15 @@ const KINDS: { id: PaletteKind; label: string }[] = [
 ];
 
 export function Pools() {
-  const [tab, setTab] = useState<"palettes" | "effects">("palettes");
+  const [tab, setTab] = useState<"palettes" | "effects" | "scenes">("palettes");
   return (
     <div class="panel lv-col pools">
       <div class="tabs" role="tablist">
         <button role="tab" aria-selected={tab === "palettes"} class={`tab ${tab === "palettes" ? "active" : ""}`} onClick={() => setTab("palettes")}>{t("Palettes")}</button>
         <button role="tab" aria-selected={tab === "effects"} class={`tab ${tab === "effects" ? "active" : ""}`} onClick={() => setTab("effects")}>{t("Effects")}</button>
+        <button role="tab" aria-selected={tab === "scenes"} class={`tab ${tab === "scenes" ? "active" : ""}`} onClick={() => setTab("scenes")}>{t("Scenes")}</button>
       </div>
-      {tab === "palettes" ? <PalettePool /> : <EffectPool />}
+      {tab === "palettes" ? <PalettePool /> : tab === "effects" ? <EffectPool /> : <ScenePool />}
     </div>
   );
 }

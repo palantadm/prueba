@@ -20,7 +20,8 @@ function useLists() {
   const effects: PickOpt[] = (s?.effects ?? []).map((e) => ({ value: e.id, label: e.name, sub: attrLabel(e.attr) }));
   const palettes: PickOpt[] = (s?.palettes ?? []).map((p) => ({ value: p.id, label: p.name, sub: t(p.kind) }));
   const pages: PickOpt[] = (s?.vconsole ?? []).map((p) => ({ value: p.id, label: p.name }));
-  return { execs, cls, groups, effects, palettes, pages };
+  const scenes: PickOpt[] = (s?.scenes ?? []).map((x) => ({ value: x.id, label: x.name, sub: t("fade {i}s / {o}s", { i: x.fade_in, o: x.fade_out }) }));
+  return { execs, cls, groups, effects, palettes, pages, scenes };
 }
 
 const Sec = (p: { title: string; children: preact.ComponentChildren; right?: preact.ComponentChildren }) => (
@@ -68,6 +69,14 @@ function ActionEditor({ w }: { w: VcWidget }) {
       {(a.type === "cuelist") && <>
         <Row label={t("Cuelist")}><Picker value={a.cuelist} options={L.cls} onChange={(v) => set({ ...a, cuelist: v })} /></Row>
         {w.kind !== "cue_list" && <Row label={t("Operation")}><Select class="bare" value={a.op} options={opOpts} onChange={(op) => set({ ...a, op: op as VcOp })} /></Row>}
+      </>}
+      {a.type === "scene" && <>
+        <Row label={t("Scene")}><Picker value={a.scene} options={L.scenes} onChange={(v) => set({ ...a, scene: v })} /></Row>
+        <Row label={t("Operation")}><Select class="bare" value={a.op} options={opOpts} onChange={(op) => set({ ...a, op: op as VcOp })} /></Row>
+      </>}
+      {a.type === "scene_morph" && <>
+        <Row label={t("Scene A (slider at 0)")}><Picker value={a.a} options={L.scenes} onChange={(v) => set({ ...a, a: v })} /></Row>
+        <Row label={t("Scene B (slider at 1)")}><Picker value={a.b} options={L.scenes} onChange={(v) => set({ ...a, b: v })} /></Row>
       </>}
       {a.type === "dmx" && <>
         <Row label={t("Universe")}><NumberField class="bare" value={a.universe} min={1} max={9999} onChange={(v) => set({ ...a, universe: v })} /></Row>

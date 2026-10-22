@@ -55,6 +55,9 @@ export function autoBuildFromExecutors(show: Show, startId: number, pageId: numb
       const fl = newWidget("button", id++, col, 6); fl.label = t("FLASH"); fl.w = 2; fl.h = 2; fl.mode = "momentary"; fl.action = { type: "exec", exec: e.id, op: "flash" }; add(fl);
     } else if (e.kind.type === "effect") {
       const b = newWidget("button", id++, col, 6); b.label = label; b.w = 2; b.h = 2; b.mode = "toggle"; b.action = { type: "exec", exec: e.id, op: "toggle" }; b.color = "#b38cff"; add(b);
+    } else if (e.kind.type === "scene") {
+      const f = newWidget("slider", id++, col, 0); f.label = label; f.h = 6; f.w = 2; f.action = { type: "exec", exec: e.id, op: "level" }; f.color = "#e266b8"; add(f);
+      const b = newWidget("button", id++, col, 6); b.label = label; b.w = 2; b.h = 2; b.mode = "toggle"; b.action = { type: "exec", exec: e.id, op: "toggle" }; b.color = "#e266b8"; add(b);
     } else if (e.kind.type === "master") {
       const f = newWidget("slider", id++, col, 0); f.label = label; f.h = 6; f.w = 2; f.action = { type: "grand_master" }; f.color = "#e5484d"; add(f);
     }
@@ -70,6 +73,22 @@ export function autoBuildFromExecutors(show: Show, startId: number, pageId: numb
   for (const cl of show.cuelists.slice(0, 3)) {
     const c = newWidget("cue_list", id++, Math.min(col, pg.cols - 4), cy);
     c.label = cl.name; c.action = { type: "cuelist", cuelist: cl.id, op: "go" }; c.w = Math.min(4, pg.cols - c.x); c.h = 3; pg.widgets.push(c); cy += 3;
+  }
+  // every scene as a toggle button (2×2) below the executors, plus an A→B morph slider
+  const scenes = (show.scenes ?? []).slice(0, 16);
+  if (scenes.length) {
+    const y0 = 10;
+    scenes.forEach((sc, i) => {
+      const b = newWidget("button", id++, (i % 8) * 2, y0 + Math.floor(i / 8) * 2);
+      b.label = sc.name; b.w = 2; b.h = 2; b.mode = "toggle"; b.color = sc.color || "#e266b8"; b.action = { type: "scene", scene: sc.id, op: "toggle" }; add(b);
+    });
+    let yEnd = y0 + Math.ceil(scenes.length / 8) * 2;
+    if (scenes.length >= 2) {
+      const m = newWidget("slider", id++, 0, yEnd); m.orientation = "horizontal"; m.w = 8; m.h = 2; m.label = `${scenes[0].name} → ${scenes[1].name}`;
+      m.action = { type: "scene_morph", a: scenes[0].id, b: scenes[1].id }; m.color = "#b38cff"; add(m);
+      yEnd += 2;
+    }
+    pg.rows = Math.max(pg.rows, yEnd);
   }
   return { page: pg, nextId: id };
 }

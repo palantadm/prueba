@@ -1,0 +1,32 @@
+/* Fixture morph dialog (Patch). Touch-first: every control ≥ 44 px, details open on tap. */
+.mp-root { display: flex; gap: 16px; align-items: stretch; min-width: 0; }
+.mp-pick { width: 300px; flex: none; display: flex; flex-direction: column; gap: 8px; }
+.mp-pick .panel { display: flex; flex-direction: column; height: 380px; }
+.mp-main { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.mp-root .input, .mp-root select.input { min-height: 44px; }
+.mp-btn { min-height: 44px; }
+.mp-row { display: flex; align-items: center; gap: 8px; height: 48px; padding: 0 12px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.mp-row:hover { background: var(--bg-2); }
+.mp-row.sel { background: var(--accent-dim); }
+.mp-head { display: flex; align-items: center; height: 48px; padding: 0 12px; background: var(--bg-2); font-size: var(--fs-xs); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--text-dim); }
+.mp-src { display: flex; flex-wrap: wrap; gap: 6px; }
+.mp-src .chip { height: 28px; }
+.mp-cov { height: 14px; background: var(--bg-3); border-radius: 7px; overflow: hidden; border: 1px solid var(--line-strong); }
+.mp-cov > i { display: block; height: 100%; border-radius: 7px; transition: width var(--dur) var(--ease); }
+.mp-map { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.mp-map td { padding: 0 8px; height: 48px; border-bottom: 1px solid var(--line); }
+.mp-map tr.mp-m { cursor: pointer; }
+.mp-map tr.mp-m:hover { background: var(--bg-2); }
+.mp-map tr.mp-note td { height: auto; padding: 8px 12px; background: var(--bg-2); color: var(--text-dim); }
+.mp-warn { padding: 10px 12px; border: 1px solid var(--live-dim); border-left: 3px solid var(--live); background: rgba(245, 165, 36, .08); border-radius: var(--r-sm); font-size: var(--fs-sm); }
+.mp-err { padding: 10px 12px; border: 1px solid var(--stop-dim); border-left: 3px solid var(--stop); background: rgba(229, 72, 77, .08); border-radius: var(--r-sm); font-size: var(--fs-sm); }
+.mp-help { padding: 10px 12px; background: var(--bg-2); border-radius: var(--r-sm); font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 6px; }
+.mp-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.mp-tags .chip { height: 28px; }
+.mp-check { display: flex; align-items: center; gap: 12px; min-height: 44px; cursor: pointer; }
+.mp-check input { width: 24px; height: 24px; flex: none; }
+@media (max-width: 900px) {
+  .mp-root { flex-direction: column; }
+  .mp-pick { width: auto; }
+  .mp-pick .panel { height: 230px; }
+}
