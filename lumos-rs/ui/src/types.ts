@@ -25,6 +25,7 @@ export type { MasterKind } from "./gen/MasterKind";
 export type { MediaKind } from "./gen/MediaKind";
 export type { MediaSource } from "./gen/MediaSource";
 export type { MidiKind } from "./gen/MidiKind";
+export type { MidiPortInfo } from "./gen/MidiPortInfo";
 export type { Mode } from "./gen/Mode";
 export type { Model3d } from "./gen/Model3d";
 export type { OscFeedbackCfg } from "./gen/OscFeedbackCfg";

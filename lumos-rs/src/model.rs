@@ -1093,9 +1093,18 @@ pub enum Command {
     VcXy { widget: u32, x: f32, y: f32 },
     /// Remove an imported/custom profile from the show library.
     LibraryRemove { id: String },
+    /// Enable/disable a native (server-side) MIDI port. Machine-level setting, persisted outside the show.
+    MidiEnable { output: bool, name: String, enabled: bool },
     // ── streaming ──
     /// Subscribe to binary DMX frames (`None` = all universes, `Some([])` = none).
     SubscribeDmx { universes: Option<Vec<u16>> },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MidiPortInfo {
+    pub name: String,
+    pub enabled: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -1123,6 +1132,8 @@ pub enum ServerMsg {
     Learned { source: Source },
     /// Saved shows list. Sent on connect and after save/delete.
     Shows { shows: Vec<ShowInfo> },
+    /// Native MIDI availability and port lists (`native=false` → the UI falls back to Web MIDI).
+    MidiPorts { native: bool, inputs: Vec<MidiPortInfo>, outputs: Vec<MidiPortInfo> },
     /// Feedback MIDI to relay to a hardware output (the browser forwards it through Web MIDI).
     MidiOut { port: Option<String>, bytes: Vec<u8> },
     Log { level: String, msg: String },

@@ -766,6 +766,8 @@ impl Engine {
                 self.touch();
             }
             SubscribeDmx { .. } => {}
+            // TODO(be-midi): native MIDI port enable/disable.
+            MidiEnable { .. } => {}
             VcSave { pages } => self.vc_save(pages)?,
             VcPress { widget, down } => self.vc_press(widget, down)?,
             VcValue { widget, value } => self.vc_set_value(widget, value)?,
