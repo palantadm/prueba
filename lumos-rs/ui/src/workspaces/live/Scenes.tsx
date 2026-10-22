@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import "../../styles/scenes.css";
 import { fire, rt, selection, send, show } from "../../store";
-import type { Scene } from "../../types";
+import type { Scene, SceneKind } from "../../types";
 import { Modal } from "../../ui";
 import { Crossfader, Fader } from "../../widgets";
 import { useLongPress } from "../../lib/hooks";
@@ -12,6 +12,11 @@ import { ConfirmDialog, PromptDialog } from "./dialogs";
 
 const COLORS = ["#3cc4e8", "#35c46a", "#f5a524", "#e5484d", "#e266b8", "#b38cff", "#5b8def", "#f2d98d"];
 const colorOf = (s: Scene) => s.color || COLORS[0];
+const KINDS: { id: SceneKind; label: string; hint: string }[] = [
+  { id: "look", label: "Look", hint: "Crossfades every recorded value" },
+  { id: "intensity", label: "Intensity only", hint: "Level scales only the dimmer, like a submaster" },
+  { id: "inhibitive", label: "Inhibitive", hint: "Level caps the dimmer of its fixtures" },
+];
 const stateOf = (id: number) => rt.value?.scenes?.find((x) => x.id === id);
 
 /** Fixtures a recording applies to: the selection, or everything (`null`). */
@@ -83,7 +88,7 @@ export function ScenePool() {
       {naming && <PromptDialog title={naming === "programmer" ? t("Record scene from programmer") : t("Record scene from output")}
         label={t("Name")} ok={t("Record")} initial={nextName} onClose={() => setNaming(null)}
         extra={<div class="dim">{n ? tp(n, "Records {n} selected fixture", "Records {n} selected fixtures") : t("Records all fixtures")}</div>}
-        onSubmit={(name) => send({ type: "scene_record", id: null, name, from_output: naming === "output", fixtures: scope(), merge: false })} />}
+        onSubmit={(name) => send({ type: "scene_record", id: null, name, from_output: naming === "output", fixtures: scope(), merge: false, refs: true })} />}
       {edit && <SceneEdit s={edit} onClose={() => setEdit(null)} />}
     </>
   );
@@ -130,6 +135,7 @@ function SceneEdit({ s, onClose }: { s: Scene; onClose: () => void }) {
   const [color, setColor] = useState(colorOf(s));
   const [fi, setFi] = useState(s.fade_in);
   const [fo, setFo] = useState(s.fade_out);
+  const [kind, setKind] = useState<SceneKind>(s.kind ?? "look");
   const [del, setDel] = useState(false);
   const held = heldCount();
   const n = selection.value.length;
@@ -137,7 +143,7 @@ function SceneEdit({ s, onClose }: { s: Scene; onClose: () => void }) {
     onYes={() => send({ type: "scene_remove", id: s.id })} />;
   const nm = name.trim() || s.name;
   const update = (fromOutput: boolean, merge: boolean) => {
-    send({ type: "scene_record", id: s.id, name: nm, from_output: fromOutput, fixtures: scope(), merge });
+    send({ type: "scene_record", id: s.id, name: nm, from_output: fromOutput, fixtures: scope(), merge, refs: true });
     onClose();
   };
   const dup = () => {
@@ -149,7 +155,7 @@ function SceneEdit({ s, onClose }: { s: Scene; onClose: () => void }) {
     <Modal title={t("Scene “{name}”", { name: s.name })} onClose={onClose} footer={<>
       <button class="btn danger" style={{ minHeight: 48 }} onClick={() => setDel(true)}>{t("Delete")}</button><span class="sp" />
       <button class="btn" style={{ minHeight: 48 }} onClick={onClose}>{t("Cancel")}</button>
-      <button class="btn primary" style={{ minHeight: 48 }} onClick={() => { send({ type: "scene_save", scene: { ...s, name: nm, color, fade_in: fi, fade_out: fo } }); onClose(); }}>{t("Save")}</button>
+      <button class="btn primary" style={{ minHeight: 48 }} onClick={() => { send({ type: "scene_save", scene: { ...s, name: nm, color, fade_in: fi, fade_out: fo, kind } }); onClose(); }}>{t("Save")}</button>
     </>}>
       <div class="field"><label>{t("Name")}</label>
         <input class="input" style={{ minHeight: 44 }} value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} aria-label={t("Name")} /></div>
@@ -157,6 +163,11 @@ function SceneEdit({ s, onClose }: { s: Scene; onClose: () => void }) {
         <div class="sc-colors" role="radiogroup" aria-label={t("Color")}>
           {COLORS.map((c) => <button key={c} role="radio" aria-checked={c === color} class={c === color ? "sel" : ""} style={{ background: c }} aria-label={c} onClick={() => setColor(c)} />)}
         </div></div>
+      <div class="field"><label>{t("Behaviour")}</label>
+        <div class="sc-actions" role="radiogroup" aria-label={t("Behaviour")} style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
+          {KINDS.map((k) => <button key={k.id} role="radio" aria-checked={kind === k.id} class={`btn ${kind === k.id ? "sel" : ""}`} onClick={() => setKind(k.id)}>{t(k.label)}</button>)}
+        </div>
+        <div class="dim" style={{ fontSize: "var(--fs-xs)" }}>{t(KINDS.find((k) => k.id === kind)!.hint)}</div></div>
       <Stepper label={t("Fade in")} value={fi} onChange={setFi} />
       <Stepper label={t("Fade out")} value={fo} onChange={setFo} />
       <div class="field"><label>{n ? tp(n, "Update from {n} selected fixture", "Update from {n} selected fixtures") : t("Update from all fixtures")}</label>

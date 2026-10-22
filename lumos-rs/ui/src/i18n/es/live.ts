@@ -290,6 +290,13 @@ export const live: Record<string, string> = {
   "Release morph": "Liberar morph",
   "Record at least two scenes to morph between them.": "Graba al menos dos escenas para hacer morph entre ellas.",
   "Pick two different scenes.": "Elige dos escenas distintas.",
+  "Behaviour": "Comportamiento",
+  "Look": "Look",
+  "Intensity only": "Solo intensidad",
+  "Inhibitive": "Inhibitivo",
+  "Crossfades every recorded value": "Funde todos los valores grabados",
+  "Level scales only the dimmer, like a submaster": "El nivel escala solo el dimmer, como un submaster",
+  "Level caps the dimmer of its fixtures": "El nivel limita el dimmer de sus aparatos",
 };
 
 /** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */
