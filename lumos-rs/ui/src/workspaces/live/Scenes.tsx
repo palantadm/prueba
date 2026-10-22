@@ -45,7 +45,7 @@ export function ScenePool() {
         <span class="sp" />
         <button class={`btn ${solo ? "on" : ""}`} aria-pressed={solo} onClick={() => setSolo(!solo)}
           title={t("Tapping a scene activates it and releases all the others")}>{t("Solo")}</button>
-        <button class="btn danger" disabled={!anyActive} onClick={() => send({ type: "scenes_release" })}>{t("Release all")}</button>
+        <button class="btn danger" disabled={!anyActive} onClick={() => send({ type: "scenes_release" })}>{t("Release scenes")}</button>
       </div>
       <div class="sc-bar" style={{ paddingTop: 0 }}>
         <span class="sc-scope">{n ? tp(n, "Records {n} selected fixture", "Records {n} selected fixtures") : t("Records all fixtures")}</span>

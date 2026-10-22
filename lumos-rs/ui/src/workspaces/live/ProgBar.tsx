@@ -65,7 +65,7 @@ function RecordCue({ onClose }: { onClose: () => void }) {
 
   const createList = async () => {
     const id = Math.max(0, ...lists.map((l) => l.id)) + 1;
-    await send({ type: "cuelist_save", cuelist: { id, name: t("Cuelist {n}", { n: id }), cues: [], looped: false, tracking: true, priority: 0 } });
+    await send({ type: "cuelist_save", cuelist: { id, name: t("Cuelist {n}", { n: id }), cues: [], looped: false, tracking: true, priority: 0, auto_mark: false } });
     setList(id);
   };
   const go = async () => {
@@ -73,7 +73,7 @@ function RecordCue({ onClose }: { onClose: () => void }) {
     const n = number.trim() === "" ? null : parseFloat(number);
     if (n !== null && !Number.isFinite(n)) return toast(t("Invalid cue number"), "err");
     try {
-      await send({ type: "prog_record_cue", cuelist: list, number: n, mode, label, release });
+      await send({ type: "prog_record_cue", cuelist: list, number: n, mode, label, release, refs: true });
       activeCuelist.value = list;
       toast(t("Recorded cue {n} in {name}", { n: n ?? t("(next)"), name: cl?.name ?? list }), "ok");
       onClose();

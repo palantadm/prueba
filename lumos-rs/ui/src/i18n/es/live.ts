@@ -250,26 +250,6 @@ export const live: Record<string, string> = {
   // ── Widgets
   "{x} / {y} pad": "Pad {x} / {y}",
   "Saturation and brightness": "Saturación y brillo",
-};
-
-/** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */
-export const capLabelsEs: Record<string, string> = {
-  "Open": "Abierto",
-  "Closed": "Cerrado",
-  "White": "Blanco",
-  "Red": "Rojo",
-  "Orange": "Naranja",
-  "Yellow": "Amarillo",
-  "Green": "Verde",
-  "Cyan": "Cian",
-  "Blue": "Azul",
-  "Magenta": "Magenta",
-  "Prism": "Prisma",
-  "Rotation": "Rotación",
-  "Shake / scroll": "Vibración / desplazamiento",
-  "Strobe slow→fast": "Strobe lento→rápido",
-  "Fog output": "Salida de niebla",
-  "Haze output": "Salida de haze",
   "Scenes": "Escenas",
   "Scene": "Escena",
   "scene": "escena",
@@ -279,6 +259,7 @@ export const capLabelsEs: Record<string, string> = {
   "Record a scene from the programmer values": "Grabar una escena con los valores del programador",
   "Record a scene from what is on stage now": "Grabar una escena con lo que hay ahora en escena",
   "Solo": "Solo",
+  "Release scenes": "Liberar escenas",
   "Tapping a scene activates it and releases all the others": "Al pulsar una escena se activa y se liberan las demás",
   "Records {n} selected fixture": "Graba {n} aparato seleccionado",
   "Records {n} selected fixtures": "Graba {n} aparatos seleccionados",
@@ -309,4 +290,24 @@ export const capLabelsEs: Record<string, string> = {
   "Release morph": "Liberar morph",
   "Record at least two scenes to morph between them.": "Graba al menos dos escenas para hacer morph entre ellas.",
   "Pick two different scenes.": "Elige dos escenas distintas.",
+};
+
+/** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */
+export const capLabelsEs: Record<string, string> = {
+  "Open": "Abierto",
+  "Closed": "Cerrado",
+  "White": "Blanco",
+  "Red": "Rojo",
+  "Orange": "Naranja",
+  "Yellow": "Amarillo",
+  "Green": "Verde",
+  "Cyan": "Cian",
+  "Blue": "Azul",
+  "Magenta": "Magenta",
+  "Prism": "Prisma",
+  "Rotation": "Rotación",
+  "Shake / scroll": "Vibración / desplazamiento",
+  "Strobe slow→fast": "Strobe lento→rápido",
+  "Fog output": "Salida de niebla",
+  "Haze output": "Salida de haze",
 };

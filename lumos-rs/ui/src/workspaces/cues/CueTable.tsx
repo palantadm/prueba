@@ -70,7 +70,7 @@ export function CueTable(p: { list: Cuelist; rt?: CuelistRt; selected: number | 
                 <td>
                   <div class="row" style={{ gap: 2, justifyContent: "flex-end" }}>
                     <button class="btn sm" title={t("Update from programmer (merge)")} aria-label={t("Update cue {n} from programmer", { n: fmtNum(c.number) })}
-                      onClick={(e) => { e.stopPropagation(); send({ type: "prog_record_cue", cuelist: list.id, number: c.number, mode: "merge", label: c.label, release: false }).then(() => toast(t("Cue {n} updated", { n: fmtNum(c.number) }), "ok")); }}>{t("Upd")}</button>
+                      onClick={(e) => { e.stopPropagation(); send({ type: "prog_record_cue", cuelist: list.id, number: c.number, mode: "merge", label: c.label, release: false, refs: true }).then(() => toast(t("Cue {n} updated", { n: fmtNum(c.number) }), "ok")); }}>{t("Upd")}</button>
                     <button class="btn sm danger" aria-label={t("Delete cue {n}", { n: fmtNum(c.number) })}
                       onClick={(e) => { e.stopPropagation(); send({ type: "cue_remove", cuelist: list.id, number: c.number }); }}>✕</button>
                   </div>
@@ -99,7 +99,7 @@ export function InsertCue(p: { list: Cuelist; after: number | null; onClose: () 
     if (!Number.isFinite(num) || num <= 0) return toast(t("Invalid cue number"), "err");
     if (nums.includes(num)) return toast(t("Cue {n} already exists", { n: fmtNum(num) }), "err");
     try {
-      await send({ type: "cue_save", cuelist: p.list.id, cue: { number: num, label, fade_in: 2, fade_out: 2, delay: 0, follow: null, timecode: null, changes: {}, block: false } });
+      await send({ type: "cue_save", cuelist: p.list.id, cue: { number: num, label, fade_in: 2, fade_out: 2, delay: 0, follow: null, timecode: null, changes: {}, block: false, refs: {}, timing: {}, curve: "linear", stagger: 0, notes: "" } });
       p.onDone(num); p.onClose();
     } catch { /* toasted */ }
   };

@@ -91,6 +91,7 @@ impl Engine {
             ExecKind::Group { .. } => st.level > 0.0,
             ExecKind::Master { .. } => true,
             ExecKind::Scene { scene } => self.scenes.is_active(*scene),
+            ExecKind::Chase { .. } | ExecKind::Speed { .. } | ExecKind::XFade { .. } => false, // be-play
             ExecKind::Empty => false,
         }
     }
@@ -861,7 +862,7 @@ mod tests {
     fn effect_rate_is_runtime_only() {
         let mut e = engine();
         e.handle(Command::EffectSave {
-            effect: Effect {
+            effect: Effect { attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0,
                 id: 0,
                 name: "e".into(),
                 attr: "dimmer".into(),
@@ -887,7 +888,7 @@ mod tests {
         let mut e = engine();
         add(&mut e, "generic/dimmer", "1ch", 1);
         set(&mut e, 1, "dimmer", 1.0);
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "A".into(), release: true })
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "A".into(), release: true, refs: true })
             .unwrap();
         let go = btn(1, VcAction::Cuelist { cuelist: 1, op: VcOp::Go }, VcMode::Trigger);
         let tg = btn(2, VcAction::Cuelist { cuelist: 1, op: VcOp::Toggle }, VcMode::Trigger);

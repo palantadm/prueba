@@ -346,7 +346,7 @@ impl Engine {
             }
             None => {
                 let name = if name.trim().is_empty() { format!("Scene {sid}") } else { name.trim().to_string() };
-                self.show.scenes.push(Scene { id: sid, name, values: data, fade_in: 1.0, fade_out: 1.0, color: String::new() });
+                self.show.scenes.push(Scene { id: sid, name, values: data, fade_in: 1.0, fade_out: 1.0, color: String::new(), refs: Default::default(), kind: Default::default() });
             }
         }
         self.touch();
@@ -428,7 +428,7 @@ mod tests {
         for (a, v) in [("red", r), ("green", g), ("blue", b)] {
             set(e, 1, a, v);
         }
-        e.handle(Command::SceneRecord { id: None, name: name.into(), from_output: false, fixtures: None, merge: false }).unwrap();
+        e.handle(Command::SceneRecord { id: None, name: name.into(), from_output: false, fixtures: None, merge: false, refs: true }).unwrap();
         e.programmer.clear();
         e.show.scenes.last().unwrap().id
     }
@@ -450,7 +450,7 @@ mod tests {
     fn empty_programmer_is_an_error() {
         let mut e = engine();
         add(&mut e, "generic/rgb-par", "3ch", 1);
-        assert!(e.handle(Command::SceneRecord { id: None, name: "x".into(), from_output: false, fixtures: None, merge: false }).is_err());
+        assert!(e.handle(Command::SceneRecord { id: None, name: "x".into(), from_output: false, fixtures: None, merge: false, refs: true }).is_err());
         assert!(e.handle(Command::SceneGo { id: 99, on: true }).is_err());
     }
 
@@ -459,7 +459,7 @@ mod tests {
         let mut e = engine();
         add(&mut e, "generic/dimmer", "1ch", 1);
         set(&mut e, 1, "dimmer", 1.0);
-        e.handle(Command::SceneRecord { id: None, name: "A".into(), from_output: false, fixtures: None, merge: false }).unwrap();
+        e.handle(Command::SceneRecord { id: None, name: "A".into(), from_output: false, fixtures: None, merge: false, refs: true }).unwrap();
         e.programmer.clear();
         let s = e.show.scenes[0].id;
         e.show.scenes[0].fade_in = 2.0;
@@ -490,7 +490,7 @@ mod tests {
         // cue: dimmer .8, red 1
         set(&mut e, 1, "dimmer", 0.8);
         set(&mut e, 1, "red", 1.0);
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "".into(), release: true }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "".into(), release: true, refs: true }).unwrap();
         e.show.cuelists[0].cues[0].fade_in = 0.0;
         e.go(1).unwrap();
         e.update_playback(0.1);
@@ -498,7 +498,7 @@ mod tests {
         set(&mut e, 1, "dimmer", 0.5);
         set(&mut e, 1, "red", 0.0);
         set(&mut e, 1, "blue", 1.0);
-        e.handle(Command::SceneRecord { id: None, name: "S".into(), from_output: false, fixtures: None, merge: false }).unwrap();
+        e.handle(Command::SceneRecord { id: None, name: "S".into(), from_output: false, fixtures: None, merge: false, refs: true }).unwrap();
         e.programmer.clear();
         let s = e.show.scenes[0].id;
         e.scene_level(s, 0.5).unwrap();
@@ -554,7 +554,7 @@ mod tests {
         add(&mut e, "generic/mh-spot", "16ch", 1);
         set(&mut e, 1, "dimmer", 1.0);
         set(&mut e, 1, "gobo", 0.6);
-        e.handle(Command::SceneRecord { id: None, name: "G".into(), from_output: false, fixtures: None, merge: false }).unwrap();
+        e.handle(Command::SceneRecord { id: None, name: "G".into(), from_output: false, fixtures: None, merge: false, refs: true }).unwrap();
         e.programmer.clear();
         let s = e.show.scenes[0].id;
         e.scene_level(s, 0.4).unwrap();
@@ -587,11 +587,11 @@ mod tests {
         add(&mut e, "generic/rgb-par-dimstrobe", "6ch", 2);
         set(&mut e, 1, "dimmer", 1.0);
         set(&mut e, 1, "red", 1.0);
-        e.handle(Command::SceneRecord { id: None, name: "A".into(), from_output: false, fixtures: Some(vec![1]), merge: false }).unwrap();
+        e.handle(Command::SceneRecord { id: None, name: "A".into(), from_output: false, fixtures: Some(vec![1]), merge: false, refs: true }).unwrap();
         e.programmer.clear();
         set(&mut e, 2, "dimmer", 1.0);
         set(&mut e, 2, "green", 1.0);
-        e.handle(Command::SceneRecord { id: None, name: "B".into(), from_output: false, fixtures: Some(vec![2]), merge: false }).unwrap();
+        e.handle(Command::SceneRecord { id: None, name: "B".into(), from_output: false, fixtures: Some(vec![2]), merge: false, refs: true }).unwrap();
         e.programmer.clear();
         let (a, b) = (e.show.scenes[0].id, e.show.scenes[1].id);
         e.handle(Command::SceneMorph { a, b, t: Some(0.25) }).unwrap();
@@ -609,7 +609,7 @@ mod tests {
         set(&mut e, 1, "dimmer", 1.0);
         set(&mut e, 1, "pan", 0.25);
         set(&mut e, 2, "dimmer", 0.5);
-        e.handle(Command::SceneRecord { id: None, name: "Snap".into(), from_output: true, fixtures: Some(vec![1]), merge: false }).unwrap();
+        e.handle(Command::SceneRecord { id: None, name: "Snap".into(), from_output: true, fixtures: Some(vec![1]), merge: false, refs: true }).unwrap();
         let id = e.show.scenes[0].id;
         {
             let sc = &e.show.scenes[0];
@@ -621,16 +621,16 @@ mod tests {
         // update with merge keeps other fixtures; replace does not
         e.programmer.clear();
         set(&mut e, 2, "dimmer", 0.5);
-        e.handle(Command::SceneRecord { id: Some(id), name: "".into(), from_output: false, fixtures: None, merge: true }).unwrap();
+        e.handle(Command::SceneRecord { id: Some(id), name: "".into(), from_output: false, fixtures: None, merge: true, refs: true }).unwrap();
         assert_eq!(e.show.scenes[0].values.len(), 2);
-        e.handle(Command::SceneRecord { id: Some(id), name: "".into(), from_output: false, fixtures: None, merge: false }).unwrap();
+        e.handle(Command::SceneRecord { id: Some(id), name: "".into(), from_output: false, fixtures: None, merge: false, refs: true }).unwrap();
         assert_eq!(e.show.scenes[0].values.len(), 1);
         assert_eq!(e.show.scenes[0].name, "Snap");
         // nothing lit → error
         e.programmer.clear();
         let mut e2 = engine();
         add(&mut e2, "generic/mh-spot", "16ch", 1);
-        assert!(e2.handle(Command::SceneRecord { id: None, name: "".into(), from_output: true, fixtures: None, merge: false }).is_err());
+        assert!(e2.handle(Command::SceneRecord { id: None, name: "".into(), from_output: true, fixtures: None, merge: false, refs: true }).is_err());
     }
 
     #[test]

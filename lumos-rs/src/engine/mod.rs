@@ -494,7 +494,7 @@ impl Engine {
             }
             ProgApplyPalette { fixtures, palette } => self.apply_palette(&fixtures, palette)?,
             ProgRecordPalette { id, fixtures, kind, name } => self.record_palette(id, &fixtures, kind, name)?,
-            ProgRecordCue { cuelist, number, mode, label, release } => {
+            ProgRecordCue { cuelist, number, mode, label, release, refs: _ } => {
                 self.record_cue(cuelist, number, mode, label, release)?
             }
             FixtureAdd { profile, mode, count, universe, address, name } => {
@@ -799,7 +799,18 @@ impl Engine {
                 self.touch();
             }
             SubscribeDmx { .. } => {}
-            SceneRecord { id, name, from_output, fixtures, merge } => self.scene_record(id, name, from_output, fixtures, merge)?,
+            // ── wave-2 stubs, one group per owner (replace as features land) ──
+            // be-prog
+            Undo | Redo | BlindSet { .. } | CueLoad { .. } | CueUpdate { .. } | Unpark { .. } => {}
+            // be-play
+            ChaseSave { .. } | ChaseRemove { .. } | ChaseRun { .. } | ChaseBpm { .. } | ChaseTap { .. } | ChaseNudge { .. } => {}
+            SpeedSave { .. } | SpeedRemove { .. } | SpeedSet { .. } | SpeedTap { .. } | CuelistManual { .. } => {}
+            // be-auto
+            CommandLine { .. } | MacroSave { .. } | MacroRemove { .. } | MacroRun { .. } | MacroStop { .. } => {}
+            TimelineSave { .. } | TimelineRemove { .. } | TimelineRun { .. } | TimelineStop { .. } | TimelineSeek { .. } => {}
+            // be-data
+            BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. } => {}
+            SceneRecord { id, name, from_output, fixtures, merge, refs: _ } => self.scene_record(id, name, from_output, fixtures, merge)?,
             SceneSave { scene } => self.scene_save(scene)?,
             SceneRemove { id } => self.scene_remove(id),
             SceneGo { id, on } => self.scene_go(id, on)?,
@@ -999,6 +1010,7 @@ impl Engine {
                 looped: false,
                 tracking: true,
                 priority: 0,
+                auto_mark: false,
             });
         }
         let prog = self.programmer.clone();
@@ -1036,6 +1048,11 @@ impl Engine {
                     timecode: None,
                     changes: prog,
                     block: false,
+                    refs: Default::default(),
+                    timing: Default::default(),
+                    curve: Default::default(),
+                    stagger: 0.0,
+                    notes: String::new(),
                 });
                 sort_cues(cl);
             }
@@ -1754,6 +1771,7 @@ impl Engine {
                     ExecKind::Group { .. } => st.level > 0.0,
                     ExecKind::Master { .. } => true,
                     ExecKind::Scene { scene } => self.scenes.is_active(*scene),
+                    ExecKind::Chase { .. } | ExecKind::Speed { .. } | ExecKind::XFade { .. } => false, // be-play
                     ExecKind::Empty => false,
                 };
                 let level = match &e.kind {
@@ -1784,6 +1802,7 @@ impl Engine {
                     next,
                     progress: run.map_or(0.0, |r| r.progress),
                     level: self.cl_levels.get(&cl.id).copied().unwrap_or(1.0),
+                    manual: false,
                 }
             })
             .collect();
@@ -1804,6 +1823,17 @@ impl Engine {
             timecode: TimecodeRt { running: self.tc.running, frames, text: fmt_tc(frames, fps) },
             learn: self.learn,
             fps: self.fps,
+            blind: false,
+            undo: 0,
+            redo: 0,
+            parked: vec![],
+            cmd_log: vec![],
+            chases: vec![],
+            speed: vec![],
+            timelines: vec![],
+            macros_running: vec![],
+            testing: false,
+            identifying: vec![],
             vc: self.vc_states(),
         }
     }
@@ -1924,9 +1954,9 @@ mod tests {
         let mut e = engine();
         add(&mut e, "generic/dimmer", "1ch", 1);
         set(&mut e, 1, "dimmer", 0.8);
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "A".into(), release: true }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "A".into(), release: true, refs: true }).unwrap();
         set(&mut e, 1, "dimmer", 0.4);
-        e.handle(Command::ProgRecordCue { cuelist: 2, number: None, mode: RecordMode::Merge, label: "B".into(), release: true }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 2, number: None, mode: RecordMode::Merge, label: "B".into(), release: true, refs: true }).unwrap();
         assert!(e.programmer.is_empty());
         // instant cues
         for cl in e.show.cuelists.iter_mut() {
@@ -1950,7 +1980,7 @@ mod tests {
         add(&mut e, "generic/rgb-par", "4ch", 1);
         set(&mut e, 1, "dimmer", 1.0);
         set(&mut e, 1, "red", 1.0);
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Replace, label: String::new(), release: true }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Replace, label: String::new(), release: true, refs: true }).unwrap();
         e.show.cuelists[0].cues[0].fade_in = 0.0;
         e.handle(Command::Go { cuelist: 1 }).unwrap();
         e.update_playback(0.1);
@@ -1964,7 +1994,7 @@ mod tests {
         let mut e = engine();
         add(&mut e, "generic/dimmer", "1ch", 1);
         set(&mut e, 1, "dimmer", 1.0);
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: true }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: true, refs: true }).unwrap();
         e.show.cuelists[0].cues[0].fade_in = 2.0;
         e.handle(Command::Go { cuelist: 1 }).unwrap();
         let start = e.runs[&1].start;
@@ -1980,7 +2010,7 @@ mod tests {
         add(&mut e, "generic/dimmer", "1ch", 1);
         for v in [0.2, 0.5, 0.9] {
             set(&mut e, 1, "dimmer", v);
-            e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: true }).unwrap();
+            e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: true, refs: true }).unwrap();
         }
         assert_eq!(e.show.cuelists[0].cues.iter().map(|c| c.number).collect::<Vec<_>>(), vec![1.0, 2.0, 3.0]);
         for _ in 0..3 {
@@ -2011,7 +2041,7 @@ mod tests {
         assert!(e.handle(Command::ExecLevel { id: 5, level: 1.0 }).is_err());
         assert!(e.handle(Command::ShowLoad { name: "../x".into() }).is_err());
         assert!(e.handle(Command::LibraryImportOfl { json: "{".into() }).is_err());
-        assert!(e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: false }).is_err());
+        assert!(e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: false, refs: true }).is_err());
     }
 
     #[test]
@@ -2074,7 +2104,7 @@ mod tests {
         let mut e = engine();
         add(&mut e, "generic/dimmer", "1ch", 1);
         set(&mut e, 1, "dimmer", 1.0);
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: true }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: true, refs: true }).unwrap();
         e.handle(Command::ExecSave { executor: Executor { id: 0, page: 0, slot: 0, label: "A".into(), kind: ExecKind::Cuelist { cuelist: 1 } } }).unwrap();
         e.handle(Command::BindingSave {
             binding: Binding {
@@ -2138,7 +2168,7 @@ mod tests {
             set(&mut e, f, "dimmer", 1.0);
         }
         e.handle(Command::EffectSave {
-            effect: Effect { id: 0, name: "pulse".into(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: vec![1, 2] },
+            effect: Effect { attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, id: 0, name: "pulse".into(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: vec![1, 2] },
         })
         .unwrap();
         e.handle(Command::EffectToggle { id: 1, on: true }).unwrap();
@@ -2183,7 +2213,7 @@ mod tests {
         let mut e = engine();
         add(&mut e, "generic/dimmer", "1ch", 1);
         set(&mut e, 1, "dimmer", 1.0);
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: true }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: String::new(), release: true, refs: true }).unwrap();
         e.show.cuelists[0].cues[0].timecode = Some("00:00:01:00".into());
         e.show.settings.timecode = TimecodeCfg { source: TcSource::Internal, fps: 25.0, offset_frames: 0 };
         e.rebuild_derived();

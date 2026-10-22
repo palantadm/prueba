@@ -156,7 +156,7 @@ mod tests {
     fn cue(n: f64, f: u32, a: &str, v: f32) -> Cue {
         let mut ch = PerFixture::new();
         ch.entry(f).or_default().insert(a.into(), v);
-        Cue { number: n, label: String::new(), fade_in: 2.0, fade_out: 2.0, delay: 0.0, follow: None, timecode: None, changes: ch, block: false }
+        Cue { refs: Default::default(), timing: Default::default(), curve: Default::default(), stagger: 0.0, notes: String::new(), number: n, label: String::new(), fade_in: 2.0, fade_out: 2.0, delay: 0.0, follow: None, timecode: None, changes: ch, block: false }
     }
 
     #[test]
@@ -177,7 +177,7 @@ mod tests {
 
     #[test]
     fn tracking_accumulates_and_blocks() {
-        let mut cl = Cuelist { id: 1, name: "t".into(), cues: vec![cue(1.0, 1, "dimmer", 1.0), cue(2.0, 1, "red", 0.5), cue(3.0, 2, "dimmer", 0.3)], looped: false, tracking: true, priority: 0 };
+        let mut cl = Cuelist { auto_mark: false, id: 1, name: "t".into(), cues: vec![cue(1.0, 1, "dimmer", 1.0), cue(2.0, 1, "red", 0.5), cue(3.0, 2, "dimmer", 0.3)], looped: false, tracking: true, priority: 0 };
         let s = tracked_state(&cl, 2);
         assert_eq!(s[&1]["dimmer"], 1.0);
         assert_eq!(s[&1]["red"], 0.5);

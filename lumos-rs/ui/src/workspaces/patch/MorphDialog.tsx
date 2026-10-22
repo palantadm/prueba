@@ -5,12 +5,14 @@ import { library, send, show, toast } from "../../store";
 import { EmptyState, Modal, Select, VirtualList } from "../../ui";
 import { collisions, footprint, profileById } from "../../lib/fixtures";
 import { ATTRS } from "../../lib/shell-attrs";
-import { tErr } from "../../i18n/errors";
+import { tMorph } from "../../i18n/morph";
 import { t, tp } from "../../i18n";
 
 type Item = { h: string } | { p: FixtureProfile };
 
-const label = (a: string) => ATTRS.find((x) => x.name === a)?.label ?? a;
+const one = (a: string) => ATTRS.find((x) => x.name === a)?.label ?? a;
+const label = (a: string) => a.split("+").map(one).join(" + ");
+const RANK: Record<string, number> = { direct: 0, emulated: 1, approx: 2 };
 const KIND: Record<string, { cls: string; name: string; help: string }> = {
   direct: { cls: "ok", name: "direct", help: "Same attribute in both fixtures: the recorded values carry over unchanged." },
   emulated: { cls: "", name: "emulated", help: "The target has no such channel, so Lumos converts it for you (for example RGB → RGBW, CMY or the nearest colour-wheel slot)." },
@@ -98,7 +100,7 @@ export function MorphDialog(props: { ids: number[]; onClose: () => void }) {
         if (my === seq.current) { setPrev(j); setOpen(new Set()); }
       } catch (e) {
         if (my !== seq.current) return;
-        const msg = tErr(e instanceof Error ? e.message : String(e));
+        const msg = tMorph(e instanceof Error ? e.message : String(e), label);
         setPrev(null); setErr(msg);
         if (msg !== lastErr.current) { lastErr.current = msg; toast(msg, "err"); }
       } finally {
@@ -182,7 +184,7 @@ export function MorphDialog(props: { ids: number[]; onClose: () => void }) {
               </div>
               <div class="mp-cov" role="progressbar" aria-valuenow={cov} aria-valuemin={0} aria-valuemax={100} aria-label={t("Coverage")}><i style={{ width: `${cov}%`, background: covColor }} /></div>
 
-              {prev.warnings.map((w, i) => <div key={i} class="mp-warn" style={{ marginTop: 8 }} role="alert">⚠ {w}</div>)}
+              {prev.warnings.filter((w) => !(addrIssue && /overlap/i.test(w))).map((w, i) => <div key={i} class="mp-warn" style={{ marginTop: 8 }} role="alert">⚠ {tMorph(w, label)}</div>)}
 
               <div class="row" style={{ margin: "12px 0 4px" }}>
                 <span class="label grow">{t("Attribute mapping")}</span>
@@ -193,7 +195,7 @@ export function MorphDialog(props: { ids: number[]; onClose: () => void }) {
               </div>}
               {prev.maps.length === 0 ? <div class="dim" style={{ padding: "8px 0" }}>{t("No attribute can be carried over.")}</div> :
                 <table class="mp-map"><tbody>
-                  {prev.maps.map((m, i) => {
+                  {[...prev.maps].sort((a, b) => (RANK[a.kind] ?? 3) - (RANK[b.kind] ?? 3)).map((m, i) => {
                     const k = kindOf(m.kind), expanded = open.has(i);
                     return [
                       <tr key={i} class="mp-m" onClick={() => toggle(i)} aria-expanded={expanded} title={t(k.help)}>
@@ -201,7 +203,7 @@ export function MorphDialog(props: { ids: number[]; onClose: () => void }) {
                         <td>{label(m.from)}</td><td style={{ width: 24 }} class="dim">→</td><td>{label(m.to)}</td>
                         <td style={{ width: 110, textAlign: "right" }}><span class={`chip ${k.cls}`}>{t(k.name)}</span></td>
                       </tr>,
-                      expanded && <tr key={`n${i}`} class="mp-note"><td colSpan={5}>{m.note || t(k.help)}</td></tr>,
+                      expanded && <tr key={`n${i}`} class="mp-note"><td colSpan={5}>{m.note ? tMorph(m.note, label) : t(k.help)}</td></tr>,
                     ];
                   })}
                 </tbody></table>}

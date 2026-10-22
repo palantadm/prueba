@@ -5,4 +5,9 @@ export type Cuelist = { id: number, name: string, cues: Array<Cue>, looped: bool
 /**
  * Higher priority wins on LTP conflicts between cuelists.
  */
-priority: number, };
+priority: number, 
+/**
+ * Auto-mark ("move on dark"): pre-position non-intensity attributes of fixtures that are dark
+ * in the current cue and lit in the next one, while the current cue plays.
+ */
+auto_mark: boolean, };

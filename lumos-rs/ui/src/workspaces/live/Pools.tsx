@@ -134,6 +134,7 @@ function EffectPool() {
   const blank = (): Effect => ({
     id: Math.max(0, ...effects.map((e) => e.id)) + 1, name: t("Effect {n}", { n: effects.length + 1 }),
     attr: "dimmer", shape: "sine", rate: 0.5, depth: 0.5, phase_spread: 0, fixtures: [...selection.value],
+    attr2: null, speed_master: null, bpm: 0, rotation: 0,
   });
   return (
     <>

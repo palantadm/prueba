@@ -653,7 +653,7 @@ mod tests {
         set(&mut e, 1, "red", 1.0);
         set(&mut e, 1, "green", 1.0);
         set(&mut e, 1, "blue", 1.0);
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "".into(), release: true }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "".into(), release: true, refs: true }).unwrap();
         e.handle(Command::FixtureMorph { ids: vec![1, 2], profile: "generic/rgbw-par".into(), mode: "4ch".into(), repack: false }).unwrap();
         e.rebuild_derived();
         assert_eq!(e.show.fixtures.iter().map(|f| f.id).collect::<Vec<_>>(), vec![1, 2]);
@@ -703,8 +703,8 @@ mod tests {
         add(&mut e, "generic/mh-spot", "16ch", 1);
         set(&mut e, 1, "dimmer", 1.0);
         set(&mut e, 1, "colorwheel", 64.0 / 255.0); // Blue slot (60..69)
-        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "".into(), release: false }).unwrap();
-        e.handle(Command::SceneRecord { id: None, name: "S".into(), from_output: false, fixtures: None, merge: false }).unwrap();
+        e.handle(Command::ProgRecordCue { cuelist: 1, number: None, mode: RecordMode::Merge, label: "".into(), release: false, refs: true }).unwrap();
+        e.handle(Command::SceneRecord { id: None, name: "S".into(), from_output: false, fixtures: None, merge: false, refs: true }).unwrap();
         e.handle(Command::FixtureMorph { ids: vec![1], profile: "generic/rgb-par-dimstrobe".into(), mode: "6ch".into(), repack: false }).unwrap();
         e.rebuild_derived();
         let cue = &e.show.cuelists[0].cues[0].changes[&1];

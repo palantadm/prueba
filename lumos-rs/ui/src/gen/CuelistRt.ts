@@ -17,4 +17,8 @@ progress: number,
 /**
  * Cuelist intensity master 0..1.
  */
-level: number, };
+level: number, 
+/**
+ * Fade progress is driven by a manual crossfader.
+ */
+manual: boolean, };

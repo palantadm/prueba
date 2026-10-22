@@ -11,7 +11,7 @@ fn frac(x: f64) -> f64 {
 pub fn shape_value(shape: Shape, phase: f64, seed: u32) -> f32 {
     let f = frac(phase);
     (match shape {
-        Shape::Sine => (phase * std::f64::consts::TAU).sin(),
+        Shape::Sine | Shape::Circle | Shape::Eight | Shape::Pulse | Shape::Ramp => (phase * std::f64::consts::TAU).sin(), // 2-D/new shapes: be-play
         Shape::Triangle => {
             if f < 0.25 {
                 4.0 * f

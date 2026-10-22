@@ -27,7 +27,7 @@ export function Cues() {
 
   const newList = (name: string) => {
     const id = Math.max(0, ...lists.map((l) => l.id)) + 1;
-    send({ type: "cuelist_save", cuelist: { id, name, cues: [], looped: false, tracking: true, priority: 0 } }).then(() => (activeCuelist.value = id));
+    send({ type: "cuelist_save", cuelist: { id, name, cues: [], looped: false, tracking: true, priority: 0, auto_mark: false } }).then(() => (activeCuelist.value = id));
   };
   const renumber = () => {
     if (!cur) return;

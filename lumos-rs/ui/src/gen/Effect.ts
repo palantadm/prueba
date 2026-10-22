@@ -16,4 +16,20 @@ depth: number,
 /**
  * Phase offset in degrees spread evenly across `fixtures` (0 = in unison).
  */
-phase_spread: number, fixtures: Array<number>, };
+phase_spread: number, fixtures: Array<number>, 
+/**
+ * Second attribute for 2-D shapes (Circle/Eight), usually `tilt` with `attr = pan`.
+ */
+attr2: string | null, 
+/**
+ * Follow a speed master (BPM) instead of `rate`.
+ */
+speed_master: number | null, 
+/**
+ * >0: rate in BPM (1 cycle per beat) overriding `rate`.
+ */
+bpm: number, 
+/**
+ * Rotation of 2-D shapes in degrees.
+ */
+rotation: number, };

@@ -27,6 +27,17 @@ pub fn de_per_fixture<'de, D: serde::Deserializer<'de>>(d: D) -> Result<PerFixtu
         .collect()
 }
 
+/// fixture → attribute → palette id: the value is *linked* to a palette (edit the palette, every
+/// cue/scene using it follows). The absolute value is also stored as a fallback.
+pub type PerFixtureRefs = BTreeMap<u32, BTreeMap<String, u32>>;
+
+pub fn de_per_fixture_refs<'de, D: serde::Deserializer<'de>>(d: D) -> Result<PerFixtureRefs, D::Error> {
+    let raw = BTreeMap::<String, BTreeMap<String, u32>>::deserialize(d)?;
+    raw.into_iter()
+        .map(|(k, v)| k.parse::<u32>().map(|k| (k, v)).map_err(|_| serde::de::Error::custom(format!("bad fixture id '{k}'"))))
+        .collect()
+}
+
 /// Canonical attribute vocabulary: (name, group, label).
 pub const ATTRS: &[(&str, &str, &str)] = &[
     ("dimmer", "intensity", "Dimmer"),
@@ -302,6 +313,52 @@ pub struct Cue {
     /// Block: stop tracking from earlier cues (stores full state).
     #[serde(default)]
     pub block: bool,
+    /// Palette links for values in `changes` (resolved at render; `changes` is the fallback).
+    #[serde(default, deserialize_with = "de_per_fixture_refs")]
+    pub refs: PerFixtureRefs,
+    /// Per attribute-group timing overrides. Keys: `intensity` `position` `color` `beam` `control`.
+    #[serde(default)]
+    pub timing: BTreeMap<String, AttrTiming>,
+    #[serde(default)]
+    pub curve: FadeCurve,
+    /// Seconds of extra delay added per fixture, in fixture-number order (0 = all together).
+    #[serde(default)]
+    pub stagger: f32,
+    #[serde(default)]
+    pub notes: String,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AttrTiming {
+    pub delay: f32,
+    pub fade: f32,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum FadeCurve {
+    #[default]
+    Linear,
+    SCurve,
+    Square,
+    InvSquare,
+    Sine,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum UpdateMode {
+    /// Merge programmer values into the cue.
+    Merge,
+    /// Replace the cue's values with the programmer.
+    Replace,
+    /// Also push the changes forward through following cues until they re-state the attribute.
+    TrackForward,
+    /// Change only this cue (following cues keep their old resulting look).
+    CueOnly,
 }
 
 fn d_fade() -> f32 {
@@ -321,6 +378,10 @@ pub struct Cuelist {
     /// Higher priority wins on LTP conflicts between cuelists.
     #[serde(default)]
     pub priority: u8,
+    /// Auto-mark ("move on dark"): pre-position non-intensity attributes of fixtures that are dark
+    /// in the current cue and lit in the next one, while the current cue plays.
+    #[serde(default)]
+    pub auto_mark: bool,
 }
 
 fn d_true() -> bool {
@@ -344,6 +405,24 @@ pub struct Scene {
     /// Accent colour `#rrggbb` for pool buttons.
     #[serde(default)]
     pub color: String,
+    #[serde(default, deserialize_with = "de_per_fixture_refs")]
+    pub refs: PerFixtureRefs,
+    /// Submaster behaviour.
+    #[serde(default)]
+    pub kind: SceneKind,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum SceneKind {
+    /// Full look; level blends all attributes.
+    #[default]
+    Look,
+    /// Only `dimmer` is taken from the scene (level scales it); other attributes are ignored.
+    Intensity,
+    /// Level caps the dimmer of the scene's fixtures (inhibitive submaster); values ignored.
+    Inhibitive,
 }
 
 fn d_scene_fade() -> f32 {
@@ -368,6 +447,12 @@ pub enum ExecKind {
     Group { group: u32 },
     /// Fader = scene level, button toggles the scene with its fade times.
     Scene { scene: u32 },
+    /// Button runs/stops the chase; fader = chase size/level.
+    Chase { chase: u32 },
+    /// Fader sets the speed master BPM (range 20..240); button taps tempo.
+    Speed { master: u32 },
+    /// Manual crossfade: fader drives the running cue's fade progress (0..1); at the ends it completes.
+    XFade { cuelist: u32 },
     /// Button toggles the effect, fader = effect depth multiplier.
     Effect { effect: u32 },
     Master { master: MasterKind },
@@ -393,6 +478,11 @@ pub enum Shape {
     Saw,
     Square,
     Random,
+    /// 2-D shapes drive `attr` (x) and `attr2` (y), e.g. pan/tilt.
+    Circle,
+    Eight,
+    Ramp,
+    Pulse,
 }
 
 /// Parametric effect. `attr` is any attribute name, or `"hue"` (rainbow across RGB fixtures).
@@ -410,6 +500,18 @@ pub struct Effect {
     /// Phase offset in degrees spread evenly across `fixtures` (0 = in unison).
     pub phase_spread: f32,
     pub fixtures: Vec<u32>,
+    /// Second attribute for 2-D shapes (Circle/Eight), usually `tilt` with `attr = pan`.
+    #[serde(default)]
+    pub attr2: Option<String>,
+    /// Follow a speed master (BPM) instead of `rate`.
+    #[serde(default)]
+    pub speed_master: Option<u32>,
+    /// >0: rate in BPM (1 cycle per beat) overriding `rate`.
+    #[serde(default)]
+    pub bpm: f32,
+    /// Rotation of 2-D shapes in degrees.
+    #[serde(default)]
+    pub rotation: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
@@ -610,6 +712,35 @@ pub struct Settings {
     pub artnet_in: ArtNetInCfg,
     pub timecode: TimecodeCfg,
     pub osc_feedback: OscFeedbackCfg,
+    #[serde(default)]
+    pub msc: MscCfg,
+    /// Start with blackout engaged (safe default for rehearsal PCs on a live rig).
+    #[serde(default)]
+    pub start_blackout: bool,
+}
+
+/// MIDI Show Control (theatre standard): lighting commands received as SysEx.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MscCfg {
+    pub enabled: bool,
+    /// MSC device id 0..=111, 127 = all-call.
+    pub device_id: u8,
+    /// Maps the MSC cue-list id (as text, e.g. "1") to a Lumos cuelist.
+    pub map: Vec<MscMap>,
+}
+
+impl Default for MscCfg {
+    fn default() -> Self {
+        MscCfg { enabled: false, device_id: 127, map: vec![] }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MscMap {
+    pub msc_list: String,
+    pub cuelist: u32,
 }
 
 impl Default for Settings {
@@ -621,6 +752,8 @@ impl Default for Settings {
             artnet_in: ArtNetInCfg { enabled: false, map: vec![] },
             timecode: TimecodeCfg { source: TcSource::Off, fps: 25.0, offset_frames: 0 },
             osc_feedback: OscFeedbackCfg { enabled: false, host: "127.0.0.1".into(), port: 9000 },
+            msc: MscCfg::default(),
+            start_blackout: false,
         }
     }
 }
@@ -702,6 +835,111 @@ impl Default for Stage {
     }
 }
 
+// ───────────────────────────── Chases, speed masters, macros, timelines ─────────────────────────────
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ChaseDir {
+    #[default]
+    Forward,
+    Backward,
+    Bounce,
+    Random,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ChaseStep {
+    #[serde(default, deserialize_with = "de_per_fixture")]
+    pub values: PerFixture,
+    #[serde(default, deserialize_with = "de_per_fixture_refs")]
+    pub refs: PerFixtureRefs,
+    /// Use a recorded scene as the step content (in addition to `values`).
+    #[serde(default)]
+    pub scene: Option<u32>,
+    /// Beats this step lasts.
+    #[serde(default = "d_one")]
+    pub hold: f32,
+    /// Crossfade as a fraction of the step (0 = snap, 1 = continuous).
+    #[serde(default)]
+    pub fade: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Chase {
+    pub id: u32,
+    pub name: String,
+    pub steps: Vec<ChaseStep>,
+    #[serde(default = "d_bpm")]
+    pub bpm: f32,
+    #[serde(default)]
+    pub speed_master: Option<u32>,
+    #[serde(default)]
+    pub dir: ChaseDir,
+}
+
+fn d_bpm() -> f32 {
+    120.0
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SpeedMaster {
+    pub id: u32,
+    pub name: String,
+    pub bpm: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MacroStep {
+    /// A command-line statement (see the command-line language in the engine).
+    pub text: String,
+    /// Seconds to wait after this step.
+    #[serde(default)]
+    pub wait: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Macro {
+    pub id: u32,
+    pub name: String,
+    pub steps: Vec<MacroStep>,
+    #[serde(default)]
+    pub color: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TlEvent {
+    /// Seconds from the timeline start.
+    pub at: f32,
+    /// Command-line statement executed when the playhead passes `at`.
+    pub text: String,
+    #[serde(default)]
+    pub label: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Timeline {
+    pub id: u32,
+    pub name: String,
+    pub length: f32,
+    pub events: Vec<TlEvent>,
+    #[serde(default)]
+    pub looped: bool,
+    /// When set, the playhead follows show timecode: `t = timecode − tc_start`.
+    #[serde(default)]
+    pub tc_start: Option<String>,
+    /// Optional audio file (`/media/<file>`) the editor shows as a waveform.
+    #[serde(default)]
+    pub audio: Option<String>,
+}
+
 // ───────────────────────────── Show ─────────────────────────────
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -714,6 +952,14 @@ pub struct Show {
     pub palettes: Vec<Palette>,
     #[serde(default)]
     pub scenes: Vec<Scene>,
+    #[serde(default)]
+    pub chases: Vec<Chase>,
+    #[serde(default)]
+    pub speed_masters: Vec<SpeedMaster>,
+    #[serde(default)]
+    pub macros: Vec<Macro>,
+    #[serde(default)]
+    pub timelines: Vec<Timeline>,
     pub cuelists: Vec<Cuelist>,
     pub executors: Vec<Executor>,
     pub effects: Vec<Effect>,
@@ -739,6 +985,10 @@ impl Default for Show {
             groups: vec![],
             palettes: vec![],
             scenes: vec![],
+            chases: vec![],
+            speed_masters: vec![],
+            macros: vec![],
+            timelines: vec![],
             cuelists: vec![],
             executors: vec![],
             effects: vec![],
@@ -944,6 +1194,49 @@ pub struct CuelistRt {
     pub progress: f32,
     /// Cuelist intensity master 0..1.
     pub level: f32,
+    /// Fade progress is driven by a manual crossfader.
+    #[serde(default)]
+    pub manual: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ParkedChannel {
+    pub universe: u16,
+    pub channel: u16,
+    pub value: u8,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CmdLogLine {
+    pub text: String,
+    pub ok: bool,
+    pub msg: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ChaseRt {
+    pub id: u32,
+    pub running: bool,
+    pub step: u32,
+    pub bpm: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SpeedRt {
+    pub id: u32,
+    pub bpm: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TimelineRt {
+    pub id: u32,
+    pub running: bool,
+    pub t: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -1030,6 +1323,33 @@ pub struct Runtime {
     /// Active scene morph (a, b, t) if any.
     #[serde(default)]
     pub morph: Option<(u32, u32, f32)>,
+    /// Blind mode: the programmer is edited but not sent to the output.
+    #[serde(default)]
+    pub blind: bool,
+    /// Undo / redo steps available.
+    #[serde(default)]
+    pub undo: u16,
+    #[serde(default)]
+    pub redo: u16,
+    #[serde(default)]
+    pub parked: Vec<ParkedChannel>,
+    /// Last command-line results (newest last, ≤ 30).
+    #[serde(default)]
+    pub cmd_log: Vec<CmdLogLine>,
+    #[serde(default)]
+    pub chases: Vec<ChaseRt>,
+    #[serde(default)]
+    pub speed: Vec<SpeedRt>,
+    #[serde(default)]
+    pub timelines: Vec<TimelineRt>,
+    #[serde(default)]
+    pub macros_running: Vec<u32>,
+    /// Output test pattern running.
+    #[serde(default)]
+    pub testing: bool,
+    /// Fixtures currently being identified/located.
+    #[serde(default)]
+    pub identifying: Vec<u32>,
 }
 
 // ───────────────────────────── Fixture morph (exchange) ─────────────────────────────
@@ -1090,6 +1410,9 @@ pub enum Command {
         mode: RecordMode,
         label: String,
         release: bool,
+        /// Store palette links (refs) for attributes applied from palettes.
+        #[serde(default = "d_true")]
+        refs: bool,
     },
     // ── patch ──
     /// Adds `count` fixtures; `address: None` = first free address from universe start.
@@ -1118,7 +1441,7 @@ pub enum Command {
     /// Record a scene. `from_output`: snapshot what is currently rendered (cuelists + programmer + scenes);
     /// otherwise record the programmer. `fixtures: None` = every fixture that has values.
     /// `id: Some(n)` updates scene n (`merge`: keep untouched fixtures, otherwise replace).
-    SceneRecord { id: Option<u32>, name: String, from_output: bool, fixtures: Option<Vec<u32>>, merge: bool },
+    SceneRecord { id: Option<u32>, name: String, from_output: bool, fixtures: Option<Vec<u32>>, merge: bool, #[serde(default = "d_true")] refs: bool },
     SceneSave { scene: Scene },
     SceneRemove { id: u32 },
     /// Activate (`on`) with `fade_in` or release with `fade_out`.
@@ -1134,6 +1457,51 @@ pub enum Command {
     /// Replace the profile/mode of `ids`, keeping fixture ids so cues/scenes/palettes/groups survive.
     /// `repack`: re-address the fixtures consecutively from the first one's address.
     FixtureMorph { ids: Vec<u32>, profile: String, mode: String, repack: bool },
+    // ── programming (be-prog) ──
+    Undo,
+    Redo,
+    BlindSet { on: bool },
+    /// Load a cue's resulting look into the programmer (to edit it, then `CueUpdate`).
+    CueLoad { cuelist: u32, number: f64 },
+    /// Write the programmer into an existing cue. `refs`: keep palette links for attributes that came from palettes.
+    CueUpdate { cuelist: u32, number: f64, mode: UpdateMode, refs: bool },
+    /// Release parked channels (`None` = all). Parking is `DmxSet` with a value.
+    Unpark { universe: Option<u16>, channel: Option<u16> },
+    // ── playback (be-play) ──
+    ChaseSave { chase: Chase },
+    ChaseRemove { id: u32 },
+    ChaseRun { id: u32, on: bool },
+    ChaseBpm { id: u32, bpm: f32 },
+    ChaseTap { id: u32 },
+    /// Step the running chase manually (±n).
+    ChaseNudge { id: u32, delta: i32 },
+    SpeedSave { master: SpeedMaster },
+    SpeedRemove { id: u32 },
+    SpeedSet { id: u32, bpm: f32 },
+    SpeedTap { id: u32 },
+    /// Manual crossfade of the running fade: `Some(p)` drives progress 0..1, `None` returns to timed.
+    CuelistManual { cuelist: u32, progress: Option<f32> },
+    // ── automation (be-auto) ──
+    /// Command-line statement (see engine cmdline docs). Result lands in `Runtime.cmd_log`.
+    CommandLine { text: String },
+    MacroSave { r#macro: Macro },
+    MacroRemove { id: u32 },
+    MacroRun { id: u32 },
+    MacroStop { id: Option<u32> },
+    TimelineSave { timeline: Timeline },
+    TimelineRemove { id: u32 },
+    TimelineRun { id: u32, from: Option<f32> },
+    TimelineStop { id: u32 },
+    TimelineSeek { id: u32, t: f32 },
+    // ── data & network (be-data) ──
+    BackupCreate { label: String },
+    BackupRestore { id: String },
+    BackupDelete { id: String },
+    /// Re-send the Art-Net node list after an ArtPoll.
+    NodesScan,
+    OutputTest { mode: TestMode },
+    /// Locate a fixture: dimmer/colour to full, pan/tilt home, shutter open.
+    Identify { fixture: u32, on: bool },
     // ── cuelists ──
     CuelistSave { cuelist: Cuelist },
     CuelistRemove { id: u32 },
@@ -1194,6 +1562,41 @@ pub enum Command {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum TestMode {
+    Off,
+    /// Every channel of `universe` (`None` = all universes) at `level`.
+    Level { universe: Option<u16>, level: u8 },
+    /// A single channel walking through `universe` (`None` = all).
+    Chase { universe: Option<u16> },
+    Channel { universe: u16, channel: u16, level: u8 },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct BackupInfo {
+    pub id: String,
+    pub label: String,
+    /// Unix seconds.
+    pub at: u32,
+    /// `auto` | `manual`
+    pub kind: String,
+    pub size: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ArtNode {
+    pub ip: String,
+    pub name: String,
+    pub long_name: String,
+    /// Output port-addresses the node reports.
+    pub universes: Vec<u16>,
+    pub last_seen_ms: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct MidiPortInfo {
     pub name: String,
@@ -1225,6 +1628,10 @@ pub enum ServerMsg {
     Learned { source: Source },
     /// Saved shows list. Sent on connect and after save/delete.
     Shows { shows: Vec<ShowInfo> },
+    /// Show backups (auto + manual). Sent on connect and after changes.
+    Backups { items: Vec<BackupInfo> },
+    /// Art-Net nodes discovered via ArtPoll.
+    Nodes { nodes: Vec<ArtNode> },
     /// Native MIDI availability and port lists (`native=false` → the UI falls back to Web MIDI).
     MidiPorts { native: bool, inputs: Vec<MidiPortInfo>, outputs: Vec<MidiPortInfo> },
     /// Feedback MIDI to relay to a hardware output (the browser forwards it through Web MIDI).
