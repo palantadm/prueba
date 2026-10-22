@@ -90,6 +90,7 @@ impl Engine {
             ExecKind::Effect { effect } => self.effects_on.contains(effect) || self.effect_flash.contains(effect),
             ExecKind::Group { .. } => st.level > 0.0,
             ExecKind::Master { .. } => true,
+            ExecKind::Scene { .. } => false,
             ExecKind::Empty => false,
         }
     }
@@ -123,6 +124,7 @@ impl Engine {
     fn vc_state_of(&self, w: &VcWidget) -> (f32, bool) {
         let cont = is_continuous(w.kind);
         let (mut value, active) = match &w.action {
+            VcAction::Scene { .. } | VcAction::SceneMorph { .. } => (0.0, false),
             VcAction::Exec { exec, op } => match op {
                 VcOp::Level => {
                     let l = match self.show.executors.iter().find(|e| e.id == *exec).map(|e| &e.kind) {
@@ -306,6 +308,7 @@ impl Engine {
     fn vc_apply_state(&mut self, w: &VcWidget, on: bool, momentary: bool) -> Result<(), String> {
         self.dirty = true;
         match &w.action {
+            VcAction::Scene { .. } | VcAction::SceneMorph { .. } => Ok(()),
             VcAction::Exec { exec, op } => match op {
                 VcOp::Flash => self.set_flash(*exec, on),
                 VcOp::Level => {
@@ -409,6 +412,7 @@ impl Engine {
     fn vc_trigger(&mut self, w: &VcWidget) -> Result<(), String> {
         self.dirty = true;
         match &w.action {
+            VcAction::Scene { .. } | VcAction::SceneMorph { .. } => Ok(()),
             VcAction::Exec { exec, op } => match op {
                 VcOp::Go => self.exec_go(*exec),
                 VcOp::Back => self.exec_back(*exec),

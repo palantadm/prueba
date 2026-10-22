@@ -7,12 +7,13 @@ import type { Fixture } from "./Fixture";
 import type { FixtureProfile } from "./FixtureProfile";
 import type { Group } from "./Group";
 import type { Palette } from "./Palette";
+import type { Scene } from "./Scene";
 import type { Settings } from "./Settings";
 import type { Stage } from "./Stage";
 import type { UniverseCfg } from "./UniverseCfg";
 import type { VcPage } from "./VcPage";
 
-export type Show = { name: string, universes: Array<UniverseCfg>, fixtures: Array<Fixture>, groups: Array<Group>, palettes: Array<Palette>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
+export type Show = { name: string, universes: Array<UniverseCfg>, fixtures: Array<Fixture>, groups: Array<Group>, palettes: Array<Palette>, scenes: Array<Scene>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
 /**
  * Profiles imported into / customised in this show (merged over the built-in library).
  */

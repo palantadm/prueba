@@ -781,6 +781,9 @@ impl Engine {
                 self.touch();
             }
             SubscribeDmx { .. } => {}
+            // TODO(be-scene): implemented in step 2.
+            SceneRecord { .. } | SceneSave { .. } | SceneRemove { .. } | SceneGo { .. } | SceneSolo { .. } | SceneLevel { .. }
+            | SceneMorph { .. } | ScenesRelease | FixtureMorph { .. } => {}
             MidiEnable { output, name, enabled } => self.midi.set_enabled(output, &name, enabled)?,
             VcSave { pages } => self.vc_save(pages)?,
             VcPress { widget, down } => self.vc_press(widget, down)?,
@@ -1693,6 +1696,7 @@ impl Engine {
                     ExecKind::Effect { effect } => self.effects_on.contains(effect) || self.effect_flash.contains(effect),
                     ExecKind::Group { .. } => st.level > 0.0,
                     ExecKind::Master { .. } => true,
+                    ExecKind::Scene { .. } => false,
                     ExecKind::Empty => false,
                 };
                 let level = match &e.kind {
@@ -1737,6 +1741,8 @@ impl Engine {
             effects_running,
             outputs,
             inputs,
+            scenes: vec![],
+            morph: None,
             timecode: TimecodeRt { running: self.tc.running, frames, text: fmt_tc(frames, fps) },
             learn: self.learn,
             fps: self.fps,

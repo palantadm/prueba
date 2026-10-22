@@ -3,6 +3,7 @@ import type { CuelistRt } from "./CuelistRt";
 import type { ExecRt } from "./ExecRt";
 import type { InputStatus } from "./InputStatus";
 import type { OutputStatus } from "./OutputStatus";
+import type { SceneRt } from "./SceneRt";
 import type { TimecodeRt } from "./TimecodeRt";
 import type { VcState } from "./VcState";
 
@@ -22,4 +23,8 @@ fps: number,
 /**
  * Virtual console widget states.
  */
-vc: Array<VcState>, };
+vc: Array<VcState>, scenes: Array<SceneRt>, 
+/**
+ * Active scene morph (a, b, t) if any.
+ */
+morph: [number, number, number] | null, };
