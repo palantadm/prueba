@@ -82,7 +82,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &[
             &MenuItem::with_id(app, "open_data", "Abrir carpeta de datos", true, None::<&str>)?,
             &PredefinedMenuItem::separator(app)?,
-            &PredefinedMenuItem::quit(app, Some("Salir"))?,
+            &MenuItem::with_id(app, "quit", "Salir", true, Some("CmdOrCtrl+Q"))?,
         ],
     )?;
     let edit = Submenu::with_items(
@@ -127,6 +127,7 @@ fn on_menu(app: &AppHandle, id: &str) {
     let Some(net) = app.try_state::<Net>() else { return };
     let win = app.get_webview_window("main");
     match id {
+        "quit" => app.exit(0),
         "open_data" => {
             let _ = opener::open(&net.data_dir);
         }
