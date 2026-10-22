@@ -4,6 +4,7 @@ import { RoundedBoxGeometry } from "three/examples/jsm/geometries/RoundedBoxGeom
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { FixtureProfile } from "../types";
 import type { Plan } from "../lib/stage-dmx";
+import { NOZZLE_LOCAL, machineKind } from "./smoke";
 
 export type FixtureKind =
   | "moving-spot" | "moving-wash" | "moving-beam" | "scanner"
@@ -102,7 +103,7 @@ export function classify(prof: FixtureProfile | undefined, plan: Plan | null): F
   if (cat === "bar" || /\b(bar|strip|batten|tube)\b/.test(id)) return "bar";
   if (cat === "strobe" || /strobe/.test(id)) return "strobe";
   if (/blinder/.test(id)) return "blinder";
-  if (/fog|haze/.test(id)) return "fogger";
+  if (machineKind(prof) || /fog|haze/.test(id)) return "fogger";
   if (/fresnel/.test(id)) return "fresnel";
   if (/profile|ellips|source ?four|leko/.test(id)) return "profile";
   if (cat === "par" || cat === "wash" || cat === "spot" || cat === "beam" || cat === "effect") {
@@ -345,6 +346,30 @@ export function buildProcedural(kind: FixtureKind, prof: FixtureProfile | undefi
       lens = ln;
       lensR = H * 0.5;
       selC = [0, -0.06, 0]; selS = [W + 0.06, 0.16, H + 0.06];
+      break;
+    }
+    case "fogger": {
+      // smoke / haze machine: body + front nozzle (matches NOZZLE_LOCAL used by the simulation) + status LED
+      add(geo("fog-body", () => merge([
+        new RoundedBoxGeometry(0.5, 0.26, 0.32, 3, 0.03).translate(0, -0.13, 0),
+        ...[-0.18, -0.06, 0.06, 0.18].map((x) => new THREE.BoxGeometry(0.02, 0.012, 0.26).translate(x, 0.003, 0)),
+        new THREE.BoxGeometry(0.46, 0.03, 0.34).translate(0, -0.265, 0),
+      ])), M.dark);
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...NOZZLE_LOCAL.dir));
+      const noz = add(geo("fog-nozzle", () => { const c = new THREE.CylinderGeometry(0.032, 0.045, 0.1, 20); c.translate(0, 0.05, 0); return c; }), M.alu);
+      noz.position.set(NOZZLE_LOCAL.pos[0], NOZZLE_LOCAL.pos[1], NOZZLE_LOCAL.pos[2] - 0.02);
+      noz.quaternion.copy(q);
+      const led = new THREE.Mesh(geo("fog-led", () => { const c = new THREE.CircleGeometry(1, 16); return c; }), lensMat);
+      led.scale.setScalar(0.014);
+      led.position.set(0.19, -0.07, 0.1605);
+      root.add(led);
+      emissive.push(led);
+      const ln = new THREE.Object3D();
+      ln.position.set(...NOZZLE_LOCAL.pos);
+      root.add(ln);
+      lens = ln;
+      lensR = 0.03;
+      selC = [0, -0.14, 0.04]; selS = [0.56, 0.32, 0.4];
       break;
     }
     default: {

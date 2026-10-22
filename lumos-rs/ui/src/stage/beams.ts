@@ -2,12 +2,13 @@
 // Rendered in a separate (reduced-resolution) target and added onto the HDR scene before bloom.
 import * as THREE from "three";
 import { FullScreenQuad, Pass } from "three/examples/jsm/postprocessing/Pass.js";
+import { NOISE_GLSL, PHASE_GLSL, SMOKE_GLSL, smokeU } from "./smokeview";
 
-export interface BeamQuality { steps: number; scale: number; noise: number }
+export interface BeamQuality { steps: number; scale: number; noise: number; plume: number }
 export const BEAM_Q: Record<"low" | "med" | "high", BeamQuality> = {
-  low: { steps: 10, scale: 0.4, noise: 0 },
-  med: { steps: 14, scale: 0.55, noise: 1 },
-  high: { steps: 22, scale: 0.75, noise: 2 },
+  low: { steps: 10, scale: 0.4, noise: 0, plume: 0 },
+  med: { steps: 14, scale: 0.55, noise: 1, plume: 20 },
+  high: { steps: 22, scale: 0.75, noise: 2, plume: 32 },
 };
 
 /** Uniforms shared by every beam material (same object refs → updated once per frame). */
@@ -19,6 +20,7 @@ export const shared = {
   uSteps: { value: 14 },
   uNoise: { value: 1 },
   uHaze: { value: 0.35 },
+  ...smokeU,
 };
 
 const VERT = /* glsl */ `
@@ -32,19 +34,16 @@ void main(){
 const FRAG = /* glsl */ `
 precision highp float;
 uniform sampler2D uDepth; uniform vec2 uRes; uniform mat4 uInvProj; uniform float uTime;
-uniform float uSteps; uniform float uNoise; uniform float uHaze;
+uniform float uSteps; uniform float uNoise; uniform float uHaze; uniform float uSmokeGain;
 uniform vec3 uApex; uniform vec3 uAxis; uniform vec3 uRight; uniform vec3 uUp;
 uniform float uCos2; uniform float uTanOuter; uniform float uTanInner; uniform float uLen; uniform float uSoft; uniform float uAtten;
 uniform vec3 uColor; uniform float uInside;
 uniform sampler2D uGobo; uniform float uGoboOn; uniform float uGoboRot;
 varying vec3 vWorld;
 
-float hash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-float vnoise(vec3 x){
-  vec3 i = floor(x), f = fract(x); f = f*f*(3.0-2.0*f);
-  return mix(mix(mix(hash(i+vec3(0,0,0)), hash(i+vec3(1,0,0)), f.x), mix(hash(i+vec3(0,1,0)), hash(i+vec3(1,1,0)), f.x), f.y),
-             mix(mix(hash(i+vec3(0,0,1)), hash(i+vec3(1,0,1)), f.x), mix(hash(i+vec3(0,1,1)), hash(i+vec3(1,1,1)), f.x), f.y), f.z);
-}
+${NOISE_GLSL}
+${SMOKE_GLSL}
+${PHASE_GLSL}
 
 vec2 coneInterval(vec3 o, vec3 d){
   vec3 co = o - uApex;
@@ -84,7 +83,7 @@ void main(){
   tout = min(tout, tin + 60.0);
   float dt = (tout - tin) / uSteps;
   float jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-  float acc = 0.0;
+  float acc = 0.0; float Tb = 1.0;
   float k = uTanInner / uTanOuter;
   float edge0 = k * mix(0.97, 0.12, uSoft);
   float ca = cos(uGoboRot), sa = sin(uGoboRot);
@@ -114,11 +113,14 @@ void main(){
       float n = vnoise(np) * 0.65 + (uNoise > 1.5 ? vnoise(np * 2.3 + 7.0) * 0.35 : 0.35 * 0.5);
       hz = 0.45 + 1.1 * n;
     }
-    acc += prof * atten * g * hz;
+    float sm = uSmokeOn > 0.5 ? smokeAt(p) : 0.0;
+    float dens = uHaze * hz + uSmokeGain * sm;
+    acc += prof * atten * g * dens * Tb;
+    Tb *= exp(-sm * dt * 0.7);
   }
-  acc *= dt * uHaze;
+  acc *= dt * phaseHG(dot(uAxis, -d));
   vec3 col = uColor * acc;
-  gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = vec4(col, 0.0);
 }`;
 
 // Unit cone: apex at origin, base (radius 1) at y = -1, closed.
@@ -235,9 +237,9 @@ export class BeamPass extends Pass {
     this.mat = new THREE.ShaderMaterial({
       uniforms: { tBeam: { value: this.rt.texture } },
       vertexShader: "varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-      fragmentShader: "uniform sampler2D tBeam; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(tBeam, vUv).rgb, 1.0); }",
+      fragmentShader: "uniform sampler2D tBeam; varying vec2 vUv; void main(){ gl_FragColor = texture2D(tBeam, vUv); }",
       transparent: true, depthTest: false, depthWrite: false,
-      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+      blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
     });
     this.quad = new FullScreenQuad(this.mat);
   }

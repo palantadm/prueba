@@ -8,8 +8,9 @@ import type { Fixture, MediaKind, StageObject } from "../types";
 import {
   TEMPLATES, aimTool, camPreset, editFixture, editMode, editObject, editStage, effFixtures, effStage, gizmoMode,
   haze, hiddenObjs, nextObjectId, selObject, showBeams, showGrid, showLabels, showPools, snapOn, stats,
-  toggleHidden, workLight, bloomOn, quality, showAudience, showMannequin, venueMode, type CamPreset, type QualityPref, type VenueMode,
+  toggleHidden, workLight, bloomOn, smokeCurrents, smokeDebug, smokeDiss, smokeHvac, smokeInfo, smokeOpen, smokeSliceY, smokeVent, smokeWind, quality, showAudience, showMannequin, venueMode, type CamPreset, type QualityPref, type VenueMode,
 } from "./state";
+import { getSmoke } from "./smoke";
 import { hasStream, startCapture, stopCapture, streamVersion, uploadMedia } from "./media";
 
 export const leftOpen = signal(typeof window === "undefined" ? true : window.innerWidth > 1000);
@@ -56,6 +57,7 @@ export function Toolbar(props: { onFullscreen: () => void }) {
     <button class={`btn sm ${p.on ? "sel" : ""}`} title={p.title ? t(p.title) : undefined} aria-pressed={p.on} onClick={() => p.set(!p.on)}>{t(p.label)}</button>
   );
   return (
+    <>
     <div class="st-toolbar">
       <div class="st-group">
         <button class={`btn sm ${edit ? "sel" : ""}`} onClick={() => (editMode.value = true)} title={t("Edit stage")}>{t("Edit")}</button>
@@ -101,6 +103,7 @@ export function Toolbar(props: { onFullscreen: () => void }) {
           <span class="label">{t("Haze")}</span>
           <input type="range" min="0" max="1" step="0.01" value={haze.value} onInput={(e) => (haze.value = parseFloat((e.target as HTMLInputElement).value))} />
         </label>
+        <Tg on={smokeOpen.value} set={(v) => (smokeOpen.value = v)} label="Smoke" title="Smoke & haze simulation" />
       </div>
       <span class="sp" />
       {edit && (
@@ -112,6 +115,51 @@ export function Toolbar(props: { onFullscreen: () => void }) {
       <span class="st-hud mono" title={t("fps · draw calls · real lights")}>{stats.value.fps} fps · {stats.value.calls} dc · {stats.value.lights} L · {stats.value.q}</span>
       {stats.value.warn && <span class="st-warn" role="status" title={t("Pick a quality level to retry")}>⚠ {stats.value.warn}</span>}
       <button class="btn sm" onClick={props.onFullscreen} title={t("Fullscreen")}>⛶</button>
+    </div>
+    {smokeOpen.value && <SmokePanel />}
+    </>
+  );
+}
+
+function Seg<T extends string>(p: { value: T; set: (v: T) => void; opts: [T, string][] }) {
+  return (
+    <div class="st-seg" role="group">
+      {p.opts.map(([v, l]) => (
+        <button key={v} class={`btn sm ${p.value === v ? "sel" : ""}`} aria-pressed={p.value === v} onClick={() => p.set(v)}>{t(l)}</button>
+      ))}
+    </div>
+  );
+}
+
+/** Smoke / haze simulation controls (the sim itself lives in smoke.ts and is shared with the 2D plan). */
+export function SmokePanel() {
+  const info = smokeInfo.value;
+  const sm = getSmoke();
+  return (
+    <div class="st-smoke panel" role="dialog" aria-label={t("Smoke & haze simulation")}>
+      <div class="panel-head"><span class="grow">{t("Smoke & haze simulation")}</span><button class="btn ghost sm" aria-label={t("Close")} onClick={() => (smokeOpen.value = false)}>✕</button></div>
+      <div class="panel-body col" style={{ gap: 10 }}>
+        <div class="field"><label>{t("Air currents")}</label>
+          <Seg value={smokeCurrents.value} set={(v) => (smokeCurrents.value = v)} opts={[["off", "Off"], ["low", "Low"], ["med", "Medium"], ["high", "High"]]} /></div>
+        <div class="field"><label title={t("0° = towards the audience")}>{t("Wind direction")} · {smokeWind.value}°</label>
+          <input type="range" min="0" max="359" step="5" value={smokeWind.value} onInput={(e) => (smokeWind.value = parseInt((e.target as HTMLInputElement).value, 10))} /></div>
+        <div class="field"><label>{t("Air conditioning (HVAC)")}</label>
+          <Seg value={smokeHvac.value} set={(v) => (smokeHvac.value = v)} opts={[["none", "None"], ["down", "Down-draft"], ["up", "Up-draft"]]} /></div>
+        <div class="field"><label>{t("Dissipation")} · ×{smokeDiss.value.toFixed(2)}</label>
+          <input type="range" min="0.1" max="4" step="0.05" value={smokeDiss.value} onInput={(e) => (smokeDiss.value = parseFloat((e.target as HTMLInputElement).value))} /></div>
+        <label class="check"><input type="checkbox" checked={smokeVent.value} onChange={(e) => (smokeVent.value = (e.target as HTMLInputElement).checked)} />{t("Room vent open")}</label>
+        <div class="row">
+          <button class="btn sm" onClick={() => sm.purge()}>{t("Purge room")}</button>
+          <button class="btn sm danger" onClick={() => sm.reset()}>{t("Reset smoke")}</button>
+        </div>
+        <div class="field"><label>{t("Show density")}</label>
+          <Seg value={smokeDebug.value} set={(v) => (smokeDebug.value = v)} opts={[["off", "Off"], ["slice", "Slice"], ["volume", "Volume"]]} /></div>
+        {smokeDebug.value === "slice" && (
+          <div class="field"><label>{t("Slice height")} · {smokeSliceY.value.toFixed(1)} m</label>
+            <input type="range" min="0.1" max="7" step="0.1" value={smokeSliceY.value} onInput={(e) => (smokeSliceY.value = parseFloat((e.target as HTMLInputElement).value))} /></div>
+        )}
+        <div class="st-hint">{tp(info.machines, "{n} smoke machine patched", "{n} smoke machines patched")} · {t("Mean density")} {(info.mean * 100).toFixed(1)}% · {info.grid} · {info.stepMs.toFixed(1)} ms</div>
+      </div>
     </div>
   );
 }

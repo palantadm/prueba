@@ -98,7 +98,7 @@ function LayersPanel() {
   return (
     <div class="pl-pop" onPointerDown={(e) => e.stopPropagation()}>
       <div class="label">{t("Layers")}</div>
-      {chk("beams", "Beams")}{chk("footprints", "Footprints (floor)")}{chk("objects", "Stage objects")}{chk("grid", "Grid & rulers")}{chk("background", "Floor-plan image")}{chk("handles", "Aim handles")}
+      {chk("beams", "Beams")}{chk("smoke", "Smoke")}{chk("footprints", "Footprints (floor)")}{chk("objects", "Stage objects")}{chk("grid", "Grid & rulers")}{chk("background", "Floor-plan image")}{chk("handles", "Aim handles")}
     </div>
   );
 }

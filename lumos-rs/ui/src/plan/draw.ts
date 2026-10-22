@@ -7,6 +7,7 @@ import {
   D2R, apply, boxCorners, hull, niceStep, proj, toScreen, toScreenP, type Cam, type V3, type ViewKind,
 } from "./math";
 import type { Bg, LabelMode, Layers } from "./state";
+import { getSmoke } from "../stage/smoke";
 
 export interface DrawInput {
   ctx: CanvasRenderingContext2D;
@@ -66,6 +67,8 @@ export function drawFrame(d: DrawInput): DrawOut {
       if (poly) out.obj.push({ id: o.id, poly });
     }
   }
+
+  if (d.layers.smoke !== false) drawSmoke(d);
 
   // fixture geometry
   const obs = obstacles(d.stage);
@@ -540,4 +543,44 @@ export function fitCam(view: ViewKind, stage: Stage | null, fixtures: Fixture[],
   const bw = (u1 - u0 + pad * 2) || 1, bh = (v1 - v0 + pad * 2) || 1;
   const scale = Math.max(4, Math.min((w - 40) / bw, (h - 110) / bh));
   return { cx: (u0 + u1) / 2, cy: (v0 + v1) / 2 + (view === "plan" ? 0.2 : 0), scale, w, h };
+}
+
+// ── smoke layer: optical-depth projection of the shared smoke simulation ──
+let smokeCv: HTMLCanvasElement | null = null;
+let smokeKey = "";
+
+function drawSmoke(d: DrawInput) {
+  const sim = getSmoke();
+  const { ctx, cam, view, stage } = d;
+  if (stage) sim.setStageSize([stage.size[0], stage.size[1], stage.size[2]]);
+  sim.sync(d.fixtures, d.profiles, d.frames);
+  sim.update(d.time);
+  if (!sim.hasActivity() || sim.meanDensity < 1e-6) return;
+  const key = `${view}|${sim.version}|${sim.nx}x${sim.ny}x${sim.nz}`;
+  const pr = sim.projection(view);
+  if (!smokeCv) smokeCv = document.createElement("canvas");
+  if (key !== smokeKey || smokeCv.width !== pr.w || smokeCv.height !== pr.h) {
+    smokeCv.width = pr.w; smokeCv.height = pr.h;
+    const g = smokeCv.getContext("2d")!;
+    const img = g.createImageData(pr.w, pr.h);
+    const flip = view !== "plan"; // elevations: world y grows upwards, screen v downwards
+    for (let r = 0; r < pr.h; r++) {
+      const srcRow = flip ? pr.h - 1 - r : r;
+      for (let c = 0; c < pr.w; c++) {
+        const tau = pr.data[c + pr.w * srcRow];
+        const a = 1 - Math.exp(-0.5 * tau);
+        const o = (c + pr.w * r) * 4;
+        img.data[o] = 196; img.data[o + 1] = 210; img.data[o + 2] = 232; img.data[o + 3] = Math.min(255, a * 190);
+      }
+    }
+    g.putImageData(img, 0, 0);
+    smokeKey = key;
+  }
+  const [xa, ya] = toScreen(cam, pr.u0, view === "plan" ? pr.v0 : -pr.v1);
+  const [xb, yb] = toScreen(cam, pr.u1, view === "plan" ? pr.v1 : -pr.v0);
+  ctx.save();
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(smokeCv, xa, ya, xb - xa, yb - ya);
+  ctx.restore();
 }

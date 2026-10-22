@@ -19,9 +19,11 @@ import { applyTransform, buildRig, disposeRig, fxSig, updateRig, type Rig } from
 import { BEAM_Q, BeamPass, shared as beamShared } from "./beams";
 import { whiteTexture, goboTexture } from "./gobos";
 import { Venue } from "./venue";
+import { GRIDS, getSmoke } from "./smoke";
+import { SmokePlume, SmokeTexture, smokeU, type PlumeBeam } from "./smokeview";
 import {
   bloomOn, camPreset, gizmoMode, haze, quality, showAudience, showBeams, showGrid, showLabels, showMannequin, showPools, snapOn, stats,
-  venueMode, workLight, type CamPreset,
+  venueMode, workLight, smokeCurrents, smokeDebug, smokeDiss, smokeHvac, smokeInfo, smokeSliceY, smokeVent, smokeWind, type CamPreset,
 } from "./state";
 
 const D2R = Math.PI / 180;
@@ -59,6 +61,12 @@ export class StageScene {
   private venue = new Venue();
   private composer!: EffectComposer;
   private beamPass!: BeamPass;
+  private plume!: SmokePlume;
+  private smokeTex = new SmokeTexture();
+  private fxList: Fixture[] = [];
+  private profMap = new Map<string, FixtureProfile>();
+  private plumeBeams: PlumeBeam[] = [];
+  private plumeAmb = new THREE.Vector3();
   private bloom!: UnrealBloomPass;
   private fxaa!: ShaderPass;
   private q: Q = "med";
@@ -157,6 +165,8 @@ export class StageScene {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     this.beamPass = new BeamPass(this.camera);
     this.composer.addPass(this.beamPass);
+    this.plume = new SmokePlume(beamShared as unknown as Record<string, { value: unknown }>);
+    this.beamPass.scene.add(this.plume.mesh);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(4, 4), 0.4, 0.5, 1.0);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
@@ -263,6 +273,8 @@ export class StageScene {
   setFixtures(fixtures: Fixture[], library: FixtureProfile[]) {
     const seen = new Set<number>();
     const profs = new Map(library.map((p) => [p.id, p]));
+    this.fxList = fixtures;
+    this.profMap = profs;
     for (const fx of fixtures) {
       seen.add(fx.id);
       const prof = profs.get(fx.profile);
@@ -567,7 +579,6 @@ export class StageScene {
     });
 
     const hz = haze.value;
-    (this.scene.fog as THREE.FogExp2).density = hz * 0.006;
     beamShared.uHaze.value = 0.1 + hz * 0.95;
     beamShared.uTime.value = tSec;
     this.grid.visible = showGrid.value;
@@ -584,6 +595,8 @@ export class StageScene {
     this.activeBeams = active;
     this.beamPass.enabled = showBeams.value && this.degrade < 2;
     for (const rig of this.rigs.values()) for (const x of rig.extra) if (!x.mesh.parent) this.beamPass.scene.add(x.mesh);
+
+    this.stepSmoke(q, tSec, hz);
 
     if (this.frameN % 2 === 0) this.assignLights(qc.shadows);
     this.media.tick(now);
@@ -625,6 +638,42 @@ export class StageScene {
       }
     }
   };
+
+  /** Smoke: drive the shared simulation from DMX + show fixtures, upload density, feed the plume pass. */
+  private stepSmoke(q: Q, tSec: number, hz: number) {
+    const sim = getSmoke();
+    sim.setStageSize(this.stageSize);
+    sim.setGrid(GRIDS[this.degrade >= 1 ? "low" : q]);
+    sim.setCfg({ currents: smokeCurrents.value, windDir: smokeWind.value, hvac: smokeHvac.value, dissipation: smokeDiss.value, vent: smokeVent.value });
+    sim.sync(this.fxList, this.profMap, dmx);
+    sim.update(tSec, q === "high" ? 12 : q === "med" ? 10 : 8);
+    const dbg = smokeDebug.value;
+    const active = sim.hasActivity();
+    this.smokeTex.sync(sim, smokeU, active);
+    // scene fog thickens with the mean density of the room
+    (this.scene.fog as THREE.FogExp2).density = hz * 0.006 + Math.min(0.03, sim.meanDensity * 0.1);
+    const bq = this.degrade >= 1 ? BEAM_Q.low : BEAM_Q[q];
+    const plumeOn = this.degrade < 2 && ((active && bq.plume > 0) || (dbg !== "off" && sim.meanDensity > 0));
+    const lit = [...this.rigs.values()].filter((r) => r.score > 0.02 && r.beam.mesh.visible).sort((a, b) => b.score - a.score);
+    this.plumeBeams.length = 0;
+    let ar = 0, ag = 0, ab = 0;
+    for (const r of lit) {
+      const k = r.state.bright * 0.9;
+      ar += r.state.r * k; ag += r.state.g * k; ab += r.state.b * k;
+      if (this.plumeBeams.length < 8) {
+        this.plumeBeams.push({ apex: r.origin, axis: r.dir, tanOuter: Math.tan(r.halfAngle), len: 60, color: new THREE.Color(r.state.r * k, r.state.g * k, r.state.b * k) });
+      }
+    }
+    // diffuse fill: multiple scattering lifts the whole plume a little; work light shows it too
+    const fill = workLight.value ? 0.5 : 0.0;
+    const s = 0.012 / Math.sqrt(Math.max(1, lit.length));
+    this.plumeAmb.set(0.006 + fill + ar * s, 0.006 + fill + ag * s, 0.008 + fill + ab * s);
+    this.plume.update(sim, plumeOn, Math.max(8, bq.plume || 16), this.plumeBeams, this.plumeAmb, dbg === "volume" ? 2 : dbg === "slice" ? 1 : 0, smokeSliceY.value);
+    if (this.frameN % 30 === 0) {
+      const st = sim.stats();
+      smokeInfo.value = { machines: st.machines, mass: st.mass, mean: st.meanDensity, stepMs: st.stepMs, grid: st.grid.join("×") };
+    }
+  }
 
   private lastGizmo = "";
   private applyGizmoModeIfChanged() {
@@ -676,6 +725,8 @@ export class StageScene {
     this.media.dispose();
     this.venue.dispose();
     this.beamPass.dispose();
+    this.smokeTex.dispose();
+    this.plume.dispose();
     this.composer.dispose();
     this.renderer.dispose();
     el.remove();

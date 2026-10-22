@@ -19,6 +19,7 @@ export type GizmoMode = "translate" | "rotate" | "scale";
 export type CamPreset = "audience" | "top" | "side" | "iso" | "free";
 export type QualityPref = "auto" | "low" | "med" | "high";
 export type VenueMode = "blackbox" | "theatre" | "cyc" | "open";
+export type SmokeDebug = "off" | "slice" | "volume";
 
 export const editMode = persisted("edit", true);
 export const gizmoMode = signal<GizmoMode>("translate");
@@ -36,6 +37,17 @@ export const bloomOn = persisted("bloom", true);
 export const venueMode = persisted<VenueMode>("venue", "theatre");
 export const showAudience = persisted("audience", false);
 export const showMannequin = persisted("mannequin", false);
+
+// ── smoke / haze simulation ──
+export const smokeCurrents = persisted<"off" | "low" | "med" | "high">("smoke.currents", "med");
+export const smokeWind = persisted("smoke.wind", 0);
+export const smokeHvac = persisted<"none" | "down" | "up">("smoke.hvac", "none");
+export const smokeDiss = persisted("smoke.diss", 1);
+export const smokeVent = persisted("smoke.vent", false);
+export const smokeDebug = signal<SmokeDebug>("off");
+export const smokeSliceY = persisted("smoke.slice", 1.5);
+export const smokeOpen = signal(false);
+export const smokeInfo = signal({ machines: 0, mass: 0, mean: 0, stepMs: 0, grid: "" });
 export const selObject = signal<number | null>(null);
 export const hiddenObjs = persisted<number[]>("hidden", []);
 export const stats = signal({ fps: 0, calls: 0, lights: 0, q: "med" as string, warn: "" });

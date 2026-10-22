@@ -7,6 +7,7 @@ import { buildProcedural, classify, type FixtureKind, type FixtureModel } from "
 import { buildGdtfModel } from "./gdtf-model";
 import { BeamVisual } from "./beams";
 import { goboTexture, whiteTexture } from "./gobos";
+import { getSmoke, machineKind } from "./smoke";
 
 const D2R = Math.PI / 180;
 const NOOP = () => undefined;
@@ -38,6 +39,8 @@ export interface Rig {
   prof: FixtureProfile | undefined;
   sig: string;
   kind: FixtureKind;
+  /** smoke / haze machine: emits through the smoke simulation, never as a light beam */
+  machine: boolean;
   model: FixtureModel;
   info: BeamInfo | null;
   assets: string;
@@ -139,7 +142,7 @@ export function buildRig(fx: Fixture, prof: FixtureProfile | undefined): Rig {
   root.add(sel);
 
   const rig: Rig = {
-    fx, plan, prof, sig: fxSig(fx, prof), kind, model, info, assets, root, panG: model.pan, tiltG: model.tilt,
+    fx, plan, prof, sig: fxSig(fx, prof), kind, machine: !!machineKind(prof), model, info, assets, root, panG: model.pan, tiltG: model.tilt,
     beam, extra: [], lensMat, glow, pool, poolMesh, poolMat, label, sel,
     state: newState(), goboAngle: 0, origin: new THREE.Vector3(), dir: new THREE.Vector3(0, -1, 0), dist: 10, halfAngle: 0.2, score: 0, mapped: false,
   };
@@ -185,6 +188,17 @@ export function updateRig(rig: Rig, frame: Uint8Array | undefined, env: Env) {
   const plan = rig.plan;
   if (plan) decode(plan, rig.fx, frame, env.time, st);
   else { st.bright = 0; }
+  if (rig.machine) {
+    // no light beam: a status LED shows the machine output, the smoke itself comes from the simulation
+    const o = getSmoke().outputOf(rig.fx.id);
+    st.bright = 0;
+    rig.lensMat.color.setRGB(0.05 + o * 0.3, 0.12 + o * 3.2, 0.06 + o * 0.5);
+    rig.glow.visible = false; rig.beam.mesh.visible = false; rig.pool.visible = false; rig.score = 0;
+    rig.extra.forEach((x) => (x.mesh.visible = false));
+    rig.model.lens.getWorldPosition(rig.origin);
+    rig.label.visible = env.labels;
+    return;
+  }
   if (plan?.moving) {
     if (rig.panG) rig.panG.rotation.y = (st.pan - 0.5) * plan.panRange * D2R;
     if (rig.tiltG) rig.tiltG.rotation.x = (st.tilt - 0.5) * plan.tiltRange * D2R;

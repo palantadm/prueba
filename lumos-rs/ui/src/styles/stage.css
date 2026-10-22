@@ -57,3 +57,6 @@
 
 .st-sel { width: auto; min-height: 26px; padding: 0 6px; font-size: var(--fs-xs); }
 .st-warn { padding: 4px 8px; background: var(--live-dim); border: 1px solid var(--live); border-radius: var(--r-sm); font-size: var(--fs-xs); color: var(--live); max-width: 360px; }
+.st-smoke { position: absolute; top: 112px; right: var(--s-2); width: 280px; z-index: 6; box-shadow: var(--shadow-2); background: var(--bg-1); }
+.st-seg { display: flex; gap: 2px; }
+.st-seg .btn { flex: 1 1 0; }
