@@ -1,6 +1,6 @@
 import "../styles/vc.css";
 import { useEffect, useRef } from "preact/hooks";
-import { connected, rt, show, toast } from "../store";
+import { connected, midiPorts, rt, show, toast } from "../store";
 import { t } from "../i18n";
 import { initMidi, midiActivity, midiOutLog, midiOutEnabled, midiState } from "../midi";
 import { EmptyState, Segmented, Tabs, promptDialog, confirmDialog } from "../ui";
@@ -88,7 +88,9 @@ export function VConsole() {
   useEffect(() => { if (editing) ensureFirstPage(); }, [editing]);
   useEffect(() => { if (!pageId.value && pages[0]) pageId.value = pages[0].id; }, [pages.length]);
 
-  const midiHint = midiState.value === "idle" ? <button class="btn sm" onClick={() => initMidi()}>{t("Enable MIDI")}</button>
+  const nativeMidi = midiPorts.value?.native ? midiPorts.value : null;
+  const midiHint = nativeMidi ? (nativeMidi.outputs.some((o) => o.enabled) ? null : <span class="chip warn" title={t("Settings → MIDI → Output ports")}>{t("No MIDI output enabled for feedback")}</span>)
+    : midiState.value === "idle" ? <button class="btn sm" onClick={() => initMidi()}>{t("Enable MIDI")}</button>
     : midiState.value === "ready" && midiOutEnabled.value.length === 0 ? <span class="chip warn" title={t("Settings → MIDI → Output ports")}>{t("No MIDI output enabled for feedback")}</span> : null;
 
   return (

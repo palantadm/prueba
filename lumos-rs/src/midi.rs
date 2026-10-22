@@ -571,4 +571,85 @@ mod tests {
         assert!(h.set_enabled(false, "x", true).is_err());
         assert!(!h.ports().native);
     }
+
+    /// Loopback through ALSA/CoreMIDI virtual ports. Skipped when no MIDI sequencer exists
+    /// (containers without /dev/snd, CI without a MIDI service).
+    #[cfg(all(feature = "midi", unix))]
+    #[test]
+    fn loopback_through_virtual_ports() {
+        use midir::os::unix::{VirtualInput, VirtualOutput};
+        use std::time::{Duration, Instant};
+
+        let (Ok(mi), Ok(mo)) = (midir::MidiInput::new("lb-in"), midir::MidiOutput::new("lb-out")) else {
+            eprintln!("skipped: no MIDI sequencer available");
+            return;
+        };
+        let (got_tx, got_rx) = std::sync::mpsc::channel::<Vec<u8>>();
+        // "device" side: a virtual sink that records what the hub writes, and a virtual source we drive
+        let _sink = match mi.create_virtual("TestSink", move |_t, d, _| { let _ = got_tx.send(d.to_vec()); }, ()) {
+            Ok(c) => c,
+            Err(e) => { eprintln!("skipped: cannot create virtual input: {e}"); return; }
+        };
+        let mut src = match mo.create_virtual("TestPad") {
+            Ok(c) => c,
+            Err(e) => { eprintln!("skipped: cannot create virtual output: {e}"); return; }
+        };
+
+        let dir = std::env::temp_dir().join(format!("lumos-midi-lb-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (ev_tx, mut ev_rx) = tokio::sync::mpsc::unbounded_channel();
+        let hub = MidiHub::start(dir.clone(), ev_tx);
+        assert!(hub.native());
+
+        let wait = |f: &dyn Fn() -> bool| {
+            let t = Instant::now();
+            while t.elapsed() < Duration::from_secs(8) {
+                if f() { return true; }
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            false
+        };
+        // discover the hub's names for our virtual ports, then enable them
+        assert!(wait(&|| hub.ports().inputs.iter().any(|p| p.name.contains("TestPad"))));
+        assert!(wait(&|| hub.ports().outputs.iter().any(|p| p.name.contains("TestSink"))));
+        let in_name = hub.ports().inputs.iter().find(|p| p.name.contains("TestPad")).unwrap().name.clone();
+        let out_name = hub.ports().outputs.iter().find(|p| p.name.contains("TestSink")).unwrap().name.clone();
+        hub.set_enabled(false, &in_name, true).unwrap();
+        hub.set_enabled(true, &out_name, true).unwrap();
+        assert!(wait(&|| hub.ports().inputs.iter().any(|p| p.enabled)));
+
+        // input: device → IoEvent::Midi
+        let mut seen = false;
+        for _ in 0..40 {
+            src.send(&[0x90, 36, 100]).unwrap();
+            std::thread::sleep(Duration::from_millis(100));
+            while let Ok(ev) = ev_rx.try_recv() {
+                if let IoEvent::Midi { port, bytes } = ev {
+                    if port == in_name && bytes == vec![0x90, 36, 100] { seen = true; }
+                }
+            }
+            if seen { break; }
+        }
+        assert!(seen, "input bytes never reached the engine channel");
+
+        // output: feedback → device (port: None = every enabled output)
+        let mut delivered = false;
+        for _ in 0..40 {
+            if hub.send(None, &[0xB0, 7, 99]) {
+                if let Ok(d) = got_rx.recv_timeout(Duration::from_millis(200)) {
+                    if d == vec![0xB0, 7, 99] { delivered = true; break; }
+                }
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        assert!(delivered, "feedback never reached the virtual sink");
+        // a named port that is not enabled natively is NOT handled (browser relay keeps it)
+        assert!(!hub.send(Some("Launchpad nobody"), &[0x90, 1, 1]));
+
+        // persisted machine-level config
+        let cfg = MidiConfig::load(&dir);
+        assert!(cfg.inputs.contains(&in_name) && cfg.outputs.contains(&out_name));
+        drop(hub);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

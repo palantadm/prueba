@@ -1951,6 +1951,61 @@ mod tests {
     }
 
     #[test]
+    fn native_midi_events_follow_the_midi_in_path() {
+        let mut e = engine();
+        e.handle(Command::BindingSave {
+            binding: Binding {
+                id: 0,
+                label: String::new(),
+                enabled: true,
+                source: Source::Midi { port: None, kind: MidiKind::Cc, channel: Some(1), number: 7 },
+                action: Action::GrandMaster,
+                out_min: 0.0,
+                out_max: 1.0,
+            },
+        })
+        .unwrap();
+        // bytes from a native input arrive as IoEvent::Midi — same effect as Command::MidiIn
+        e.on_io(IoEvent::Midi { port: "Native Pad".into(), bytes: vec![0xB0, 7, 64] });
+        assert!((e.grand_master - 64.0 / 127.0).abs() < 1e-4);
+        // learn mode sees native input too
+        let mut rx = e.out.subscribe();
+        e.handle(Command::LearnStart { binding: None }).unwrap();
+        e.on_io(IoEvent::Midi { port: "Native Pad".into(), bytes: vec![0x90, 40, 100] });
+        let mut learned = false;
+        while let Ok(m) = rx.try_recv() {
+            if let Out::Json(j) = m {
+                learned |= matches!(serde_json::from_str::<ServerMsg>(&j), Ok(ServerMsg::Learned { .. }));
+            }
+        }
+        assert!(learned);
+    }
+
+    #[test]
+    fn midi_ports_message_and_enable_without_native_support() {
+        let mut e = engine();
+        // port-list change events are re-broadcast as ServerMsg::MidiPorts
+        let mut rx = e.out.subscribe();
+        e.on_io(IoEvent::MidiPorts { inputs: vec![], outputs: vec![] });
+        let mut got = None;
+        while let Ok(m) = rx.try_recv() {
+            if let Out::Json(j) = m {
+                if let Ok(ServerMsg::MidiPorts { native, .. }) = serde_json::from_str::<ServerMsg>(&j) {
+                    got = Some(native);
+                }
+            }
+        }
+        assert_eq!(got, Some(false)); // test engines use the inert hub
+        // the initial snapshot carries the port message too
+        let (r, mut rrx) = oneshot::channel();
+        e.on_in(EngineIn::Snapshot { reply: r });
+        let snap = rrx.try_recv().unwrap();
+        assert!(snap.iter().any(|j| j.contains("\"midi_ports\"")), "{snap:?}");
+        // enabling a port without native MIDI is a clean error, not a panic
+        assert!(e.handle(Command::MidiEnable { output: false, name: "x".into(), enabled: true }).is_err());
+    }
+
+    #[test]
     fn binding_edge_trigger_and_levels() {
         let mut e = engine();
         add(&mut e, "generic/dimmer", "1ch", 1);

@@ -24,6 +24,9 @@ const EXACT: Record<string, string> = {
   "Show name may only contain letters, digits, spaces and - _ . ( )": "El nombre del show solo puede contener letras, dígitos, espacios y - _ . ( )",
   "no serial port selected": "no hay puerto serie seleccionado",
   "built without usb support": "compilado sin soporte USB",
+  "Native MIDI is not available in this build": "El MIDI nativo no está disponible en esta versión",
+  "Port name required": "Se necesita el nombre del puerto",
+  "MIDI worker stopped": "El módulo MIDI se ha detenido",
 };
 
 const NOUN: Record<string, string> = {

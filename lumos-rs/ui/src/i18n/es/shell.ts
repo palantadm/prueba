@@ -394,4 +394,8 @@ export const shell: Record<string, string> = {
   "Shutter/Strobe": "Shutter/Strobe",
   "Speed": "Velocidad",
   "Control": "Control",
+  "MIDI controllers are read by the Lumos engine on this computer and work in any window or browser.": "El motor de Lumos lee los controladores MIDI de este equipo; funcionan en cualquier ventana o navegador.",
+  "Enabled ports reconnect automatically when plugged in again.": "Los puertos activados se reconectan solos al volver a enchufarlos.",
+  "Port enabled": "Puerto activado",
+  "Port disabled": "Puerto desactivado",
 };

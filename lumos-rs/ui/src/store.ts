@@ -2,7 +2,7 @@
 // The server is authoritative: the UI only sends Commands and renders what comes back.
 import { signal } from "@preact/signals";
 import { tErr } from "./i18n/errors";
-import type { Command, FixtureProfile, Runtime, ServerMsg, Show, ShowInfo, Source } from "./types";
+import type { Command, FixtureProfile, MidiPortInfo, Runtime, ServerMsg, Show, ShowInfo, Source } from "./types";
 
 export const connected = signal(false);
 export const show = signal<Show | null>(null);
@@ -36,6 +36,9 @@ const learnedListeners = new Set<(s: Source) => void>();
 let dmxSub: number[] | null | undefined = undefined; // remembered for reconnects
 
 /** Late-bound hooks so modules that import the store can receive server events without import cycles. */
+/** Server-side (native) MIDI ports. `native=false` → the UI uses Web MIDI instead. `null` until the server says. */
+export const midiPorts = signal<{ native: boolean; inputs: MidiPortInfo[]; outputs: MidiPortInfo[] } | null>(null);
+
 export const hooks: { midiOut?: (port: string | null, bytes: number[]) => void } = {};
 
 export function onLearned(cb: (s: Source) => void) {
@@ -92,6 +95,7 @@ function onMessage(ev: MessageEvent) {
     case "library": library.value = m.profiles; break;
     case "shows": shows.value = m.shows; break;
     case "learned": learnedListeners.forEach((f) => f(m.source)); break;
+    case "midi_ports": midiPorts.value = { native: m.native, inputs: m.inputs, outputs: m.outputs }; break;
     case "midi_out": hooks.midiOut?.(m.port, m.bytes); break;
     case "log":
       serverLog.value = [{ level: m.level, msg: m.msg, at: Date.now() }, ...serverLog.value].slice(0, 200);

@@ -1,8 +1,54 @@
 import { EmptyState, PageHead, StatusDot, Toggle } from "../../ui";
-import { initMidi, midiActivity, midiEnabled, midiError, midiOutEnabled, midiOutputs, midiPorts, midiRelay, midiState, sendMidi, setMidiEnabled, setMidiOutEnabled, setMidiRelay } from "../../midi";
+import { initMidi, midiActivity, midiEnabled, midiError, midiOutEnabled, midiOutputs, midiPorts as webPorts, midiRelay, midiState, sendMidi, setMidiEnabled, setMidiOutEnabled, setMidiRelay } from "../../midi";
 import { t } from "../../i18n";
+import { midiPorts, rt, send } from "../../store";
+import type { MidiPortInfo } from "../../types";
+
+function NativeMidiPage({ inputs, outputs }: { inputs: MidiPortInfo[]; outputs: MidiPortInfo[] }) {
+  const enable = (output: boolean, name: string, enabled: boolean) => send({ type: "midi_enable", output, name, enabled });
+  const recent = rt.value?.inputs.recent ?? [];
+  return (
+    <div class="page">
+      <PageHead title="MIDI" sub={t("MIDI controllers are read by the Lumos engine on this computer and work in any window or browser.")} />
+      <div class="page-body col" style={{ gap: 16 }}>
+        <div class="panel">
+          <div class="panel-head">{t("Input ports")}</div>
+          {inputs.length === 0 && <div class="panel-body dim">{t("No MIDI inputs detected. Plug in a controller — it appears here automatically.")}</div>}
+          {inputs.map((p) => (
+            <div class="vrow" key={p.name}>
+              <StatusDot state={p.enabled ? "ok" : "off"} title={p.enabled ? t("Port enabled") : t("Port disabled")} />
+              <span class="grow">{p.name}</span>
+              <Toggle checked={p.enabled} onChange={(on) => enable(false, p.name, on)} label={t("Forward to engine")} />
+            </div>
+          ))}
+        </div>
+        <div class="panel">
+          <div class="panel-head">{t("Output ports · controller feedback")}</div>
+          {outputs.length === 0 && <div class="panel-body dim">{t("No MIDI outputs detected.")}</div>}
+          {outputs.map((p) => (
+            <div class="vrow" key={p.name}>
+              <StatusDot state={p.enabled ? "ok" : "off"} title={p.enabled ? t("Port enabled") : t("Port disabled")} />
+              <span class="grow">{p.name}</span>
+              <Toggle checked={p.enabled} onChange={(on) => enable(true, p.name, on)} label={t("Send feedback")} />
+            </div>
+          ))}
+        </div>
+        <div class="faint" style={{ fontSize: "var(--fs-sm)" }}>{t("Enabled ports reconnect automatically when plugged in again.")}</div>
+        <div class="panel">
+          <div class="panel-head">{t("Activity")}</div>
+          <div class="mono scroll" style={{ maxHeight: 280, fontSize: "var(--fs-sm)" }}>
+            {recent.length === 0 ? <div class="panel-body faint">{t("Move a fader or press a pad on an enabled port…")}</div> :
+              recent.map((a, i) => <div key={i} class="vrow" style={{ height: 26 }}><span>{a}</span></div>)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function MidiPage() {
+  const nat = midiPorts.value;
+  if (nat?.native) return <NativeMidiPage inputs={nat.inputs} outputs={nat.outputs} />;
   const st = midiState.value;
   return (
     <div class="page">
@@ -15,8 +61,8 @@ export function MidiPage() {
         {st === "ready" && (
           <div class="panel">
             <div class="panel-head">{t("Input ports")}</div>
-            {midiPorts.value.length === 0 && <div class="panel-body dim">{t("No MIDI inputs detected. Plug in a controller — it appears here automatically.")}</div>}
-            {midiPorts.value.map((p) => (
+            {webPorts.value.length === 0 && <div class="panel-body dim">{t("No MIDI inputs detected. Plug in a controller — it appears here automatically.")}</div>}
+            {webPorts.value.map((p) => (
               <div class="vrow" key={p.id}>
                 <StatusDot state={p.connected ? "ok" : "off"} title={p.connected ? t("connected") : t("disconnected")} />
                 <span class="grow">{p.name} <span class="faint">{p.manufacturer}</span></span>
