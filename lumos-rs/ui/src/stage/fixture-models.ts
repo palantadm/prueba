@@ -349,19 +349,39 @@ export function buildProcedural(kind: FixtureKind, prof: FixtureProfile | undefi
       break;
     }
     case "fogger": {
-      // smoke / haze machine: body + front nozzle (matches NOZZLE_LOCAL used by the simulation) + status LED
-      add(geo("fog-body", () => merge([
-        new RoundedBoxGeometry(0.5, 0.26, 0.32, 3, 0.03).translate(0, -0.13, 0),
-        ...[-0.18, -0.06, 0.06, 0.18].map((x) => new THREE.BoxGeometry(0.02, 0.012, 0.26).translate(x, 0.003, 0)),
-        new THREE.BoxGeometry(0.46, 0.03, 0.34).translate(0, -0.265, 0),
-      ])), M.dark);
+      // smoke / haze / low-fog machine: readable body + chrome nozzle aimed exactly like the simulation's nozzle + status LED
+      const mk = machineKind(prof) ?? "fog";
+      const bodyM = new THREE.MeshStandardMaterial({ color: "#6a707b", roughness: 0.42, metalness: 0.7 });
+      const trimM = new THREE.MeshStandardMaterial({ color: "#1b1d22", roughness: 0.6, metalness: 0.4 });
+      own.push(bodyM, trimM);
+      if (mk === "low") {
+        // vertical tank with a wide hose outlet
+        add(geo("low-tank", () => merge([lathe([[0, 0], [0.2, 0], [0.22, -0.03], [0.22, -0.46], [0.2, -0.5], [0.0, -0.5]], 36), ring(0.225, 0.02, -0.12, 36), ring(0.225, 0.02, -0.34, 36)])), bodyM);
+        add(geo("low-lid", () => lathe([[0, 0.0], [0.21, 0.0], [0.19, 0.04], [0.0, 0.05]], 28)), trimM, root, 0, 0.0, 0);
+      } else if (mk === "haze") {
+        add(geo("haze-body", () => merge([
+          new RoundedBoxGeometry(0.44, 0.3, 0.32, 4, 0.045).translate(0, -0.15, 0),
+          ...[-0.15, -0.05, 0.05, 0.15].map((x) => new THREE.BoxGeometry(0.018, 0.012, 0.24).translate(x, 0.004, 0)),
+          new THREE.TorusGeometry(0.11, 0.012, 8, 28).translate(0, -0.16, 0.165),
+        ])), bodyM);
+        add(geo("haze-grille", () => { const g = new THREE.CircleGeometry(0.1, 28); g.translate(0, -0.16, 0.162); return g; }), trimM);
+      } else {
+        add(geo("fog-body2", () => merge([
+          new RoundedBoxGeometry(0.54, 0.27, 0.36, 4, 0.04).translate(0, -0.135, 0),
+          ...[-0.2, -0.1, 0, 0.1, 0.2].map((x) => new THREE.BoxGeometry(0.02, 0.012, 0.28).translate(x, 0.004, 0)),
+          new THREE.TorusGeometry(0.06, 0.012, 8, 16, Math.PI).rotateY(Math.PI / 2).translate(0.275, -0.1, 0),
+          new THREE.TorusGeometry(0.06, 0.012, 8, 16, Math.PI).rotateY(-Math.PI / 2).translate(-0.275, -0.1, 0),
+          new THREE.BoxGeometry(0.5, 0.025, 0.38).translate(0, -0.265, 0),
+        ])), bodyM);
+        add(geo("fog-cap", () => { const c = new THREE.CylinderGeometry(0.045, 0.05, 0.03, 20); c.translate(-0.15, 0.015, -0.05); return c; }), trimM);
+      }
       const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...NOZZLE_LOCAL.dir));
-      const noz = add(geo("fog-nozzle", () => { const c = new THREE.CylinderGeometry(0.032, 0.045, 0.1, 20); c.translate(0, 0.05, 0); return c; }), M.alu);
-      noz.position.set(NOZZLE_LOCAL.pos[0], NOZZLE_LOCAL.pos[1], NOZZLE_LOCAL.pos[2] - 0.02);
+      const noz = add(geo(`noz-${mk}`, () => { const c = mk === "low" ? new THREE.CylinderGeometry(0.06, 0.075, 0.2, 24, 1, true) : new THREE.CylinderGeometry(0.028, 0.05, 0.12, 24); c.translate(0, 0.06, 0); return c; }), M.chrome);
+      noz.position.set(NOZZLE_LOCAL.pos[0], NOZZLE_LOCAL.pos[1], NOZZLE_LOCAL.pos[2] - 0.03);
       noz.quaternion.copy(q);
-      const led = new THREE.Mesh(geo("fog-led", () => { const c = new THREE.CircleGeometry(1, 16); return c; }), lensMat);
-      led.scale.setScalar(0.014);
-      led.position.set(0.19, -0.07, 0.1605);
+      const led = new THREE.Mesh(geo("fog-led", () => new THREE.CircleGeometry(1, 16)), lensMat);
+      led.scale.setScalar(0.015);
+      led.position.set(0.17, -0.06, 0.1815);
       root.add(led);
       emissive.push(led);
       const ln = new THREE.Object3D();
@@ -369,7 +389,8 @@ export function buildProcedural(kind: FixtureKind, prof: FixtureProfile | undefi
       root.add(ln);
       lens = ln;
       lensR = 0.03;
-      selC = [0, -0.14, 0.04]; selS = [0.56, 0.32, 0.4];
+      selC = mk === "low" ? [0, -0.25, 0] : [0, -0.14, 0.04];
+      selS = mk === "low" ? [0.5, 0.6, 0.5] : [0.6, 0.34, 0.44];
       break;
     }
     default: {

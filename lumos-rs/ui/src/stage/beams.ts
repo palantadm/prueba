@@ -6,7 +6,7 @@ import { NOISE_GLSL, PHASE_GLSL, SMOKE_GLSL, smokeU } from "./smokeview";
 
 export interface BeamQuality { steps: number; scale: number; noise: number; plume: number }
 export const BEAM_Q: Record<"low" | "med" | "high", BeamQuality> = {
-  low: { steps: 10, scale: 0.4, noise: 0, plume: 0 },
+  low: { steps: 10, scale: 0.4, noise: 0, plume: 12 },
   med: { steps: 14, scale: 0.55, noise: 1, plume: 20 },
   high: { steps: 22, scale: 0.75, noise: 2, plume: 32 },
 };
@@ -97,12 +97,14 @@ void main(){
     vec3 rv = q - h * uAxis;
     float R = h * uTanOuter;
     float s = length(rv) / R;
-    if (s >= 1.0) continue;
-    float prof = 1.0 - smoothstep(edge0, 1.0, s);
-    prof = prof * prof * (1.5 - 0.5 * prof);
+    // crisp core + soft scattered halo beyond the field edge (Tyndall glow around the shaft)
+    float prof;
+    if (s < 1.0) { prof = 1.0 - smoothstep(edge0, 1.0, s); prof = prof * prof * (1.5 - 0.5 * prof); }
+    else if (s < 1.5) { prof = 0.14 * exp(-(s - 1.0) * 6.5); }
+    else continue;
     float atten = smoothstep(0.0, 0.35, h) / (1.0 + h * h * uAtten);
     float g = 1.0;
-    if (uGoboOn > 0.5) {
+    if (uGoboOn > 0.5 && s < 1.0) {
       vec2 uv = vec2(dot(rv, uRight), dot(rv, uUp)) / R;
       uv = vec2(ca * uv.x - sa * uv.y, sa * uv.x + ca * uv.y) * 0.5 + 0.5;
       g = mix(0.12, 1.0, texture2D(uGobo, uv).r);
@@ -185,7 +187,7 @@ export class BeamVisual {
   update(p: BeamParams, camPos: THREE.Vector3) {
     const u = this.mat.uniforms;
     const half = THREE.MathUtils.degToRad(Math.max(0.5, p.fieldAngle) / 2);
-    const halfProxy = Math.min(1.45, half * 1.12 + 0.01);
+    const halfProxy = Math.min(1.5, half * 1.55 + 0.012);
     const tp = Math.tan(halfProxy);
     u.uApex.value.copy(p.apex);
     u.uAxis.value.copy(p.axis);

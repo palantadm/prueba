@@ -644,30 +644,30 @@ export class StageScene {
     const sim = getSmoke();
     sim.setStageSize(this.stageSize);
     sim.setGrid(GRIDS[this.degrade >= 1 ? "low" : q]);
+    sim.setFine(this.degrade >= 2 ? 0 : q === "high" ? 0.14 : q === "med" ? 0.22 : 0.38);
     sim.setCfg({ currents: smokeCurrents.value, windDir: smokeWind.value, hvac: smokeHvac.value, dissipation: smokeDiss.value, vent: smokeVent.value });
     sim.sync(this.fxList, this.profMap, dmx);
     sim.update(tSec, q === "high" ? 12 : q === "med" ? 10 : 8);
     const dbg = smokeDebug.value;
     const active = sim.hasActivity();
     this.smokeTex.sync(sim, smokeU, active);
-    // scene fog thickens with the mean density of the room
-    (this.scene.fog as THREE.FogExp2).density = hz * 0.006 + Math.min(0.03, sim.meanDensity * 0.1);
+    // Haze is only visible where light passes through it: no scene-fog lift, no uniform tint.
+    (this.scene.fog as THREE.FogExp2).density = hz * 0.006;
     const bq = this.degrade >= 1 ? BEAM_Q.low : BEAM_Q[q];
     const plumeOn = this.degrade < 2 && ((active && bq.plume > 0) || (dbg !== "off" && sim.meanDensity > 0));
     const lit = [...this.rigs.values()].filter((r) => r.score > 0.02 && r.beam.mesh.visible).sort((a, b) => b.score - a.score);
     this.plumeBeams.length = 0;
-    let ar = 0, ag = 0, ab = 0;
     for (const r of lit) {
+      if (this.plumeBeams.length >= 12) break;
       const k = r.state.bright * 0.9;
-      ar += r.state.r * k; ag += r.state.g * k; ab += r.state.b * k;
-      if (this.plumeBeams.length < 8) {
-        this.plumeBeams.push({ apex: r.origin, axis: r.dir, tanOuter: Math.tan(r.halfAngle), len: 60, color: new THREE.Color(r.state.r * k, r.state.g * k, r.state.b * k) });
-      }
+      const hit = new THREE.Vector3();
+      let bounce = 0;
+      if (r.dir.y < -0.05 && r.origin.y > 0.05) { hit.copy(r.origin).addScaledVector(r.dir, r.origin.y / -r.dir.y); bounce = Math.min(1, k); } else hit.copy(r.origin).addScaledVector(r.dir, 30);
+      this.plumeBeams.push({ apex: r.origin, axis: r.dir, tanOuter: Math.tan(r.halfAngle), len: 60, color: new THREE.Color(r.state.r * k, r.state.g * k, r.state.b * k), hit, bounce });
     }
-    // diffuse fill: multiple scattering lifts the whole plume a little; work light shows it too
-    const fill = workLight.value ? 0.5 : 0.0;
-    const s = 0.012 / Math.sqrt(Math.max(1, lit.length));
-    this.plumeAmb.set(0.006 + fill + ar * s, 0.006 + fill + ag * s, 0.008 + fill + ab * s);
+    // only the work light lights smoke "for free"; stage light must reach the smoke to show it
+    const fill = workLight.value ? 0.35 : 0.0;
+    this.plumeAmb.set(fill, fill, fill * 1.05);
     this.plume.update(sim, plumeOn, Math.max(8, bq.plume || 16), this.plumeBeams, this.plumeAmb, dbg === "volume" ? 2 : dbg === "slice" ? 1 : 0, smokeSliceY.value);
     if (this.frameN % 30 === 0) {
       const st = sim.stats();

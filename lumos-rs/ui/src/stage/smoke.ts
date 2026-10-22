@@ -54,15 +54,17 @@ interface KindParams {
   dV: number;
   /** drift speed of dense smoke in the grid (+ up), m/s */
   gridBuoy: number;
+  /** relative puff emission rate */
+  puffs: number;
 }
 
 export const KIND: Record<SmokeKind, KindParams> = {
   // heated glycol: dense and hot — rises in a jet, then cools, spreads and sinks slightly; thins out in 1–3 min
-  fog: { rate: 5.0, jet: 3.2, spread: 0.2, buoy0: 1.5, buoyInf: -0.22, cool: 5, drag: 0.9, depTau: 2.4, halfLife: 80, dH: 0.04, dV: 0.03, gridBuoy: -0.012 },
+  fog: { rate: 5.0, jet: 3.0, spread: 0.3, buoy0: 1.2, buoyInf: -0.22, cool: 5, drag: 0.9, depTau: 2.4, halfLife: 80, dH: 0.04, dV: 0.03, gridBuoy: -0.012, puffs: 1.5 },
   // oil / glycol haze: very fine, neutrally buoyant, builds an even layer that lingers for 10–20 min
-  haze: { rate: 0.9, jet: 1.1, spread: 0.38, buoy0: 0.12, buoyInf: 0.004, cool: 3, drag: 1.3, depTau: 1.6, halfLife: 540, dH: 0.11, dV: 0.08, gridBuoy: 0.004 },
+  haze: { rate: 0.9, jet: 1.1, spread: 0.38, buoy0: 0.12, buoyInf: 0.004, cool: 3, drag: 1.3, depTau: 1.6, halfLife: 540, dH: 0.11, dV: 0.08, gridBuoy: 0.004, puffs: 0.9 },
   // dry-ice / chilled low fog: heavy, hugs the floor and flows like a liquid
-  low: { rate: 4.0, jet: 1.3, spread: 0.5, buoy0: -0.5, buoyInf: -0.9, cool: 1, drag: 1.0, depTau: 1.8, halfLife: 55, dH: 0.12, dV: 0.004, gridBuoy: -0.12 },
+  low: { rate: 4.0, jet: 1.3, spread: 0.5, buoy0: -0.5, buoyInf: -0.9, cool: 1, drag: 1.0, depTau: 1.8, halfLife: 55, dH: 0.12, dV: 0.004, gridBuoy: -0.12, puffs: 1.2 },
 };
 const SPECIES: SmokeKind[] = ["fog", "haze", "low"];
 
@@ -140,11 +142,32 @@ function vnoise(x: number, y: number, z: number): number {
   return y0 + (y1 - y0) * fz;
 }
 
+/** Same swirl with the amplitude normalisation used by the room air field. */
+function curl3s(X: number, Y: number, Z: number, e: number): [number, number, number] {
+  const c = curl3(X, Y, Z, e);
+  const k = 2 * e;
+  return [c[0] * k, c[1] * k, c[2] * k];
+}
+
+/** Curl of a vector value-noise potential (divergence-free swirl), ~±0.35 magnitude. */
+function curl3(X: number, Y: number, Z: number, e: number): [number, number, number] {
+  const dPzdy = vnoise(X + 11, Y + e, Z + 3) - vnoise(X + 11, Y - e, Z + 3);
+  const dPydz = vnoise(X + 5, Y + 7, Z + e) - vnoise(X + 5, Y + 7, Z - e);
+  const dPxdz = vnoise(X, Y, Z + e + 20) - vnoise(X, Y, Z - e + 20);
+  const dPzdx = vnoise(X + e + 11, Y, Z + 3) - vnoise(X - e + 11, Y, Z + 3);
+  const dPydx = vnoise(X + e + 5, Y + 7, Z) - vnoise(X - e + 5, Y + 7, Z);
+  const dPxdy = vnoise(X, Y + e, Z + 20) - vnoise(X, Y - e, Z + 20);
+  const k = 1 / (2 * e);
+  return [(dPzdy - dPydz) * k, (dPxdz - dPzdx) * k * 0.6, (dPydx - dPxdy) * k];
+}
+
 const AMP: Record<Currents, number> = { off: 0, low: 0.05, med: 0.12, high: 0.26 };
 /** Eddy (turbulent mixing) diffusivity of the room air, m²/s — stirs fog/haze into an even layer over minutes. */
 const EDDY: Record<Currents, number> = { off: 0.01, low: 0.08, med: 0.2, high: 0.5 };
-const MAX_PART = 2600;
+const MAX_PART = 7000;
 const PART_RATE = 46;
+/** puff lifetime: they stay visible as fine billows for a long time before melting into the room-scale grid */
+const LIFE = 26;
 const B = 4; // ambient-air block size in cells
 
 interface Machine {
@@ -165,6 +188,7 @@ export interface SmokeStats {
   emitted: number[];
   massFog: number;
   massHaze: number;
+  fineMass: number;
   massLow: number;
   maxDensity: number;
   meanDensity: number;
@@ -199,6 +223,14 @@ export class SmokeSim {
   private tinv = new Float64Array(96);
   private tdp = new Float64Array(96);
   private starts = new Map<string, number[]>();
+
+  // fine "puff" field: the particles splatted as gaussians at ~0.1–0.2 m resolution (billows, wisps)
+  fine = new Float32Array(0);
+  fnx = 0; fny = 0; fnz = 0;
+  fmin: [number, number, number] = [-7, 0, -4.5];
+  fsize: [number, number, number] = [14, 6, 11.5];
+  private fineVoxel = 0;
+  fineVersion = 0;
   private machines = new Map<number, Machine>();
   private rnd = mulberry32(1234);
   private purgeLeft = 0;
@@ -256,15 +288,87 @@ export class SmokeSim {
     const size: [number, number, number] = [W + 5, H + 1.5, D + 0.6 + 7];
     if (min.every((v, i) => Math.abs(v - this.min[i]) < 1e-6) && size.every((v, i) => Math.abs(v - this.size[i]) < 1e-6)) return;
     this.min = min; this.size = size;
+    this.fmin = [-(W / 2 + 1), 0, -D / 2 - 0.5];
+    this.fsize = [W + 2, H, D + 3.5];
+    this.fineVoxel = -1; // force re-allocation on the next setFine()
     this.reset();
   }
 
   setCfg(c: Partial<SmokeCfg>) { this.cfg = { ...this.cfg, ...c }; }
 
+  /** Enable the fine puff field with the given voxel size in metres (0 = off). */
+  setFine(voxel: number) {
+    if (voxel === this.fineVoxel) return;
+    this.fineVoxel = voxel;
+    if (voxel <= 0) { this.fine = new Float32Array(0); this.fnx = this.fny = this.fnz = 0; this.fineVersion++; return; }
+    this.fnx = Math.min(160, Math.max(8, Math.ceil(this.fsize[0] / voxel)));
+    this.fny = Math.min(100, Math.max(8, Math.ceil(this.fsize[1] / voxel)));
+    this.fnz = Math.min(160, Math.max(8, Math.ceil(this.fsize[2] / voxel)));
+    this.fine = new Float32Array(this.fnx * this.fny * this.fnz);
+    this.rebuildFine();
+  }
+  get fineOn() { return this.fine.length > 0; }
+
+  private rebuildFine() {
+    if (!this.fine.length) return;
+    const { fnx, fny, fnz } = this;
+    const f = this.fine;
+    f.fill(0);
+    const dx = this.fsize[0] / fnx, dy = this.fsize[1] / fny, dz = this.fsize[2] / fnz;
+    const vol = dx * dy * dz;
+    const wx = new Float32Array(9), wy = new Float32Array(9), wz = new Float32Array(9);
+    for (let i = 0; i < this.np; i++) {
+      const m = this.pm[i];
+      if (m < 1e-6) continue;
+      const age = this.pa[i];
+      // puffs expand as they age (entrainment): ~0.12 m at the nozzle → 0.45 m
+      const sg = Math.min(0.45, 0.12 + 0.11 * Math.pow(age, 0.8));
+      const gx = (this.px[i] - this.fmin[0]) / dx - 0.5, gy = (this.py[i] - this.fmin[1]) / dy - 0.5, gz = (this.pz[i] - this.fmin[2]) / dz - 0.5;
+      const rx = Math.min(4, Math.ceil((2 * sg) / dx)), ry = Math.min(4, Math.ceil((2 * sg) / dy)), rz = Math.min(4, Math.ceil((2 * sg) / dz));
+      const cx = Math.round(gx), cy = Math.round(gy), cz = Math.round(gz);
+      let sx = 0, sy = 0, sz = 0;
+      for (let k = -rx; k <= rx; k++) { const d = (cx + k - gx) * dx; const w = Math.exp(-(d * d) / (2 * sg * sg)); wx[k + rx] = w; sx += w; }
+      for (let k = -ry; k <= ry; k++) { const d = (cy + k - gy) * dy; const w = Math.exp(-(d * d) / (2 * sg * sg)); wy[k + ry] = w; sy += w; }
+      for (let k = -rz; k <= rz; k++) { const d = (cz + k - gz) * dz; const w = Math.exp(-(d * d) / (2 * sg * sg)); wz[k + rz] = w; sz += w; }
+      const q = m / (vol * sx * sy * sz);
+      for (let a = -rz; a <= rz; a++) {
+        const z = cz + a; if (z < 0 || z >= fnz) continue;
+        for (let b = -ry; b <= ry; b++) {
+          const y = cy + b; if (y < 0 || y >= fny) continue;
+          const wzy = q * wz[a + rz] * wy[b + ry];
+          const o = fnx * (y + fny * z);
+          for (let c = -rx; c <= rx; c++) {
+            const x = cx + c; if (x < 0 || x >= fnx) continue;
+            f[o + x] += wzy * wx[c + rx];
+          }
+        }
+      }
+    }
+    this.fineVersion++;
+  }
+
+  /** Fine puff density at a world position (0 outside the fine volume). */
+  fineAt(x: number, y: number, z: number): number {
+    if (!this.fine.length) return 0;
+    const gx = ((x - this.fmin[0]) / this.fsize[0]) * this.fnx - 0.5, gy = ((y - this.fmin[1]) / this.fsize[1]) * this.fny - 0.5, gz = ((z - this.fmin[2]) / this.fsize[2]) * this.fnz - 0.5;
+    if (gx < -1 || gy < -1 || gz < -1 || gx > this.fnx || gy > this.fny || gz > this.fnz) return 0;
+    return trilinear(this.fine, this.fnx, this.fny, this.fnz, gx, gy, gz);
+  }
+
+  fillFineTexture(out: Uint8Array, dmax = 3) {
+    const n = this.fine.length, k = 1 / dmax;
+    for (let i = 0; i < n; i++) {
+      const d = this.fine[i] * k;
+      out[i] = d <= 0 ? 0 : d >= 1 ? 255 : (Math.sqrt(d) * 255 + 0.5) | 0;
+    }
+  }
+
   reset() {
     for (const f of this.f) f.fill(0);
     this.mass = [0, 0, 0];
     this.np = 0;
+    this.fine.fill(0);
+    this.fineVersion++;
     this.purgeLeft = 0;
     for (const m of this.machines.values()) { m.out = 0; m.onTime = 0; m.acc = 0; }
     this.version++;
@@ -389,6 +493,7 @@ export class SmokeSim {
     const h = dt / ns;
     for (let i = 0; i < ns; i++) { this.machinesStep(h); this.particlesStep(h); }
     this.gridStep(dt);
+    this.rebuildFine();
     if (this.purgeLeft > 0) this.purgeLeft = Math.max(0, this.purgeLeft - dt);
     this.time += dt;
     this.version++;
@@ -404,9 +509,9 @@ export class SmokeSim {
       if (m.out < 0.015) continue;
       // pressure burst when the pump kicks in
       const burst = 1 + 0.7 * Math.exp(-m.onTime / 1.4);
-      m.acc += PART_RATE * h * Math.min(1.2, m.out + 0.15);
+      m.acc += PART_RATE * kp.puffs * h * Math.min(1.2, m.out + 0.15);
       const sp = SPECIES.indexOf(m.kind);
-      const mq = (kp.rate * m.out * burst * h) / Math.max(1e-6, PART_RATE * h * Math.min(1.2, m.out + 0.15));
+      const mq = (kp.rate * m.out * burst * h) / Math.max(1e-6, PART_RATE * kp.puffs * h * Math.min(1.2, m.out + 0.15));
       while (m.acc >= 1 && this.np < MAX_PART) {
         m.acc -= 1;
         const i = this.np++;
@@ -448,8 +553,14 @@ export class SmokeSim {
       this.vx[i] = amb[0] + (this.vx[i] - amb[0]) * k;
       this.vy[i] = amb[1] + (this.vy[i] - amb[1]) * k;
       this.vz[i] = amb[2] + (this.vz[i] - amb[2]) * k;
+      // billowing: curl-noise eddies (~1 m) swirl the puffs once they leave the nozzle
+      if (age > 0.25) {
+        const ek = Math.min(1, (age - 0.25) / 1.5) * 1.5 * h;
+        const c = curl3(this.px[i] * 0.95, this.py[i] * 0.95, this.pz[i] * 0.95 + this.time * 0.3, 0.3);
+        this.vx[i] += c[0] * ek; this.vy[i] += c[1] * ek * 0.7; this.vz[i] += c[2] * ek;
+      }
       // turbulent meander grows with age
-      const sig = 0.35 * Math.min(1, age / 2.5) * Math.sqrt(h);
+      const sig = 0.3 * Math.min(1, age / 2.5) * Math.sqrt(h);
       this.vx[i] += (this.rnd() - 0.5) * 3.4 * sig; this.vy[i] += (this.rnd() - 0.5) * 2.4 * sig; this.vz[i] += (this.rnd() - 0.5) * 3.4 * sig;
       let x = this.px[i] + this.vx[i] * h, y = this.py[i] + this.vy[i] * h, z = this.pz[i] + this.vz[i] * h;
       // closed room: bounce off walls, slide along floor / ceiling
@@ -458,11 +569,12 @@ export class SmokeSim {
       if (y < y0 + 0.03) { y = y0 + 0.03; this.vy[i] = 0; this.vx[i] *= 0.99; } else if (y > y1 - 0.03) { y = y1 - 0.03; this.vy[i] = 0; }
       this.px[i] = x; this.py[i] = y; this.pz[i] = z;
       // hand mass to the grid
-      const dep = 1 - Math.exp(-h / kp.depTau);
+      // young puffs keep their mass (and their fine structure); older ones melt into the room grid
+      const dep = 1 - Math.exp(-h / (kp.depTau * (1 + 4 * Math.exp(-age / 6))));
       const m = this.pm[i] * dep;
       this.splat(this.ps[i], x, y, z, m);
       this.pm[i] -= m;
-      if (age > 14 || this.pm[i] < 1e-5) {
+      if (age > LIFE || this.pm[i] < 1e-5) {
         if (this.pm[i] > 0) this.splat(this.ps[i], x, y, z, this.pm[i]);
         this.np--;
         const j = this.np; // swap-remove
@@ -508,23 +620,14 @@ export class SmokeSim {
     const wx = Math.sin(th) * wmag, wz = Math.cos(th) * wmag;
     const hv = this.cfg.hvac === "down" ? -0.06 : this.cfg.hvac === "up" ? 0.06 : 0;
     const t = this.time * 0.07;
-    const curl = (X: number, Y: number, Z: number, e: number): [number, number, number] => {
-      const dPzdy = vnoise(X + 11, Y + e, Z + 3) - vnoise(X + 11, Y - e, Z + 3);
-      const dPydz = vnoise(X + 5, Y + 7, Z + e) - vnoise(X + 5, Y + 7, Z - e);
-      const dPxdz = vnoise(X, Y, Z + e + 20) - vnoise(X, Y, Z - e + 20);
-      const dPzdx = vnoise(X + e + 11, Y, Z + 3) - vnoise(X - e + 11, Y, Z + 3);
-      const dPydx = vnoise(X + e + 5, Y + 7, Z) - vnoise(X - e + 5, Y + 7, Z);
-      const dPxdy = vnoise(X, Y + e, Z + 20) - vnoise(X, Y - e, Z + 20);
-      return [dPzdy - dPydz, (dPxdz - dPzdx) * 0.6, dPydx - dPxdy];
-    };
     for (let bz = 0; bz < bnz; bz++) for (let by = 0; by < bny; by++) for (let bx = 0; bx < bnx; bx++) {
       const i = (bx + bnx * (by + bny * bz)) * 3;
       let vx = wx, vy = hv, vz = wz;
       if (amp > 0) {
         const fx = (bx + 0.5) / bnx, fy = (by + 0.5) / bny, fz = (bz + 0.5) / bnz;
         // small eddies (~3 m) plus room-scale circulation (~9 m) that slowly wanders and stirs the whole volume
-        const a = curl(fx * this.size[0] / 3.2, fy * this.size[1] / 2.2, fz * this.size[2] / 3.2 + t, 0.35);
-        const b2 = curl(fx * this.size[0] / 9 + 40, fy * this.size[1] / 5 + 40, fz * this.size[2] / 9 + t * 1.6 + 40, 0.35);
+        const a = curl3s(fx * this.size[0] / 3.2, fy * this.size[1] / 2.2, fz * this.size[2] / 3.2 + t, 0.35);
+        const b2 = curl3s(fx * this.size[0] / 9 + 40, fy * this.size[1] / 5 + 40, fz * this.size[2] / 9 + t * 1.6 + 40, 0.35);
         const k = (amp / 0.7) * 1.6;
         vx += (a[0] * 0.55 + b2[0] * 0.9) * k; vy += (a[1] * 0.55 + b2[1] * 0.9) * k; vz += (a[2] * 0.55 + b2[2] * 0.9) * k;
       }
@@ -689,7 +792,7 @@ export class SmokeSim {
     const gz = ((z - this.min[2]) / this.size[2]) * this.nz - 0.5;
     let d = 0;
     for (let s = 0; s < 3; s++) d += trilinear(this.f[s], this.nx, this.ny, this.nz, gx, gy, gz);
-    return d;
+    return d + this.fineAt(x, y, z);
   }
 
   /** Pack total density as sqrt-encoded bytes for a 3D texture (x fastest, then y, then z). */
@@ -717,6 +820,7 @@ export class SmokeSim {
         const o = nx * (y + ny * z);
         for (let x = 0; x < nx; x++) data[x + nx * z] += (a[o + x] + b[o + x] + c[o + x]) * dy;
       }
+      this.addFineProjection(data, "plan");
       return { w: nx, h: nz, data, u0: this.min[0], u1: this.min[0] + this.size[0], v0: this.min[2], v1: this.min[2] + this.size[2] };
     }
     if (view === "front") {
@@ -725,6 +829,7 @@ export class SmokeSim {
         const o = nx * (y + ny * z);
         for (let x = 0; x < nx; x++) data[x + nx * y] += (a[o + x] + b[o + x] + c[o + x]) * dz;
       }
+      this.addFineProjection(data, "front");
       return { w: nx, h: ny, data, u0: this.min[0], u1: this.min[0] + this.size[0], v0: this.min[1], v1: this.min[1] + this.size[1] };
     }
     const data = new Float32Array(nz * ny);
@@ -734,7 +839,40 @@ export class SmokeSim {
       for (let x = 0; x < nx; x++) s += a[o + x] + b[o + x] + c[o + x];
       data[z + nz * y] = s * dx;
     }
+    this.addFineProjection(data, "side");
     return { w: nz, h: ny, data, u0: this.min[2], u1: this.min[2] + this.size[2], v0: this.min[1], v1: this.min[1] + this.size[1] };
+  }
+
+  /** Add the fine puff field to a projection image (sampled at the coarse cell centres). */
+  private addFineProjection(data: Float32Array, view: "plan" | "front" | "side") {
+    if (!this.fine.length) return;
+    const { nx, ny, nz } = this;
+    const sx = (i: number) => this.min[0] + ((i + 0.5) / nx) * this.size[0];
+    const sy = (i: number) => this.min[1] + ((i + 0.5) / ny) * this.size[1];
+    const sz = (i: number) => this.min[2] + ((i + 0.5) / nz) * this.size[2];
+    const steps = 24;
+    if (view === "plan") {
+      const dy = this.fsize[1] / steps;
+      for (let z = 0; z < nz; z++) for (let x = 0; x < nx; x++) {
+        let t = 0;
+        for (let k = 0; k < steps; k++) t += this.fineAt(sx(x), this.fmin[1] + (k + 0.5) * dy, sz(z));
+        data[x + nx * z] += t * dy;
+      }
+    } else if (view === "front") {
+      const dz = this.fsize[2] / steps;
+      for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+        let t = 0;
+        for (let k = 0; k < steps; k++) t += this.fineAt(sx(x), sy(y), this.fmin[2] + (k + 0.5) * dz);
+        data[x + nx * y] += t * dz;
+      }
+    } else {
+      const dx = this.fsize[0] / steps;
+      for (let y = 0; y < ny; y++) for (let z = 0; z < nz; z++) {
+        let t = 0;
+        for (let k = 0; k < steps; k++) t += this.fineAt(this.fmin[0] + (k + 0.5) * dx, sy(y), sz(z));
+        data[z + nz * y] += t * dx;
+      }
+    }
   }
 
   stats(): SmokeStats {
@@ -750,11 +888,13 @@ export class SmokeSim {
     }
     const total = this.mass[0] + this.mass[1] + this.mass[2];
     return {
-      mass: total, inFlight: this.flight(), emitted: this.emitted.slice(), massFog: this.mass[0], massHaze: this.mass[1], massLow: this.mass[2], maxDensity: mx,
+      mass: total, fineMass: this.fineMass(), inFlight: this.flight(), emitted: this.emitted.slice(), massFog: this.mass[0], massHaze: this.mass[1], massLow: this.mass[2], maxDensity: mx,
       meanDensity: total / (this.size[0] * this.size[1] * this.size[2]), lowMeanY: lm > 0 ? ly / lm : 0,
       particles: this.np, machines: this.machines.size, grid: [this.nx, this.ny, this.nz], stepMs: this.stepMs, time: this.time,
     };
   }
+
+  private fineMass(): number { let m = 0; for (let i = 0; i < this.fine.length; i++) m += this.fine[i]; return m * ((this.fsize[0] / Math.max(1, this.fnx)) * (this.fsize[1] / Math.max(1, this.fny)) * (this.fsize[2] / Math.max(1, this.fnz))); }
 
   private flight(): number { let m = 0; for (let i = 0; i < this.np; i++) m += this.pm[i]; return m; }
 
