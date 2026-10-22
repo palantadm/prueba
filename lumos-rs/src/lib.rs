@@ -38,7 +38,8 @@ impl RunningServer {
             let _ = tx.send(());
         }
         if let Some(h) = self.done.take() {
-            let _ = h.await;
+            // Open WebSocket connections would otherwise keep a graceful shutdown waiting forever.
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(2), h).await;
         }
         tokio::time::sleep(std::time::Duration::from_millis(400)).await;
     }

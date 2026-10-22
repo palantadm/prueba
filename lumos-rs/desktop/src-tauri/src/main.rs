@@ -31,7 +31,12 @@ fn main() {
             }
         }))
         .setup(move |app| {
-            let data_dir = app.path().app_data_dir()?;
+            // Shows, media and library live in Documents/Lumos (easy to find and back up);
+            // the webview keeps its own cache under the app data dir.
+            let data_dir = match app.path().document_dir() {
+                Ok(d) => d.join("Lumos"),
+                Err(_) => app.path().app_data_dir()?.join("data"),
+            };
             std::fs::create_dir_all(&data_dir)?;
             let server = rt.block_on(lumos::start(lumos::ServerConfig {
                 bind: "0.0.0.0".into(),

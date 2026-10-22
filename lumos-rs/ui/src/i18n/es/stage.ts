@@ -263,4 +263,6 @@ export const stage: Record<string, string> = {
   "{n} smoke machine patched": "{n} máquina de humo en el patch",
   "{n} smoke machines patched": "{n} máquinas de humo en el patch",
   "Smoke layer": "Capa de humo",
+  "WebGL is not available in this window": "WebGL no está disponible en esta ventana",
+  "The 3D view needs hardware-accelerated graphics. Update your graphics drivers, or open Lumos in a browser (Help → Open in browser). The 2D view works without it.": "La vista 3D necesita gráficos con aceleración por hardware. Actualiza los controladores de vídeo o abre Lumos en el navegador (Ayuda → Abrir en el navegador). La vista 2D funciona sin ello.",
 };

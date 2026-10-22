@@ -3,6 +3,22 @@
 Professional theatrical lighting control. One binary serves the engine and the UI; open it from the desk,
 a tablet or a phone on the same network.
 
+## Instalar (aplicación de escritorio)
+
+Los instaladores se generan solos en GitHub (pestaña **Actions → "Lumos desktop installers" → última ejecución → Artifacts**):
+`lumos-Windows` (`.exe`/`.msi`), `lumos-macOS` (`.dmg`, universal Intel + Apple Silicon), `lumos-Linux` (`.deb`/`.AppImage`).
+Con una etiqueta `v*` (p. ej. `git tag v0.3.0 && git push --tags`) se publican en **Releases**.
+Los instaladores no están firmados: Windows mostrará SmartScreen («Más información → Ejecutar de todos modos») y macOS pedirá
+clic derecho → Abrir la primera vez.
+
+La app abre su propia ventana, guarda shows/medios/librerías en `Documentos/Lumos`, usa MIDI nativo (sin depender del navegador)
+y sirve la misma consola en red (menú Ayuda → «Dirección para tablet o móvil…») para controlarla desde una tablet.
+Si no se ve el 3D: la ventana necesita aceleración gráfica (WebGL); el 2D y el resto funcionan igualmente.
+
+Build local: `cd desktop && npm ci && npx tauri build` (Linux: `libwebkit2gtk-4.1-dev libasound2-dev libgtk-3-dev librsvg2-dev libxdo-dev patchelf`).
+
+## Servidor sin ventana / desarrollo
+
 ```bash
 ./scripts/build.sh                                  # UI (Vite/Preact/three.js) + release binary
 ./target/release/lumos --port 8080 --bind 0.0.0.0 --data ./data

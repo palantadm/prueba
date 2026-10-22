@@ -10,11 +10,26 @@ import {
   aimTool, draftVersion, editFixture, editMode, editObject, effFixtures, effStage, gizmoMode, hiddenObjs, selObject,
 } from "../stage/state";
 
+let glChecked: boolean | null = null;
+function webglAvailable(): boolean {
+  if (glChecked === null) {
+    try {
+      const c = document.createElement("canvas");
+      glChecked = !!(c.getContext("webgl2") || c.getContext("webgl"));
+    } catch {
+      glChecked = false;
+    }
+  }
+  return glChecked;
+}
+
 export function Stage3D() {
   const host = useRef<HTMLDivElement>(null);
   const root = useRef<HTMLDivElement>(null);
+  const glOk = webglAvailable();
 
   useEffect(() => {
+    if (!glOk) return;
     requestDmx("stage", null);
     const scene = new StageScene(host.current!, {
       onPick(hit, additive) {
@@ -82,7 +97,7 @@ export function Stage3D() {
       releaseDmx("stage");
       delete (window as unknown as { __stage?: StageScene }).__stage;
     };
-  }, []);
+  }, [glOk]);
 
   const edit = editMode.value;
   const fullscreen = () => {
@@ -97,6 +112,13 @@ export function Stage3D() {
       {edit && leftOpen.value && <LeftPanel />}
       <div class="st-view">
         <div class="st-canvas" ref={host} />
+        {!glOk && (
+          <div class="st-banner" style={{ top: "40%", bottom: "auto", maxWidth: 520, whiteSpace: "normal", textAlign: "center" }}>
+            <b>{t("WebGL is not available in this window")}</b>
+            <br />
+            {t("The 3D view needs hardware-accelerated graphics. Update your graphics drivers, or open Lumos in a browser (Help → Open in browser). The 2D view works without it.")}
+          </div>
+        )}
         <Toolbar onFullscreen={fullscreen} />
         {aimTool.value && <div class="st-banner">{t("AIM — click the stage to point the selected moving heads · Esc to cancel")}</div>}
         {!show.value && <div class="st-banner">{t("Waiting for the engine…")}</div>}
