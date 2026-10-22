@@ -24,12 +24,15 @@ parking_lot = "0.12"
 futures-util = "0.3"
 local-ip-address = "0.6"
 rusb = { version = "0.9", optional = true }
+midir = { version = "0.10", optional = true }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 roxmltree = "0.20"
 
 [features]
 # Raw USB DMX interfaces (uDMX). Needs libusb-1.0 at build time.
 usb = ["dep:rusb"]
+# Native MIDI in/out (needs libasound2-dev on Linux). Desktop app and CI enable it.
+midi = ["dep:midir"]
 
 [profile.release]
 lto = "thin"

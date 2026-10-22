@@ -6,6 +6,7 @@ pub mod gdtf;
 pub mod glb;
 pub mod io;
 pub mod library;
+pub mod midi;
 pub mod model;
 pub mod persist;
 pub mod qxf;

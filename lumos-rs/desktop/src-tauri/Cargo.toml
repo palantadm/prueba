@@ -1,0 +1,26 @@
+[package]
+name = "lumos-desktop"
+version = "0.3.0"
+edition = "2021"
+description = "Lumos — professional theatrical lighting control (desktop app)"
+authors = ["Lumos"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+tauri-plugin-dialog = "2"
+lumos = { path = "../..", features = ["midi"] }
+tokio = { version = "1", features = ["full"] }
+opener = "0.7"
+anyhow = "1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 4
+strip = true
+
+[workspace]

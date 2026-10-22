@@ -83,8 +83,10 @@ pub fn spawn(store: Store) -> Handle {
     let (tx, rx) = mpsc::unbounded_channel();
     let (out, _) = broadcast::channel(512);
     let (io_tx, io_rx) = mpsc::unbounded_channel();
+    let midi = crate::midi::MidiHub::start(store.dir.clone(), io_tx.clone());
     let io = IoHub::new(io_tx);
-    let engine = Engine::new(store.clone(), out.clone(), io);
+    let mut engine = Engine::new(store.clone(), out.clone(), io);
+    engine.midi = midi;
     tokio::spawn(engine.run(rx, io_rx));
     Handle { tx, out, store }
 }
@@ -108,6 +110,7 @@ struct Engine {
     t0: Instant,
     out: broadcast::Sender<Out>,
     io: IoHub,
+    midi: crate::midi::MidiHub,
 
     show: Show,
     rev: u32,
@@ -191,6 +194,7 @@ impl Engine {
             t0: now,
             out,
             io,
+            midi: crate::midi::MidiHub::disabled(),
             show,
             rev: 1,
             builtin: library::builtin(),
@@ -296,6 +300,7 @@ impl Engine {
                     json(&ServerMsg::Library { profiles: self.library_list() }),
                     json(&ServerMsg::Show { rev: self.rev, show: self.show.clone() }),
                     json(&ServerMsg::Shows { shows: self.store.list() }),
+                    self.midi_ports_json(),
                 ];
                 v.push(json(&ServerMsg::Rt { rt: self.build_rt() }));
                 let _ = reply.send(v);
@@ -324,6 +329,11 @@ impl Engine {
     fn on_io(&mut self, ev: IoEvent) {
         match ev {
             IoEvent::Osc { addr, value } => self.handle_input(InEvent::Osc { addr: &addr, value }),
+            IoEvent::Midi { port, bytes } => self.midi_in(&port, &bytes),
+            IoEvent::MidiPorts { .. } => {
+                let j = self.midi_ports_json();
+                let _ = self.out.send(Out::Json(Arc::from(j)));
+            }
             IoEvent::ExternalDmx { universe, data } => {
                 self.ext_dmx.insert(universe, (Instant::now(), data));
                 self.dirty = true;
@@ -332,6 +342,11 @@ impl Engine {
     }
 
     // ───────────── helpers ─────────────
+
+    fn midi_ports_json(&self) -> String {
+        let v = self.midi.ports();
+        json(&ServerMsg::MidiPorts { native: v.native, inputs: v.inputs, outputs: v.outputs })
+    }
 
     fn emit(&self, msg: &ServerMsg) {
         let _ = self.out.send(Out::Json(Arc::from(json(msg))));
@@ -766,8 +781,7 @@ impl Engine {
                 self.touch();
             }
             SubscribeDmx { .. } => {}
-            // TODO(be-midi): native MIDI port enable/disable.
-            MidiEnable { .. } => {}
+            MidiEnable { output, name, enabled } => self.midi.set_enabled(output, &name, enabled)?,
             VcSave { pages } => self.vc_save(pages)?,
             VcPress { widget, down } => self.vc_press(widget, down)?,
             VcValue { widget, value } => self.vc_set_value(widget, value)?,

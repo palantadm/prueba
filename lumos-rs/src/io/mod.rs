@@ -40,6 +40,10 @@ pub enum IoEvent {
     /// Incoming Art-Net DMX already translated through `ArtNetInCfg.map`
     /// to a Lumos universe id; engine merges it HTP.
     ExternalDmx { universe: u16, data: Vec<u8> },
+    /// Raw MIDI bytes from an enabled native input port (same path as `Command::MidiIn`).
+    Midi { port: String, bytes: Vec<u8> },
+    /// Native MIDI port lists / enabled state changed.
+    MidiPorts { inputs: Vec<MidiPortInfo>, outputs: Vec<MidiPortInfo> },
 }
 
 /// Snapshot of one output's health.

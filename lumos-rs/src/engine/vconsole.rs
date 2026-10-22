@@ -697,7 +697,10 @@ impl Engine {
             }
         }
         for (port, bytes) in midi {
-            self.emit(&ServerMsg::MidiOut { port, bytes });
+            // Native outputs take it first; browsers only relay what no native port handled.
+            if !self.midi.send(port.as_deref(), &bytes) {
+                self.emit(&ServerMsg::MidiOut { port, bytes });
+            }
         }
         for (host, port, addr, v) in osc {
             self.io.osc_send(&host, port, &addr, v);

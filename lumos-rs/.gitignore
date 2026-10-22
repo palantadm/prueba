@@ -2,3 +2,6 @@ target/
 ui/node_modules/
 ui/dist/
 data/
+desktop/node_modules/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
