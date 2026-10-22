@@ -90,7 +90,7 @@ impl Engine {
             ExecKind::Effect { effect } => self.effects_on.contains(effect) || self.effect_flash.contains(effect),
             ExecKind::Group { .. } => st.level > 0.0,
             ExecKind::Master { .. } => true,
-            ExecKind::Scene { .. } => false,
+            ExecKind::Scene { scene } => self.scenes.is_active(*scene),
             ExecKind::Empty => false,
         }
     }
@@ -124,7 +124,24 @@ impl Engine {
     fn vc_state_of(&self, w: &VcWidget) -> (f32, bool) {
         let cont = is_continuous(w.kind);
         let (mut value, active) = match &w.action {
-            VcAction::Scene { .. } | VcAction::SceneMorph { .. } => (0.0, false),
+            VcAction::Scene { scene, op } => match op {
+                VcOp::Level => {
+                    let l = self.scenes.effective(*scene);
+                    (Self::vc_norm_out(w, l), self.scenes.is_active(*scene))
+                }
+                VcOp::Flash => {
+                    let f = self.scenes.flash.contains(scene);
+                    (f as u8 as f32, f)
+                }
+                _ => {
+                    let a = self.scenes.is_active(*scene);
+                    (a as u8 as f32, a)
+                }
+            },
+            VcAction::SceneMorph { a, b } => match self.scenes.morph {
+                Some((ma, mb, t)) if ma == *a && mb == *b => (Self::vc_norm_out(w, t), true),
+                _ => (self.vc.values.get(&w.id).copied().unwrap_or(0.0), false),
+            },
             VcAction::Exec { exec, op } => match op {
                 VcOp::Level => {
                     let l = match self.show.executors.iter().find(|e| e.id == *exec).map(|e| &e.kind) {
@@ -308,7 +325,22 @@ impl Engine {
     fn vc_apply_state(&mut self, w: &VcWidget, on: bool, momentary: bool) -> Result<(), String> {
         self.dirty = true;
         match &w.action {
-            VcAction::Scene { .. } | VcAction::SceneMorph { .. } => Ok(()),
+            VcAction::Scene { scene, op } => match op {
+                VcOp::Flash => self.scene_set_flash(*scene, on),
+                VcOp::Level => self.scene_level(*scene, if on { w.out_max } else { w.out_min }),
+                _ => {
+                    // momentary: held = on, release = off; toggle state: follow `on`
+                    if momentary || !matches!(op, VcOp::Back | VcOp::Release) {
+                        self.scene_go(*scene, on)
+                    } else {
+                        self.scene_go(*scene, false)
+                    }
+                }
+            },
+            VcAction::SceneMorph { a, b } => {
+                let t = if on { w.out_max } else { w.out_min };
+                self.scene_morph(*a, *b, Some(t))
+            }
             VcAction::Exec { exec, op } => match op {
                 VcOp::Flash => self.set_flash(*exec, on),
                 VcOp::Level => {
@@ -412,7 +444,20 @@ impl Engine {
     fn vc_trigger(&mut self, w: &VcWidget) -> Result<(), String> {
         self.dirty = true;
         match &w.action {
-            VcAction::Scene { .. } | VcAction::SceneMorph { .. } => Ok(()),
+            VcAction::Scene { scene, op } => match op {
+                VcOp::Go => self.scene_go(*scene, true),
+                VcOp::Back | VcOp::Release => self.scene_go(*scene, false),
+                VcOp::Toggle => self.scene_toggle(*scene),
+                VcOp::Level => self.scene_level(*scene, w.out_max),
+                VcOp::Flash => Ok(()),
+            },
+            VcAction::SceneMorph { a, b } => {
+                let t = match self.scenes.morph {
+                    Some((ma, mb, t)) if ma == *a && mb == *b && t >= 0.5 => w.out_min,
+                    _ => w.out_max,
+                };
+                self.scene_morph(*a, *b, Some(t))
+            }
             VcAction::Exec { exec, op } => match op {
                 VcOp::Go => self.exec_go(*exec),
                 VcOp::Back => self.exec_back(*exec),
@@ -528,6 +573,8 @@ impl Engine {
                 self.vc.effect_rate.insert(*effect, mapped.max(0.0));
                 Ok(())
             }
+            VcAction::Scene { scene, op: VcOp::Level } => self.scene_level(*scene, clamp01(mapped)),
+            VcAction::SceneMorph { a, b } => self.scene_morph(*a, *b, Some(mapped)),
             VcAction::Xy { .. } => Ok(()),
             _ => {
                 // Trigger-type action driven by an analogue value: press on the rising edge through 0.5,

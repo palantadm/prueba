@@ -2,8 +2,10 @@
 
 mod bindings;
 mod effects;
+mod morph;
 mod patch;
 mod playback;
+mod scenes;
 mod vconsole;
 
 use crate::io::{IoEvent, IoHub, MtcDecoder};
@@ -13,6 +15,7 @@ use crate::persist::Store;
 use bindings::*;
 use patch::*;
 use playback::*;
+use scenes::ScenesState;
 use vconsole::VcRt;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
@@ -30,6 +33,8 @@ pub enum EngineIn {
     ImportShow { show: Box<Show>, reply: Reply },
     /// Profiles parsed from uploaded GDTF/QLC+/OFL files (assets already on disk).
     ImportProfiles { profiles: Vec<FixtureProfile>, reply: Reply },
+    /// Dry-run of a fixture morph (REST `POST /api/morph/preview`).
+    MorphPreview { ids: Vec<u32>, profile: String, mode: String, reply: oneshot::Sender<Result<MorphPreview, String>> },
 }
 
 #[derive(Clone)]
@@ -67,6 +72,13 @@ impl Handle {
         let (r, rx) = oneshot::channel();
         self.tx
             .send(EngineIn::ImportShow { show: Box::new(show), reply: r })
+            .map_err(|_| "Engine stopped".to_string())?;
+        rx.await.map_err(|_| "Engine stopped".to_string())?
+    }
+    pub async fn morph_preview(&self, ids: Vec<u32>, profile: String, mode: String) -> Result<MorphPreview, String> {
+        let (r, rx) = oneshot::channel();
+        self.tx
+            .send(EngineIn::MorphPreview { ids, profile, mode, reply: r })
             .map_err(|_| "Engine stopped".to_string())?;
         rx.await.map_err(|_| "Engine stopped".to_string())?
     }
@@ -160,6 +172,7 @@ struct Engine {
     tc: Tc,
     osc_fb: HashMap<String, f32>,
     vc: VcRt,
+    scenes: ScenesState,
 }
 
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
@@ -238,6 +251,7 @@ impl Engine {
             tc: Tc { running: false, frames_f: 0.0, last_mtc: None, dec: MtcDecoder::default(), prev_disp: 0 },
             osc_fb: HashMap::new(),
             vc: VcRt::default(),
+            scenes: ScenesState::default(),
         };
         e.hz = e.show.settings.tick_hz.clamp(10, 100);
         e.rebuild_derived();
@@ -311,6 +325,9 @@ impl Engine {
             EngineIn::ImportShow { show, reply } => {
                 self.set_show(*show);
                 let _ = reply.send(Ok(()));
+            }
+            EngineIn::MorphPreview { ids, profile, mode, reply } => {
+                let _ = reply.send(self.morph_preview(&ids, &profile, &mode));
             }
             EngineIn::ImportProfiles { profiles, reply } => {
                 for p in profiles {
@@ -416,6 +433,7 @@ impl Engine {
         self.dmx_override.clear();
         self.bind_last.clear();
         self.vc = VcRt::default();
+        self.scenes = ScenesState::default();
         self.last_merged.clear();
         self.ext_dmx.clear();
         self.hz = self.show.settings.tick_hz.clamp(10, 100);
@@ -781,9 +799,21 @@ impl Engine {
                 self.touch();
             }
             SubscribeDmx { .. } => {}
-            // TODO(be-scene): implemented in step 2.
-            SceneRecord { .. } | SceneSave { .. } | SceneRemove { .. } | SceneGo { .. } | SceneSolo { .. } | SceneLevel { .. }
-            | SceneMorph { .. } | ScenesRelease | FixtureMorph { .. } => {}
+            SceneRecord { id, name, from_output, fixtures, merge } => self.scene_record(id, name, from_output, fixtures, merge)?,
+            SceneSave { scene } => self.scene_save(scene)?,
+            SceneRemove { id } => self.scene_remove(id),
+            SceneGo { id, on } => self.scene_go(id, on)?,
+            SceneSolo { id } => {
+                let now = self.now();
+                self.scene_solo_at(id, now)?
+            }
+            SceneLevel { id, level } => self.scene_level(id, level)?,
+            SceneMorph { a, b, t } => self.scene_morph(a, b, t)?,
+            ScenesRelease => {
+                let now = self.now();
+                self.scenes_release_at(now)
+            }
+            FixtureMorph { ids, profile, mode, repack } => self.fixture_morph(ids, profile, mode, repack)?,
             MidiEnable { output, name, enabled } => self.midi.set_enabled(output, &name, enabled)?,
             VcSave { pages } => self.vc_save(pages)?,
             VcPress { widget, down } => self.vc_press(widget, down)?,
@@ -1183,6 +1213,7 @@ impl Engine {
         for r in self.runs.values_mut() {
             r.update(now, &disc);
         }
+        self.scene_update(now);
         let due: Vec<u32> = self
             .runs
             .values()
@@ -1212,6 +1243,7 @@ impl Engine {
                 self.cl_levels.insert(cuelist, l);
             }
             ExecKind::Master { master: MasterKind::Grand } => self.grand_master = l,
+            ExecKind::Scene { scene } => self.scene_level(scene, l)?,
             _ => {}
         }
         self.dirty = true;
@@ -1228,6 +1260,7 @@ impl Engine {
                 self.dirty = true;
                 Ok(())
             }
+            ExecKind::Scene { scene } => self.scene_toggle(scene),
             _ => Ok(()),
         }
     }
@@ -1235,6 +1268,7 @@ impl Engine {
     fn exec_back(&mut self, id: u32) -> Result<(), String> {
         match self.exec_kind(id)? {
             ExecKind::Cuelist { cuelist } => self.back(cuelist),
+            ExecKind::Scene { scene } => self.scene_go(scene, false),
             _ => Ok(()),
         }
     }
@@ -1242,12 +1276,16 @@ impl Engine {
     fn set_flash(&mut self, id: u32, down: bool) -> Result<(), String> {
         let kind = self.exec_kind(id)?;
         self.exec.entry(id).or_insert(ExecState { level: 1.0, flash: false }).flash = down;
-        if let ExecKind::Effect { effect } = kind {
-            if down {
-                self.effect_flash.insert(effect);
-            } else {
-                self.effect_flash.remove(&effect);
+        match kind {
+            ExecKind::Effect { effect } => {
+                if down {
+                    self.effect_flash.insert(effect);
+                } else {
+                    self.effect_flash.remove(&effect);
+                }
             }
+            ExecKind::Scene { scene } => self.scene_set_flash(scene, down)?,
+            _ => {}
         }
         self.dirty = true;
         Ok(())
@@ -1398,7 +1436,8 @@ impl Engine {
 
     // ───────────── render ─────────────
 
-    fn render(&mut self, now: f64) {
+    /// Steps 1–3 of the render: cuelists → scenes (+ scene morph) → programmer → effects.
+    fn compute_look(&mut self, now: f64) -> PerFixture {
         // 1. cuelists
         let mut order: Vec<&CueRun> = self.runs.values().filter(|r| !r.values.is_empty()).collect();
         order.sort_by_key(|r| (self.show.cuelists.iter().find(|c| c.id == r.cuelist).map_or(0, |c| c.priority), r.go_seq));
@@ -1423,6 +1462,8 @@ impl Engine {
                 }
             }
         }
+        // 1b. scenes and scene morph
+        self.apply_scenes(&mut merged);
         self.last_merged = merged.clone();
         // 2. programmer
         for (f, attrs) in &self.programmer {
@@ -1468,6 +1509,17 @@ impl Engine {
                 &self.patch,
                 now,
             );
+        }
+        merged
+    }
+
+    fn render(&mut self, now: f64) {
+        let mut merged = self.compute_look(now);
+        // colour emulation: derive what each fixture really has from the colour attributes of the look
+        for pf in &self.patch.fixtures {
+            if let Some(a) = merged.get_mut(&pf.id) {
+                morph::emulate(pf, a);
+            }
         }
         // 4. masters
         let mut factor: HashMap<u32, f32> = HashMap::new();
@@ -1545,6 +1597,7 @@ impl Engine {
         !self.effects_on.is_empty()
             || !self.effect_flash.is_empty()
             || self.runs.values().any(|r| !r.settled)
+            || self.scenes.ramping()
     }
 
     // ───────────── tick ─────────────
@@ -1670,6 +1723,10 @@ impl Engine {
             items.push((format!("/lumos/exec/{}/level", e.id), e.level));
             items.push((format!("/lumos/exec/{}/active", e.id), if e.active { 1.0 } else { 0.0 }));
         }
+        for sc in &rt.scenes {
+            items.push((format!("/lumos/scene/{}/level", sc.id), sc.level));
+            items.push((format!("/lumos/scene/{}/active", sc.id), if sc.active { 1.0 } else { 0.0 }));
+        }
         for c in &rt.cuelists {
             items.push((format!("/lumos/cuelist/{}/current", c.id), c.current.unwrap_or(0.0) as f32));
         }
@@ -1696,11 +1753,12 @@ impl Engine {
                     ExecKind::Effect { effect } => self.effects_on.contains(effect) || self.effect_flash.contains(effect),
                     ExecKind::Group { .. } => st.level > 0.0,
                     ExecKind::Master { .. } => true,
-                    ExecKind::Scene { .. } => false,
+                    ExecKind::Scene { scene } => self.scenes.is_active(*scene),
                     ExecKind::Empty => false,
                 };
                 let level = match &e.kind {
                     ExecKind::Master { .. } => self.grand_master,
+                    ExecKind::Scene { scene } => self.scenes.effective(*scene),
                     _ => st.level,
                 };
                 ExecRt { id: e.id, level, active, flash: st.flash }
@@ -1741,8 +1799,8 @@ impl Engine {
             effects_running,
             outputs,
             inputs,
-            scenes: vec![],
-            morph: None,
+            scenes: self.scene_rt(),
+            morph: self.scenes.morph,
             timecode: TimecodeRt { running: self.tc.running, frames, text: fmt_tc(frames, fps) },
             learn: self.learn,
             fps: self.fps,

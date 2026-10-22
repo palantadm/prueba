@@ -334,7 +334,7 @@ fn d_true() -> bool {
 pub struct Scene {
     pub id: u32,
     pub name: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "de_per_fixture")]
     pub values: PerFixture,
     /// Seconds to fade in when activated / out when released.
     #[serde(default = "d_scene_fade")]

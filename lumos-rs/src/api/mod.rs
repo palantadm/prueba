@@ -27,6 +27,7 @@ pub fn router(h: Handle) -> Router {
         .route("/api/net", get(net))
         .route("/api/media", post(upload).layer(DefaultBodyLimit::max(512 * 1024 * 1024)))
         .route("/api/show", get(get_show).put(put_show).layer(DefaultBodyLimit::max(64 * 1024 * 1024)))
+        .route("/api/morph/preview", post(morph_preview))
         .route("/api/library/import", post(library_import).layer(DefaultBodyLimit::max(256 * 1024 * 1024)))
         .nest_service("/media", ServeDir::new(media))
         .nest_service("/library", ServeDir::new(library))
@@ -55,6 +56,21 @@ async fn net() -> Json<serde_json::Value> {
         .map(|(name, ip)| serde_json::json!({ "name": name, "ip": ip.to_string() }))
         .collect();
     Json(serde_json::Value::Array(v))
+}
+
+#[derive(serde::Deserialize)]
+struct MorphReq {
+    ids: Vec<u32>,
+    profile: String,
+    mode: String,
+}
+
+/// Dry-run of `FixtureMorph`: attribute mapping, coverage and warnings.
+async fn morph_preview(State(h): State<Handle>, Json(req): Json<MorphReq>) -> Response {
+    match h.morph_preview(req.ids, req.profile, req.mode).await {
+        Ok(p) => Json(p).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+    }
 }
 
 async fn get_show(State(h): State<Handle>) -> Response {
