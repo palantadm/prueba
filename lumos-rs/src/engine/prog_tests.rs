@@ -413,10 +413,10 @@ fn park_and_unpark() {
 
 fn two_cue_rgb(e: &mut Engine, n: u32) {
     add(e, "generic/rgb-par", "4ch", n);
-    for f in 1..=n {
-        save_cue(e, 1, cue_with(1.0, &[(f, "dimmer", 0.0), (f, "red", 0.0)]));
-        save_cue(e, 1, cue_with(2.0, &[(f, "dimmer", 1.0), (f, "red", 1.0)]));
-    }
+    let zero: Vec<(u32, &str, f32)> = (1..=n).flat_map(|f| [(f, "dimmer", 0.0), (f, "red", 0.0)]).collect();
+    let full: Vec<(u32, &str, f32)> = (1..=n).flat_map(|f| [(f, "dimmer", 1.0), (f, "red", 1.0)]).collect();
+    save_cue(e, 1, cue_with(1.0, &zero));
+    save_cue(e, 1, cue_with(2.0, &full));
     for c in e.show.cuelists[0].cues.iter_mut() {
         c.fade_in = 4.0;
         c.fade_out = 4.0;
