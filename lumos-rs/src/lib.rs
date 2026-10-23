@@ -8,8 +8,12 @@ pub mod io;
 pub mod library;
 pub mod midi;
 pub mod model;
+pub mod csv;
+pub mod mvr;
+pub mod pdf;
 pub mod persist;
 pub mod qxf;
+pub mod reports;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
