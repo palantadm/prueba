@@ -3,6 +3,7 @@ import type { OutputCfg, OutputStatus, UniverseCfg } from "../../types";
 import { rt, send, show, toast } from "../../store";
 import { EmptyState, Modal, NumberField, PageHead, Segmented, Select, StatusDot, TextField, Toggle, VirtualList, confirmDialog } from "../../ui";
 import { KINDS, KindFields, OutputEditor, advance, defaultKind, defaultOutput, summarize, type KindName } from "./OutputEditor";
+import { TestPanel } from "./OutputTest";
 import { t, tp } from "../../i18n";
 
 const ROW = 40;
@@ -163,6 +164,7 @@ export function UniversesPage() {
           setSel(new Set());
         }}>{t("Remove")}{selIds.length ? ` (${selIds.length})` : ""}</button>
       </PageHead>
+      <TestPanel />
       <div class="vrow" style={{ background: "var(--bg-2)", height: 32, fontSize: "var(--fs-xs)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 700 }}>
         <input type="checkbox" aria-label={t("Select all")} checked={sel.size > 0 && sel.size === rows.length} onChange={(e) => setSel((e.target as HTMLInputElement).checked ? new Set(rows.map((r) => r.id)) : new Set())} />
         <span style={{ width: 48 }}>#</span><span style={{ width: 160 }}>{t("Name")}</span><span class="grow">{t("Outputs")}</span><span style={{ width: 70 }}>{t("Status")}</span><span style={{ width: 80, textAlign: "right" }}>{t("Frames")}</span><span style={{ width: 64 }} />

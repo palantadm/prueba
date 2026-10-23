@@ -1,10 +1,11 @@
 import { useEffect, useState } from "preact/hooks";
 import type { TcSource } from "../../types";
 import { fire, rt, show } from "../../store";
-import { EmptyState, NumberField, Segmented, Select, TextField } from "../../ui";
+import { EmptyState, NumberField, Segmented, Select, TextField, Toggle } from "../../ui";
 import { useSettingsDraft } from "../../lib/draft";
 import { fetchNet } from "../../lib/api";
 import { SaveBar, SettingsPage } from "./Common";
+import { NodesPanel } from "./Network";
 import { lang, setLang, t, type Lang } from "../../i18n";
 
 export function TimecodePage() {
@@ -56,6 +57,7 @@ export function NetworkPage() {
           {ips && ips.length === 0 && <div class="dim">{t("No LAN address found — the server may be bound to localhost only (start it with --bind 0.0.0.0).")}</div>}
         </div>
       </div>
+      <NodesPanel />
       {draft && <div class="panel panel-body"><TextField label={t("Node name")} hint={t("Shown to Art-Net / sACN receivers.")} value={draft.node_name} onChange={(v) => patch((s) => (s.node_name = v))} /></div>}
     </SettingsPage>
   );
@@ -72,6 +74,7 @@ export function GeneralPage() {
           <span class="faint" style={{ fontSize: "var(--fs-xs)" }}>{t("Applies immediately on this device.")}</span></div>
         <TextField label={t("Node name")} value={draft.node_name} onChange={(v) => patch((s) => (s.node_name = v))} />
         <NumberField label={t("Engine rate (Hz)")} width={120} hint={t("44 Hz is the DMX512 maximum for full frames. Lower it for slow networks.")} value={draft.tick_hz} min={10} max={100} onChange={(v) => patch((s) => (s.tick_hz = v))} />
+        <Toggle checked={draft.start_blackout} onChange={(v) => patch((s) => (s.start_blackout = v))} label={t("Start in blackout")} title={t("Safe default for a rehearsal PC connected to a live rig.")} />
         <div class="dim">{t("Show: {name} · measured engine rate {fps} fps", { name: show.value?.name ?? "—", fps: rt.value?.fps.toFixed(1) ?? "–" })}</div>
       </div>
     </SettingsPage>

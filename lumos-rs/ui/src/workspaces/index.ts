@@ -9,6 +9,7 @@ import { Stage3D } from "./Stage3D";
 import { Plan2D } from "./Plan2D";
 import { Settings } from "./Settings";
 import { VConsole } from "./VConsole";
+import { Timeline } from "./Timeline";
 
 export type Workspace = { id: string; key: string; label: string; component: ComponentType };
 
@@ -23,4 +24,5 @@ export const workspaces: Workspace[] = [
   { id: "monitor", key: "6", get label() { return t("Monitor"); }, component: Monitor },
   { id: "settings", key: "7", get label() { return t("Settings"); }, component: Settings },
   { id: "vc", key: "9", get label() { return t("Console"); }, component: VConsole },
+  { id: "timeline", key: "0", get label() { return t("Timeline"); }, component: Timeline },
 ];

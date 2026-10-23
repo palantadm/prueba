@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import type { Fixture } from "../types";
-import { library, selection, send, show, toast } from "../store";
+import { library, rt, selection, send, show, toast } from "../store";
 import { EmptyState, NumberField, PageHead, Segmented, Select, TextField, VirtualList, confirmDialog } from "../ui";
 import { collisions, footprint, modeOf, profileById } from "../lib/fixtures";
 import { AddDialog } from "./patch/AddDialog";
@@ -9,7 +9,7 @@ import { MorphDialog } from "./patch/MorphDialog";
 import { UniverseMap } from "./patch/UniverseMap";
 import { t, tp } from "../i18n";
 
-const ROW = 40;
+const ROW = 48;
 const upd = (f: Fixture, p: Partial<Fixture>) => send({ type: "fixture_update", fixture: { ...f, ...p } }, { quiet: false }).catch(() => {});
 
 function NameCell(props: { x: Fixture }) {
@@ -32,6 +32,10 @@ export function Patch() {
   const rows = f ? sorted.filter((x) => `${x.id} ${x.name} ${x.profile} ${x.mode}`.toLowerCase().includes(f)) : sorted;
   const sel = new Set(selection.value);
   const unis = (show.value?.universes ?? []).map((u) => ({ value: u.id, label: String(u.id) }));
+  const identifying = new Set(rt.value?.identifying ?? []);
+  const selFix = selection.value.filter((id) => fixtures.some((x) => x.id === id));
+  const selIdentOn = selFix.length > 0 && selFix.every((id) => identifying.has(id));
+  const identifySel = () => { for (const fixture of selFix) void send({ type: "identify", fixture, on: !selIdentOn }, { quiet: true }).catch(() => {}); };
 
   const click = (e: MouseEvent, id: number, idx: number) => {
     if (e.shiftKey && anchor.current !== null) {
@@ -55,6 +59,8 @@ export function Patch() {
         <input class="input" style={{ width: 160 }} placeholder={t("Filter…")} aria-label={t("Filter fixtures")} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         <Segmented value={view} onChange={setView} label={t("View")} options={[{ value: "table", label: t("Table") }, { value: "map", label: t("Universe map") }]} />
         <button class="btn tall" onClick={() => setImporting(true)} title={t("Import GDTF, QLC+ (.qxf) or Open Fixture Library (.json) fixture files")}>{t("Import fixtures…")}</button>
+        <button class={`btn tall ${selIdentOn ? "on" : ""}`} disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={identifySel}
+          title={t("Locate the selected fixtures: full light, home position, flashing")}>{selIdentOn ? t("Stop identifying") : t("Identify selection")}</button>
         <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setMorphing(true)}
           title={t("Replace the selected fixtures with another model keeping cues, scenes and groups")}>{t("Swap (Morph)")}</button>
         <button class="btn tall danger" disabled={!selection.value.length} onClick={del}>{t("Delete")}{selection.value.length ? ` (${selection.value.length})` : ""}</button>
@@ -62,7 +68,7 @@ export function Patch() {
       </PageHead>
       {view === "map" ? <div class="grow scroll"><UniverseMap fixtures={fixtures} /></div> : <>
         <div class="vrow" style={{ background: "var(--bg-2)", height: 32, fontSize: "var(--fs-xs)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 700 }}>
-          <span style={cell(48)}>ID</span><span style={cell(170)}>{t("Name")}</span><span class="grow hide-narrow">{t("Profile")}</span><span class="grow-narrow" style={cell(110)}>{t("Mode")}</span><span style={cell(70)}>{t("Univ")}</span><span style={cell(76)}>{t("Addr")}</span><span style={cell(40)}>{t("Ch")}</span><span style={cell(52)}>{t("End")}</span>
+          <span style={cell(48)}>ID</span><span style={cell(170)}>{t("Name")}</span><span class="grow hide-narrow">{t("Profile")}</span><span class="grow-narrow" style={cell(110)}>{t("Mode")}</span><span style={cell(70)}>{t("Univ")}</span><span style={cell(76)}>{t("Addr")}</span><span style={cell(40)}>{t("Ch")}</span><span style={cell(52)}>{t("End")}</span><span style={cell(56)} title={t("Identify")}>◎</span>
           <span class="hide-narrow" style={cell(66)}>X</span><span class="hide-narrow" style={cell(66)}>Y</span><span class="hide-narrow" style={cell(66)}>Z</span>
         </div>
         {rows.length === 0 ? <EmptyState icon="⌖" title={fixtures.length ? t("No fixtures match the filter") : t("Nothing patched yet")} hint={t("Add fixtures from the library, choose a universe and DMX address.")} >
@@ -80,6 +86,10 @@ export function Patch() {
                 <span style={cell(76)} onClick={(e) => e.stopPropagation()}><NumberField class="bare" label={t("Address")} value={x.address} min={1} max={512} onChange={(address) => upd(x, { address })} /></span>
                 <span class="mono dim" style={cell(40)}>{fp}</span>
                 <span class="mono" style={{ ...cell(52), color: bad.has(x.id) ? "var(--stop)" : undefined }}>{x.address + fp - 1}</span>
+                <span style={cell(56)} onClick={(e) => e.stopPropagation()}>
+                  <button class={`btn icon ${identifying.has(x.id) ? "on" : ""}`} style={{ width: 44, height: 44 }} aria-pressed={identifying.has(x.id)} aria-label={t("Identify fixture {id}", { id: x.id })}
+                    title={t("Identify (locate)")} onClick={() => send({ type: "identify", fixture: x.id, on: !identifying.has(x.id) }, { quiet: true }).catch(() => {})}>◎</button>
+                </span>
                 {[0, 1, 2].map((i) => <span key={i} class="hide-narrow" style={cell(66)} onClick={(e) => e.stopPropagation()}>
                   <NumberField float class="bare" label={"XYZ"[i]} value={x.pos[i]} step={0.5} onChange={(v) => { const pos = [...x.pos] as [number, number, number]; pos[i] = v; upd(x, { pos }); }} /></span>)}
               </div>

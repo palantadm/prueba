@@ -1,12 +1,15 @@
 import "../styles/live.css";
 import { useEffect, useState } from "preact/hooks";
-import { rt, send, show, toast } from "../store";
+import { fire, rt, send, show, toast } from "../store";
+import { Fader } from "../widgets";
 import type { Cue, Cuelist } from "../types";
 import { attrLabel, fixtureById, fmtNum, pct } from "../lib/attrs";
 import { activeCuelist } from "../lib/state";
 import { useKey } from "../lib/hooks";
 import { CueTable, InsertCue } from "./cues/CueTable";
+import { CueDetail } from "./cues/CueDetail";
 import { Executors } from "./cues/Executors";
+import { Macros } from "./cues/Macros";
 import { ConfirmDialog, PromptDialog } from "./live/dialogs";
 import { t, tp } from "../i18n";
 
@@ -36,7 +39,7 @@ export function Cues() {
   };
 
   return (
-    <div class="lv-cues">
+    <div class="lv-cues has-macros">
       <div class="panel lv-col">
         <div class="panel-head"><span>{t("Cuelists")}</span><span class="sp" /><button class="btn sm primary" onClick={() => setDlg("new")} aria-label={t("New cuelist")}>{t("+ New")}</button></div>
         <div class="lv-scroll" role="listbox" aria-label={t("Cuelists")}>
@@ -63,6 +66,7 @@ export function Cues() {
               <div class="panel-head">
                 <span>{cur.name}</span><span class="sp" />
                 <label class="check"><input type="checkbox" checked={cur.looped} onChange={(e) => save({ looped: (e.target as HTMLInputElement).checked })} />{t("Loop")}</label>
+                <label class="check" title={t("Pre-position moving heads that are dark in this cue and lit in the next one")}><input type="checkbox" checked={cur.auto_mark} onChange={(e) => save({ auto_mark: (e.target as HTMLInputElement).checked })} />{t("Auto-mark")}</label>
                 <label class="check"><input type="checkbox" checked={cur.tracking} onChange={(e) => save({ tracking: (e.target as HTMLInputElement).checked })} />{t("Tracking")}</label>
                 <label class="check">{t("Priority")} <input class="input num" type="number" min={0} max={255} style={{ width: 60 }} value={cur.priority}
                   onChange={(e) => save({ priority: Math.max(0, Math.min(255, Number((e.target as HTMLInputElement).value) || 0)) })} /></label>
@@ -79,11 +83,12 @@ export function Cues() {
             </div>
 
             <CueTable list={cur} rt={c_rt} selected={selCue} onSelect={setSelCue} />
-            <Detail list={cur} number={selCue} />
+            <CueDetail list={cur} number={selCue} />
           </>
         )}
         <Executors />
       </div>
+      <Macros />
 
       {dlg === "new" && <PromptDialog title={t("New cuelist")} label={t("Name")} initial={t("Cuelist {n}", { n: Math.max(0, ...lists.map((l) => l.id)) + 1 })} ok={t("Create")} onClose={() => setDlg(null)} onSubmit={newList} />}
       {dlg === "rename" && cur && <PromptDialog title={t("Rename cuelist")} label={t("Name")} initial={cur.name} onClose={() => setDlg(null)} onSubmit={(name) => save({ name })} />}
@@ -108,6 +113,7 @@ function Transport({ list }: { list: Cuelist }) {
       <button class="btn lg danger" onClick={() => send({ type: "release_cuelist", cuelist: list.id })} aria-label={t("Release cuelist")}>{t("RELEASE")}</button>
       <div class="col" style={{ gap: 2 }}><span class="label">{t("Current")}</span><span class="lv-big" style={{ color: "var(--go)" }}>{r?.current != null ? fmtNum(r.current) : "—"}</span></div>
       <div class="col" style={{ gap: 2 }}><span class="label">{t("Next")}</span><span class="lv-big" style={{ color: "var(--live)" }}>{r?.next != null ? fmtNum(r.next) : "—"}</span></div>
+      <ManualFade list={list} />
       <div class="col grow" style={{ gap: 4, minWidth: 180 }}>
         <div class="row"><span class="chip">{t(state)}</span><span class="mono dim">{cue?.label}</span><span class="sp" />
           <span class="mono" aria-label={t("Fade countdown")}>{state === "running" && prog < 1 ? `${remain.toFixed(1)} s` : ""}</span></div>
@@ -117,32 +123,21 @@ function Transport({ list }: { list: Cuelist }) {
   );
 }
 
-function Detail({ list, number }: { list: Cuelist; number: number | null }) {
-  const cue: Cue | undefined = number === null ? undefined : list.cues.find((c) => c.number === number);
-  if (!cue) return <div class="panel panel-body dim" style={{ flex: "none" }}>{t("Select a cue to see what it stores.")}</div>;
-  const entries = Object.entries(cue.changes).filter(([, a]) => a && Object.keys(a).length);
-  const removeAttr = (fid: string, attr: string) => {
-    const changes = { ...cue.changes };
-    const a = { ...(changes[Number(fid)] ?? {}) };
-    delete a[attr];
-    if (Object.keys(a).length) changes[Number(fid)] = a; else delete changes[Number(fid)];
-    send({ type: "cue_save", cuelist: list.id, cue: { ...cue, changes } });
-  };
+/** Manual crossfader: drive the running cue's fade by hand (theatre-style A/B fade). */
+function ManualFade({ list }: { list: Cuelist }) {
+  const r = rt.value?.cuelists.find((c) => c.id === list.id);
+  const [drag, setDrag] = useState<number | null>(null);
+  const manual = !!r?.manual;
+  const shown = drag ?? (manual ? r?.progress ?? 0 : 0);
   return (
-    <div class="panel" style={{ flex: "none" }}>
-      <div class="panel-head">Cue {fmtNum(cue.number)} {cue.label && `· ${cue.label}`}<span class="sp" /><span>{tp(entries.length, "{n} fixture stored", "{n} fixtures stored")}</span></div>
-      <div class="panel-body lv-detail">
-        {entries.length === 0 && <span class="dim">{t("Empty cue (tracks previous state).")}</span>}
-        {entries.map(([fid, attrs]) => (
-          <div class="lv-detail-fx" key={fid}>
-            <b class="mono" style={{ minWidth: 90 }}>{fid} {fixtureById(Number(fid))?.name ?? ""}</b>
-            {Object.entries(attrs!).map(([a, v]) => (
-              <span class="chip" key={a}>{attrLabel(a)} <span class="mono">{pct(v ?? 0)}</span>
-                <button class="lv-x" aria-label={t("Remove {attr} from fixture {id}", { attr: attrLabel(a), id: fid })} onClick={() => removeAttr(fid, a)}>✕</button></span>
-            ))}
-          </div>
-        ))}
+    <div class="col" style={{ gap: 4, minWidth: 220, flex: "1 1 220px" }}>
+      <div class="row">
+        <span class="label">{t("Manual fade")}</span><span class="sp" />
+        <span class={`chip ${manual ? "warn" : ""}`}>{manual ? t("manual") : t("timed")}</span>
+        <button class="btn sm" style={{ minHeight: 44 }} disabled={!manual} onClick={() => fire({ type: "cuelist_manual", cuelist: list.id, progress: null })}>{t("Auto")}</button>
       </div>
+      <Fader horizontal width="100%" height={44} value={shown} color="var(--live)" held={manual} ariaLabel={t("Manual crossfade")}
+        onChange={(v) => { setDrag(v); fire({ type: "cuelist_manual", cuelist: list.id, progress: v }); }} onEnd={() => setDrag(null)} />
     </div>
   );
 }

@@ -2,12 +2,16 @@ import { signal } from "@preact/signals";
 import { useEffect, useRef, useState } from "preact/hooks";
 import { connected, dmx, dmxVersion, fire, rt, send, show, shows, toast } from "./store";
 import { workspaces } from "./workspaces";
-import { DialogHost, Kbd, Modal, Toasts, confirmDialog, promptDialog } from "./ui";
+import { BlindBanner, DialogHost, Kbd, Modal, ProgChips, Toasts, confirmDialog, promptDialog } from "./ui";
 import { autoInitMidi } from "./midi";
+import { CmdChip, CommandBar } from "./auto/CommandBar";
+import { setCmdOpen } from "./auto/state";
 import { downloadShow, importShow } from "./lib/api";
 import { releaseDmx, requestDmx } from "./lib/dmxsub";
 import { t, tp } from "./i18n";
 import { tErr } from "./i18n/errors";
+import { TestBanner } from "./workspaces/settings/OutputTest";
+import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/data/DataDialogs";
 
 export const current = signal(localStorage.getItem("ws") ?? "live");
 export function goto(id: string) {
@@ -19,6 +23,9 @@ const SHORTCUTS: [string, string][] = [
   ["1 … 7", "Switch workspace"],
   ["Ctrl/⌘ + B", "Toggle blackout"],
   ["Ctrl/⌘ + S", "Save show"],
+  ["Ctrl/⌘ + Z", "Undo"],
+  ["Ctrl/⌘ + Y  ·  Ctrl/⌘ + Shift + Z", "Redo"],
+  ["/", "Command line"],
   ["?", "This help"],
   ["Esc", "Close dialogs"],
 ];
@@ -27,6 +34,7 @@ function ShowMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
+  const [dataDlg, setDataDlg] = useState<"reports" | "csv" | "mvr" | "backups" | null>(null);
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
@@ -70,8 +78,18 @@ function ShowMenu() {
           <hr />
           <button role="menuitem" onClick={run(() => downloadShow(name))}>{t("Download JSON")}</button>
           <button role="menuitem" onClick={() => file.current?.click()}>{t("Import JSON…")}</button>
+          <hr />
+          <div class="menu-label">{t("Data")}</div>
+          <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("reports"))}>{t("Reports…")}</button>
+          <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("csv"))}>{t("Patch CSV…")}</button>
+          <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("mvr"))}>{t("MVR…")}</button>
+          <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("backups"))}>{t("Backups…")}</button>
         </div>
       )}
+      {dataDlg === "reports" && <ReportsDialog onClose={() => setDataDlg(null)} />}
+      {dataDlg === "csv" && <CsvImportDialog onClose={() => setDataDlg(null)} />}
+      {dataDlg === "mvr" && <MvrDialog onClose={() => setDataDlg(null)} />}
+      {dataDlg === "backups" && <BackupsDialog onClose={() => setDataDlg(null)} />}
       <input ref={file} type="file" accept=".json,application/json" hidden onChange={async (e) => {
         const f = (e.target as HTMLInputElement).files?.[0];
         (e.target as HTMLInputElement).value = "";
@@ -148,6 +166,9 @@ export function App() {
       if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); void send({ type: "blackout", on: !rt.value?.blackout }); return; }
       if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); void send({ type: "show_save", name: null }).then(() => toast(t("Show saved"), "ok", 1500)).catch(() => {}); return; }
       if ((e.target as HTMLElement)?.matches?.("input,textarea,select")) return;
+      if (mod && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); void send({ type: e.shiftKey ? "redo" : "undo" }).catch(() => {}); return; }
+      if (mod && !e.altKey && e.key.toLowerCase() === "y") { e.preventDefault(); void send({ type: "redo" }).catch(() => {}); return; }
+      if (e.key === "/" && !mod && !e.altKey) { e.preventDefault(); setCmdOpen(true); return; }
       if (e.key === "?") { setHelp((v) => !v); return; }
       if (mod || e.altKey) return;
       const w = workspaces.find((w) => w.key === e.key);
@@ -173,6 +194,8 @@ export function App() {
           ))}
         </nav>
         <span class="sp" />
+        <ProgChips />
+        <CmdChip />
         <ShowMenu />
         <GrandMaster />
         <span class="hdr-chip mono" title={t("Show timecode")} style={{ color: tc?.running ? "var(--live)" : "var(--text-dim)" }}>{tc?.text ?? "00:00:00:00"}</span>
@@ -183,7 +206,10 @@ export function App() {
         <button class={`btn tall ${bo ? "blink" : "danger"}`} aria-pressed={bo} onClick={() => send({ type: "blackout", on: !bo })} title={t("Blackout (Ctrl+B)")}>BLACKOUT</button>
         <button class="btn tall ghost icon hide-mid" aria-label={t("Keyboard shortcuts")} onClick={() => setHelp(true)}>?</button>
       </header>
+      <TestBanner />
+      <BlindBanner />
       <main class="grow" style={{ minHeight: 0, overflow: "hidden" }}><Cur /></main>
+      <CommandBar />
       <StatusBar />
       {help && (
         <Modal title={t("Keyboard shortcuts")} onClose={() => setHelp(false)}>

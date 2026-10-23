@@ -54,3 +54,18 @@ Timecode: MTC decoded from `MidiIn` (`io::MtcDecoder`) or the internal clock; cu
 | Live, Desk, Cues, executors, widgets | `ui/src/workspaces/{Live,Desk,Cues}*`, `ui/src/widgets/**` |
 | 3D visualiser + stage editor | `ui/src/workspaces/Stage3D*`, `ui/src/stage/**` |
 Shared and frozen: `src/model.rs`, `ui/src/store.ts`, `ui/src/gen/**`, `ui/src/styles/tokens.css` (ask before changing; additive CSS goes in `base.css`).
+
+## Automation: command line, macros, timelines, MSC
+* **Command line** (`Command::CommandLine{text}`, `src/engine/cmdline.rs`): console-style statements separated by `;`/newline,
+  English + Spanish keywords, compiled to ordinary `Command`s and executed in order; results in `Runtime.cmd_log` (last 30).
+  Selection lives in the interpreter session (one text / one macro run): `fixture 1 thru 4 at 50; red at 100`.
+  Selection `fixture|aparato 1 thru 10 + 15 - 4`, `group N`, `all`, `odd|even`, `next|prev`; values `at 50|full|out|half|home|0 thru 100`;
+  `record cue|palette|scene|group`, `update cue`, `delete …`, `apply palette`, `go|back|pause|release|goto`, `scene N on|off|solo|at V`,
+  `chase N on|off|bpm V|tap`, `macro N`, `timeline N run|stop|seek`, `blackout`, `gm`, `clear`, `park U/C at V`, `undo|redo`, `blind`.
+  Syntax errors run nothing and report the column; a failing statement stops the rest. `GET /api/cmdline/help` (grammar JSON),
+  `GET /api/cmdline/complete?q=` (autocomplete).
+* **Macros** (`macros.rs`): steps = command-line texts with a `wait`; non-blocking on the engine clock; nesting limit 8; a failing step aborts the run.
+* **Timelines** (`timeline.rs`): events fire command-line texts when the playhead passes `at`; `seek` never fires skipped events;
+  `looped`; `tc_start` follows show timecode (holds while TC is stopped; jumps >2 s are seeks).
+* **MSC** (`msc.rs`): SysEx `F0 7F <dev> 02 <fmt> <cmd> … F7` via `MidiIn` (browser needs Web MIDI `sysex: true`) or native MIDI. GO/STOP/RESUME/TIMED_GO/LOAD/ALL_OFF/RESET
+  honouring `Settings.msc` (device id, list→cuelist map); LOAD arms the cue for the next MSC GO.

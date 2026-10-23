@@ -2,13 +2,15 @@ import { useState } from "preact/hooks";
 import { selection } from "../../store";
 import type { Fixture } from "../../types";
 import {
-  attrColor, attrHome, attrLabel, capLabel, channelOf, fixtureById, GROUP_COLOR, hexToRgb, pct, rgbToHex, unionAttrs,
+  ALL_ATTRS, attrColor, attrHome, attrLabel, capLabel, channelOf, fixtureById, GROUP_COLOR, hexToRgb, pct, rgbToHex, unionAttrs,
 } from "../../lib/attrs";
 import { attrState, releaseAttrs, setAttrs } from "../../lib/program";
-import { colorHistory, pushColor } from "../../lib/state";
+import { attrView, colorHistory, pushColor, setAttrView } from "../../lib/state";
 import { useDmxTick } from "../../lib/hooks";
 import { ColorPicker, Fader, Knob, XYPad } from "../../widgets";
 import { t } from "../../i18n";
+import { FanDialog } from "./FanDialog";
+import { Sheet } from "./Sheet";
 
 const sel = (): Fixture[] => selection.value.map((i) => fixtureById(i)).filter((f): f is Fixture => !!f);
 
@@ -55,11 +57,27 @@ function AttrFader({ fxs, attr, height = 190 }: { fxs: Fixture[]; attr: string; 
   );
 }
 
+/** Faders/knobs ↔ fixture sheet switch shown in the attribute panel header. */
+function ViewSwitch() {
+  const v = attrView.value;
+  return (
+    <div class="row" style={{ gap: 2 }} role="tablist" aria-label={t("Attribute view")}>
+      <button role="tab" aria-selected={v === "faders"} class={`btn sm ${v === "faders" ? "sel" : ""}`} style={{ minHeight: 44 }} onClick={() => setAttrView("faders")}>{t("Faders")}</button>
+      <button role="tab" aria-selected={v === "sheet"} class={`btn sm ${v === "sheet" ? "sel" : ""}`} style={{ minHeight: 44 }} onClick={() => setAttrView("sheet")}>{t("Sheet")}</button>
+    </div>
+  );
+}
+
 export function AttrPanels() {
+  return attrView.value === "sheet" ? <Sheet /> : <AttrFaders />;
+}
+
+function AttrFaders() {
   useDmxTick(10);
   const fxs = sel();
+  const [fanOpen, setFanOpen] = useState(false);
   if (!fxs.length) {
-    return <div class="panel lv-col"><div class="panel-head">{t("Attributes")}</div>
+    return <div class="panel lv-col"><div class="panel-head"><span>{t("Attributes")}</span><span class="sp" /><ViewSwitch /></div>
       <div class="panel-body dim">{t("Select fixtures in the pool to edit their attributes.")}</div></div>;
   }
   const has = unionAttrs(fxs);
@@ -76,7 +94,10 @@ export function AttrPanels() {
 
   return (
     <div class="panel lv-col">
-      <div class="panel-head"><span>{t("Attributes")}</span><span class="sp" /><span class="chip">{t("{n} selected", { n: fxs.length })}</span></div>
+      <div class="panel-head"><span>{t("Attributes")}</span><span class="sp" /><span class="chip">{t("{n} selected", { n: fxs.length })}</span>
+        <button class="btn sm" style={{ minHeight: 44 }} disabled={fxs.length < 2} onClick={() => setFanOpen(true)} title={t("Spread any attribute across the selection")}>{t("↔ Fan")}</button>
+        <ViewSwitch />
+      </div>
       <div class="lv-scroll" style={{ padding: "var(--s-2)" }}>
         {has.has("dimmer") && <IntensityCard fxs={fxs} held={anyHeld(["dimmer"])} onRelease={rel(["dimmer"])} />}
         {posAttrs.length > 0 && <PositionCard fxs={fxs} attrs={posAttrs} held={anyHeld(posAttrs)} onRelease={rel(posAttrs)} />}
@@ -84,6 +105,7 @@ export function AttrPanels() {
         {beamAttrs.length > 0 && <EncoderCard title="Beam" group="beam" fxs={fxs} attrs={beamAttrs} onRelease={rel(beamAttrs)} />}
         {(ctrlAttrs.length > 0 || other.length > 0) && <EncoderCard title="Control" group="control" fxs={fxs} attrs={[...ctrlAttrs, ...other]} onRelease={rel([...ctrlAttrs, ...other])} />}
       </div>
+      {fanOpen && <FanDialog ids={selection.value} attrs={[...has].sort((a, b) => (ALL_ATTRS.indexOf(a) + 1 || 99) - (ALL_ATTRS.indexOf(b) + 1 || 99))} onClose={() => setFanOpen(false)} />}
     </div>
   );
 }
