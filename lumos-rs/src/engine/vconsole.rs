@@ -93,7 +93,7 @@ impl Engine {
             ExecKind::Scene { scene } => self.scenes.is_active(*scene),
             ExecKind::Chase { chase } => self.chases.is_running(*chase),
             ExecKind::Speed { master } => self.speed_bpm(*master).is_some(),
-            ExecKind::XFade { .. } => false, // be-prog
+            ExecKind::XFade { cuelist } => self.manual_active(*cuelist),
             ExecKind::Empty => false,
         }
     }
