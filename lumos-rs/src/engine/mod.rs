@@ -1,11 +1,13 @@
 //! The engine task: owns all show/runtime state, executes commands, renders DMX at `tick_hz`.
 
 mod bindings;
+mod chases;
 mod effects;
 mod morph;
 mod patch;
 mod playback;
 mod scenes;
+mod speed;
 mod vconsole;
 
 use crate::io::{IoEvent, IoHub, MtcDecoder};
@@ -13,9 +15,11 @@ use crate::library;
 use crate::model::*;
 use crate::persist::Store;
 use bindings::*;
+use chases::ChasesState;
 use patch::*;
 use playback::*;
 use scenes::ScenesState;
+use speed::SpeedState;
 use vconsole::VcRt;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
@@ -173,6 +177,10 @@ struct Engine {
     osc_fb: HashMap<String, f32>,
     vc: VcRt,
     scenes: ScenesState,
+    chases: ChasesState,
+    speed: SpeedState,
+    /// Accumulated phase (cycles) and last update time per running effect.
+    fx_clock: HashMap<u32, (f64, f64)>,
 }
 
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
@@ -252,6 +260,9 @@ impl Engine {
             osc_fb: HashMap::new(),
             vc: VcRt::default(),
             scenes: ScenesState::default(),
+            chases: ChasesState::default(),
+            speed: SpeedState::default(),
+            fx_clock: HashMap::new(),
         };
         e.hz = e.show.settings.tick_hz.clamp(10, 100);
         e.rebuild_derived();
@@ -434,6 +445,9 @@ impl Engine {
         self.bind_last.clear();
         self.vc = VcRt::default();
         self.scenes = ScenesState::default();
+        self.chases = ChasesState::default();
+        self.speed = SpeedState::default();
+        self.fx_clock.clear();
         self.last_merged.clear();
         self.ext_dmx.clear();
         self.hz = self.show.settings.tick_hz.clamp(10, 100);
@@ -803,8 +817,17 @@ impl Engine {
             // be-prog
             Undo | Redo | BlindSet { .. } | CueLoad { .. } | CueUpdate { .. } | Unpark { .. } => {}
             // be-play
-            ChaseSave { .. } | ChaseRemove { .. } | ChaseRun { .. } | ChaseBpm { .. } | ChaseTap { .. } | ChaseNudge { .. } => {}
-            SpeedSave { .. } | SpeedRemove { .. } | SpeedSet { .. } | SpeedTap { .. } | CuelistManual { .. } => {}
+            ChaseSave { chase } => self.chase_save(chase)?,
+            ChaseRemove { id } => self.chase_remove(id)?,
+            ChaseRun { id, on } => self.chase_run(id, on)?,
+            ChaseBpm { id, bpm } => self.chase_set_bpm(id, bpm)?,
+            ChaseTap { id } => self.chase_tap(id)?,
+            ChaseNudge { id, delta } => self.chase_nudge(id, delta)?,
+            SpeedSave { master } => self.speed_save(master)?,
+            SpeedRemove { id } => self.speed_remove(id)?,
+            SpeedSet { id, bpm } => self.speed_set(id, bpm)?,
+            SpeedTap { id } => self.speed_tap(id)?,
+            CuelistManual { .. } => {}
             // be-auto
             CommandLine { .. } | MacroSave { .. } | MacroRemove { .. } | MacroRun { .. } | MacroStop { .. } => {}
             TimelineSave { .. } | TimelineRemove { .. } | TimelineRun { .. } | TimelineStop { .. } | TimelineSeek { .. } => {}
@@ -1231,6 +1254,7 @@ impl Engine {
             r.update(now, &disc);
         }
         self.scene_update(now);
+        self.chase_update(now);
         let due: Vec<u32> = self
             .runs
             .values()
@@ -1261,6 +1285,7 @@ impl Engine {
             }
             ExecKind::Master { master: MasterKind::Grand } => self.grand_master = l,
             ExecKind::Scene { scene } => self.scene_level(scene, l)?,
+            ExecKind::Speed { master } => self.speed_set(master, speed::level_to_bpm(l))?,
             _ => {}
         }
         self.dirty = true;
@@ -1278,6 +1303,8 @@ impl Engine {
                 Ok(())
             }
             ExecKind::Scene { scene } => self.scene_toggle(scene),
+            ExecKind::Chase { chase } => self.chase_toggle(chase),
+            ExecKind::Speed { master } => self.speed_tap(master),
             _ => Ok(()),
         }
     }
@@ -1286,6 +1313,7 @@ impl Engine {
         match self.exec_kind(id)? {
             ExecKind::Cuelist { cuelist } => self.back(cuelist),
             ExecKind::Scene { scene } => self.scene_go(scene, false),
+            ExecKind::Chase { chase } => self.chase_run(chase, false),
             _ => Ok(()),
         }
     }
@@ -1302,6 +1330,7 @@ impl Engine {
                 }
             }
             ExecKind::Scene { scene } => self.scene_set_flash(scene, down)?,
+            ExecKind::Chase { chase } => self.chase_flash(chase, down)?,
             _ => {}
         }
         self.dirty = true;
@@ -1309,6 +1338,9 @@ impl Engine {
     }
 
     fn exec_level(&self, id: u32) -> f32 {
+        if let Some(ExecKind::Speed { master }) = self.show.executors.iter().find(|e| e.id == id).map(|e| &e.kind) {
+            return self.speed_bpm(*master).map_or(0.0, speed::bpm_to_level);
+        }
         self.exec.get(&id).map_or(1.0, |e| e.level)
     }
 
@@ -1481,6 +1513,7 @@ impl Engine {
         }
         // 1b. scenes and scene morph
         self.apply_scenes(&mut merged);
+        self.apply_chases(&mut merged);
         self.last_merged = merged.clone();
         // 2. programmer
         for (f, attrs) in &self.programmer {
@@ -1513,6 +1546,21 @@ impl Engine {
                     .collect();
                 &overridden
             };
+            // accumulated phase per running effect: a BPM change (tap tempo, speed master) never makes the shape jump
+            let mut phases: HashMap<u32, f64> = HashMap::new();
+            let mut clock = std::mem::take(&mut self.fx_clock);
+            clock.retain(|id, _| on.contains(id) || fl.contains(id));
+            for e in effs {
+                if !(on.contains(&e.id) || fl.contains(&e.id)) {
+                    continue;
+                }
+                let cps = effects::cycles_per_sec(e, e.speed_master.and_then(|m| self.speed_bpm(m)));
+                let c = clock.entry(e.id).or_insert((cps * now, now));
+                c.0 += cps * (now - c.1).max(0.0);
+                c.1 = c.1.max(now);
+                phases.insert(e.id, c.0);
+            }
+            self.fx_clock = clock;
             effects::apply(
                 &mut merged,
                 effs,
@@ -1523,9 +1571,11 @@ impl Engine {
                         .find(|e| matches!(e.kind, ExecKind::Effect { effect } if effect == id))
                         .map_or(1.0, |e| exec.get(&e.id).map_or(1.0, |s| s.level))
                 },
+                &|id| phases.get(&id).copied().unwrap_or(0.0),
                 &self.patch,
-                now,
             );
+        } else {
+            self.fx_clock.clear();
         }
         merged
     }
@@ -1538,6 +1588,8 @@ impl Engine {
                 morph::emulate(pf, a);
             }
         }
+        // 3b. inhibitive submasters cap the dimmer of their fixtures (before the masters)
+        self.apply_inhibit(&mut merged);
         // 4. masters
         let mut factor: HashMap<u32, f32> = HashMap::new();
         for e in &self.show.executors {
@@ -1615,6 +1667,7 @@ impl Engine {
             || !self.effect_flash.is_empty()
             || self.runs.values().any(|r| !r.settled)
             || self.scenes.ramping()
+            || self.chases.any_running()
     }
 
     // ───────────── tick ─────────────
@@ -1771,10 +1824,13 @@ impl Engine {
                     ExecKind::Group { .. } => st.level > 0.0,
                     ExecKind::Master { .. } => true,
                     ExecKind::Scene { scene } => self.scenes.is_active(*scene),
-                    ExecKind::Chase { .. } | ExecKind::Speed { .. } | ExecKind::XFade { .. } => false, // be-play
+                    ExecKind::Chase { chase } => self.chases.is_running(*chase),
+                    ExecKind::Speed { master } => self.speed_bpm(*master).is_some(),
+                    ExecKind::XFade { .. } => false, // be-prog
                     ExecKind::Empty => false,
                 };
                 let level = match &e.kind {
+                    ExecKind::Speed { master } => self.speed_bpm(*master).map_or(0.0, speed::bpm_to_level),
                     ExecKind::Master { .. } => self.grand_master,
                     ExecKind::Scene { scene } => self.scenes.effective(*scene),
                     _ => st.level,
@@ -1828,8 +1884,8 @@ impl Engine {
             redo: 0,
             parked: vec![],
             cmd_log: vec![],
-            chases: vec![],
-            speed: vec![],
+            chases: self.chase_rt(),
+            speed: self.speed_rt(),
             timelines: vec![],
             macros_running: vec![],
             testing: false,
