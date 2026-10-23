@@ -260,6 +260,79 @@ r = await cmd({ type: "fixture_morph", ids: [1], profile: "nope", mode: "x", rep
 ok(!r.ok, "fixture_morph with unknown profile rejected");
 await cmd({ type: "prog_release", fixtures: null, attrs: null });
 
+console.log("command line + macros + timelines + MSC");
+{
+  const j = async (path) => (await fetch(`http://${base}${path}`)).json();
+  const help = await j("/api/cmdline/help");
+  ok(help.version === 1 && help.statements.length >= 10 && help.keywords.fixture.includes("aparato"), "GET /api/cmdline/help");
+  const comp = await j("/api/cmdline/complete?q=rec");
+  ok(comp.suggestions.includes("record"), "GET /api/cmdline/complete suggests 'record'");
+
+  await cmd({ type: "prog_release", fixtures: null, attrs: null });
+  r = await cmd({ type: "fixture_add", profile: "generic/dimmer", mode: "1ch", count: 1, universe: 1, address: 300, name: "CL" });
+  ok(r.ok, "add a dimmer at 300 for the automation tests");
+  await until(() => state.show.fixtures.some((f) => f.address === 300), "dimmer fixture in show");
+  const fid = state.show.fixtures.find((f) => f.address === 300).id;
+  const dmx300 = () => state.frames.get(1)?.[299];
+
+  r = await cmd({ type: "command_line", text: `fixture ${fid} at 50` });
+  ok(r.ok && (await until(() => dmx300() === 128, "ch300 = 128")), "command_line: 'fixture N at 50' drives DMX");
+  r = await cmd({ type: "command_line", text: `fixture ${fid} colour red; at 100` });
+  ok(r.ok && (await until(() => dmx300() === 255, "ch300 = 255")), "command_line: several statements in one text share the selection");
+  r = await cmd({ type: "command_line", text: "wibble" });
+  ok(!r.ok && /unknown command 'wibble'/.test(r.err) && /col 1/.test(r.err), "command_line: syntax error reports message + column");
+  r = await cmd({ type: "command_line", text: "fixture 9999 at 50" });
+  ok(!r.ok && /does not exist/.test(r.err), "command_line: semantic error reported");
+  r = await cmd({ type: "command_line", text: "aparato 1 hasta 2; en 0" });
+  ok(r.ok, "command_line: Spanish aliases");
+  ok(await until(() => state.rt.cmd_log?.length >= 4 && state.rt.cmd_log.some((l) => !l.ok) && state.rt.cmd_log.some((l) => l.ok), "cmd_log"), "runtime cmd_log carries ok and failed statements");
+
+  await cmd({ type: "command_line", text: `fixture ${fid} at 100; record cue 1 cuelist 9 release; fixture ${fid} at 20; record cue 2 cuelist 9 release` });
+  await until(() => state.show.cuelists.find((c) => c.id === 9)?.cues.length === 2, "cuelist 9 recorded by text");
+  ok(state.show.cuelists.find((c) => c.id === 9)?.cues.length === 2, "command_line: record cue ... cuelist 9");
+  await cmd({ type: "command_line", text: "go cuelist 9; go cuelist 9" });
+  ok(await until(() => state.rt.cuelists.find((c) => c.id === 9)?.current === 2, "cue 2 current"), "command_line: go; go advances the cuelist");
+  await cmd({ type: "command_line", text: "release all" });
+
+  // macro
+  r = await cmd({ type: "macro_save", macro: { id: 0, name: "Flash", color: "", steps: [{ text: `fixture ${fid} at 100`, wait: 0.4 }, { text: `fixture ${fid} at 0`, wait: 0 }] } });
+  ok(r.ok && (await until(() => state.show.macros?.length === 1, "macro in show")), "macro_save");
+  r = await cmd({ type: "macro_save", macro: { id: 0, name: "Bad", color: "", steps: [{ text: "wibble", wait: 0 }] } });
+  ok(!r.ok && /step 1/.test(r.err), "macro_save rejects a syntax error with the step number");
+  const mid = state.show.macros[0].id;
+  r = await cmd({ type: "macro_run", id: mid });
+  const progDimmer = () => state.rt.programmer[String(fid)]?.dimmer;
+  ok(r.ok && (await until(() => progDimmer() === 1 || state.rt.macros_running.includes(mid), "macro step 1")), "macro_run: first step runs immediately");
+  ok(await until(() => progDimmer() === 0 && !state.rt.macros_running.includes(mid), "macro step 2", 4000), "macro: second step runs after the wait and the macro ends");
+
+  // timeline
+  r = await cmd({ type: "timeline_save", timeline: { id: 0, name: "TL", length: 1.2, looped: false, tc_start: null, audio: null,
+    events: [{ at: 0.3, text: `fixture ${fid} at 80`, label: "" }, { at: 0.9, text: `fixture ${fid} at 10`, label: "" }] } });
+  ok(r.ok && (await until(() => state.show.timelines?.length === 1, "timeline in show")), "timeline_save");
+  const tid = state.show.timelines[0].id;
+  await cmd({ type: "timeline_run", id: tid, from: null });
+  ok(await until(() => dmx300() === 204, "tl event 1 (80% = 204)", 3000), "timeline fires its first event");
+  ok(await until(() => dmx300() === 26, "tl event 2 (10% = 26)", 3000), "timeline fires its second event");
+  ok(await until(() => state.rt.timelines?.find((t) => t.id === tid)?.running === false, "timeline finished", 3000), "timeline stops at its length");
+  await cmd({ type: "timeline_seek", id: tid, t: 1.0 });
+  ok(await until(() => Math.abs(state.rt.timelines.find((t) => t.id === tid).t - 1.0) < 0.05, "seek"), "timeline_seek moves the playhead");
+  ok(!(await cmd({ type: "timeline_run", id: 9999, from: null })).ok, "timeline_run of an unknown timeline fails");
+
+  // MSC
+  await cmd({ type: "settings_save", settings: { ...state.show.settings, msc: { enabled: true, device_id: 1, map: [{ msc_list: "5", cuelist: 9 }] } } });
+  await until(() => state.show.settings.msc?.enabled, "msc enabled");
+  await cmd({ type: "command_line", text: "release all" });
+  await cmd({ type: "midi_in", port: "e2e", bytes: [0xF0, 0x7F, 0x01, 0x02, 0x01, 0x01, 0x31, 0x00, 0x35, 0xF7] }); // GO cue 1 list "5"
+  ok(await until(() => state.rt.cuelists.find((c) => c.id === 9)?.current === 1, "MSC GO"), "MSC GO cue 1 list 5 → cuelist 9, cue 1");
+  ok(await until(() => state.rt.inputs.recent.some((l) => l.startsWith("MSC GO")), "msc activity"), "MSC shows in the input activity list");
+  await cmd({ type: "midi_in", port: "e2e", bytes: [0xF0, 0x7F, 0x01, 0x02, 0x01, 0x08, 0xF7] }); // ALL_OFF
+  ok(await until(() => state.rt.cuelists.find((c) => c.id === 9)?.current == null, "MSC ALL_OFF"), "MSC ALL_OFF releases the cuelist");
+  await cmd({ type: "midi_in", port: "e2e", bytes: [0xF0, 0x7F, 0x02, 0x02, 0x01, 0x01, 0xF7] }); // other device id
+  await sleep(300);
+  ok(state.rt.cuelists.find((c) => c.id === 9)?.current == null, "MSC for another device id is ignored");
+  await cmd({ type: "prog_release", fixtures: null, attrs: null });
+}
+
 console.log("idle CPU");
 const cpu = () => { const f = readFileSync(`/proc/${proc.pid}/stat`, "utf8").split(") ")[1].split(" "); return (+f[11] + +f[12]) / 100; };
 await cmd({ type: "prog_release", fixtures: null, attrs: null });

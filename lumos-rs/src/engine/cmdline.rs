@@ -2496,4 +2496,18 @@ mod tests {
         let r = e.handle(Command::CommandLine { text: "at 50".into() });
         assert!(r.unwrap_err().contains("no fixtures selected"));
     }
+
+    #[test]
+    fn programmer_overrides_a_releasing_cuelist() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 1);
+        e.handle(Command::CommandLine {
+            text: "fixture 1 at 100; record cue 1 cuelist 9 release; fixture 1 at 20; record cue 2 cuelist 9 release; go cuelist 9; go cuelist 9; release all".into(),
+        })
+        .unwrap();
+        e.handle(Command::CommandLine { text: "fixture 1 at 100".into() }).unwrap();
+        let t = e.now();
+        e.update_playback(t + 0.3);
+        assert_eq!(frame(&mut e)[0], 255, "programmer 100% must win over a releasing cuelist");
+    }
 }
