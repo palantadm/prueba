@@ -273,7 +273,11 @@ fn values_summary(lang: Lang, vals: &PerFixture, refs: &PerFixtureRefs) -> Strin
         }
     }
     let n = vals.len();
-    let g: Vec<&str> = groups.iter().map(|g| group_label(lang, g)).collect();
+    let g: Vec<&str> = ["intensity", "position", "color", "beam", "control"]
+        .iter()
+        .filter(|k| groups.contains(*k))
+        .map(|g| group_label(lang, g))
+        .collect();
     let r: usize = refs.values().map(|m| m.len()).sum();
     let mut s = format!("{} {}", n, if n == 1 { lang.t("aparato", "fixture") } else { lang.t("aparatos", "fixtures") });
     if !g.is_empty() {

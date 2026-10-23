@@ -14,6 +14,7 @@
 mod artnet;
 mod inputs;
 mod mtc;
+mod nodes;
 mod oscout;
 mod sacn;
 mod serial;
@@ -106,6 +107,7 @@ pub struct IoHub {
     artnet_key: Option<u16>,
     artnet_error: String,
     pub(crate) artnet_port: u16,
+    scanner: Option<nodes::NodeScanner>,
 
     feedback: Option<(UdpSocket, SocketAddr)>,
     feedback_key: String,
@@ -136,6 +138,7 @@ impl IoHub {
             artnet_key: None,
             artnet_error: String::new(),
             artnet_port: artnet::ARTNET_PORT,
+            scanner: None,
             feedback: None,
             feedback_key: String::new(),
             osc_tx: UdpSocket::bind("0.0.0.0:0").ok().and_then(|s| s.set_nonblocking(true).ok().map(|_| s)),
@@ -296,6 +299,28 @@ impl IoHub {
             Ok(buf) => sock.send_to(&buf, target).is_ok(),
             Err(_) => false,
         }
+    }
+
+    /// Send an ArtPoll (limited/directed broadcasts + known nodes). Replies fill [`IoHub::nodes`].
+    pub fn nodes_scan(&mut self) {
+        if self.scanner.is_none() {
+            match nodes::NodeScanner::start(self.artnet_shared.nodes.clone(), Some(self.artnet_port)) {
+                Ok(s) => self.scanner = Some(s),
+                Err(e) => {
+                    tracing::warn!("Art-Net scan: {e}");
+                    return;
+                }
+            }
+        }
+        let targets = nodes::poll_targets(self.artnet_port, &self.artnet_shared.nodes.ips());
+        if let Some(s) = &self.scanner {
+            s.poll(&targets);
+        }
+    }
+
+    /// `(version, nodes)`; the version changes whenever the set of nodes changes.
+    pub fn nodes(&self) -> (u32, Vec<ArtNode>) {
+        self.artnet_shared.nodes.snapshot()
     }
 
     /// Send one OSC message to the configured feedback target (no-op when disabled).

@@ -14,9 +14,9 @@ use super::{push_recent, IoEvent, Recent, Sink, Stat};
 use crate::model::{ArtNetInMap, OutState};
 
 pub const ARTNET_PORT: u16 = 6454;
-const ID: &[u8; 8] = b"Art-Net\0";
-const OP_POLL: u16 = 0x2000;
-const OP_POLL_REPLY: u16 = 0x2100;
+pub(super) const ID: &[u8; 8] = b"Art-Net\0";
+pub(super) const OP_POLL: u16 = 0x2000;
+pub(super) const OP_POLL_REPLY: u16 = 0x2100;
 const OP_DMX: u16 = 0x5000;
 
 /// 15-bit port-address: net(7) | subnet(4) | universe(4).
@@ -219,6 +219,8 @@ pub struct ArtShared {
     pub map: Mutex<Vec<ArtNetInMap>>,
     /// Port-addresses of enabled outputs (advertised in ArtPollReply).
     pub out_ports: Mutex<Vec<u16>>,
+    /// Nodes discovered through ArtPollReply.
+    pub nodes: Arc<super::nodes::NodeTable>,
 }
 
 impl Default for ArtShared {
@@ -228,6 +230,7 @@ impl Default for ArtShared {
             in_enabled: AtomicBool::new(false),
             map: Mutex::new(vec![]),
             out_ports: Mutex::new(vec![]),
+            nodes: Arc::new(Default::default()),
         }
     }
 }
@@ -248,7 +251,7 @@ impl Drop for ArtNetListener {
     }
 }
 
-fn bind_shared(port: u16) -> std::io::Result<UdpSocket> {
+pub(super) fn bind_shared(port: u16) -> std::io::Result<UdpSocket> {
     use socket2::{Domain, Protocol, Socket, Type};
     let s = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
     s.set_reuse_address(true)?;
@@ -304,6 +307,10 @@ fn listener_loop(
             }
         };
         let pkt = &buf[..n];
+        if let Some(info) = super::nodes::parse_poll_reply(pkt) {
+            shared.nodes.update(info);
+            continue;
+        }
         if parse_poll(pkt) {
             // Reply with the address of the interface that reaches the poller.
             let ip = UdpSocket::bind("0.0.0.0:0")
