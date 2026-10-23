@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { dmx, selection, show } from "../store";
+import { dmx, rt, selection, show } from "../store";
+import { ParkedButton, ParkedList } from "../ui";
+import { parkChannel, parkedSet, unparkChannel } from "../lib/park";
 import { EmptyState, PageHead, Segmented, Toggle } from "../ui";
 import { footprint, modeOf, profileById } from "../lib/fixtures";
 import { attrLabel } from "../lib/shell-attrs";
@@ -23,8 +25,11 @@ export function Monitor() {
   const [active, setActive] = useState<Set<number>>(new Set());
   const wrap = useRef<HTMLDivElement>(null);
   const cv = useRef<HTMLCanvasElement>(null);
-  const st = useRef({ u, fmt, nz, hover: null as number | null, pin: null as number | null, dirty: true, cols: 32, prev: new Uint8Array(512), flash: new Float32Array(512) });
-  Object.assign(st.current, { u, fmt, nz, hover, pin, dirty: true });
+  const st = useRef({ u, fmt, nz, hover: null as number | null, pin: null as number | null, parked: new Set<number>(), dirty: true, cols: 32, prev: new Uint8Array(512), flash: new Float32Array(512) });
+  const parked = parkedSet(u);
+  void rt.value?.parked;
+  const [parkedOpen, setParkedOpen] = useState(false);
+  Object.assign(st.current, { u, fmt, nz, hover, pin, parked, dirty: true });
 
   useEffect(() => { if (unis.length && !unis.includes(u)) setU(unis[0]); }, [unis.join(",")]);
   useEffect(() => { requestDmx("monitor", unis.length > 24 ? [u] : unis); return () => releaseDmx("monitor"); }, [u, unis.length > 24, unis.length]);
@@ -96,6 +101,10 @@ export function Monitor() {
         if (v) { ctx.globalAlpha = 0.55; ctx.fillStyle = col.accent; const bh = ((CELL_H - 2) * v) / 255; ctx.fillRect(x + 1, y + CELL_H - 1 - bh, cw - 2, bh); ctx.globalAlpha = 1; }
         const age = now - s.flash[i];
         if (age < 400) { ctx.globalAlpha = 1 - age / 400; ctx.strokeStyle = col.live; ctx.lineWidth = 2; ctx.strokeRect(x + 1.5, y + 1.5, cw - 3, CELL_H - 3); ctx.globalAlpha = 1; }
+        if (s.parked.has(i + 1)) {
+          ctx.strokeStyle = col.live; ctx.lineWidth = 2; ctx.strokeRect(x + 1.5, y + 1.5, cw - 3, CELL_H - 3);
+          ctx.fillStyle = col.live; ctx.font = "700 10px ui-monospace, monospace"; ctx.textAlign = "right"; ctx.fillText("P", x + cw - 4, y + 11);
+        }
         if (s.hover === i + 1 || s.pin === i + 1) { ctx.strokeStyle = col.text; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, cw - 1, CELL_H - 1); }
         ctx.fillStyle = col.faint; ctx.font = "9px ui-monospace, monospace"; ctx.textAlign = "left"; ctx.fillText(String(i + 1), x + 4, y + 11);
         ctx.fillStyle = v ? col.text : col.faint; ctx.font = "600 13px ui-monospace, monospace"; ctx.textAlign = "center";
@@ -122,6 +131,7 @@ export function Monitor() {
       <PageHead title={t("DMX monitor")} sub={t("Final merged output, as sent to the outputs.")}>
         <Segmented<Fmt> value={fmt} onChange={setFmt} label={t("Number format")} options={[{ value: "dec", label: "DEC" }, { value: "hex", label: "HEX" }, { value: "pct", label: "%" }]} />
         <Toggle checked={nz} onChange={setNz} label={t("Only non-zero")} />
+        <ParkedButton onOpen={() => setParkedOpen(true)} />
       </PageHead>
       {unis.length === 0 ? <EmptyState title={t("No universes")} hint={t("Add universes in Settings.")} /> : <>
         <div class="row scroll" role="tablist" aria-label={t("Universes")} style={{ padding: "6px 12px", gap: 4, flex: "none", borderBottom: "1px solid var(--line)" }}>
@@ -136,15 +146,20 @@ export function Monitor() {
             onMouseMove={(e) => setHover(chAt(e as MouseEvent))} onMouseLeave={() => setHover(null)}
             onClick={(e) => { const c = chAt(e as MouseEvent); setPin(c === pin ? null : c); const f = c ? chInfo.get(c) : null; if (f) selection.value = [f.fixture]; }} />
         </div>
-        <div class="statusbar" style={{ height: 34, fontSize: "var(--fs-sm)" }} aria-live="polite">
+        <div class="statusbar" style={{ height: pin ? 56 : 34, fontSize: "var(--fs-sm)" }} aria-live="polite">
           {shown ? <>
             <b class="mono" style={{ color: "var(--text)" }}>U{u}.{String(shown).padStart(3, "0")}</b>
             <span class="mono" style={{ color: "var(--text)" }}>{v} · 0x{v.toString(16).toUpperCase().padStart(2, "0")} · {Math.round((v / 255) * 100)}%</span>
             {info ? <span style={{ color: "var(--text)" }}>#{info.fixture} {info.name} — <span style={{ color: "var(--live)" }}>{attrLabel(info.attr.replace(" fine", ""))}{info.attr.endsWith("fine") ? ` ${t("(fine)")}` : ""}</span></span> : <span class="faint">{t("unpatched")}</span>}
             {pin && <span class="faint">{t("(pinned — click again to release)")}</span>}
+            {pin && <span class="sp" />}
+            {pin && (parked.has(pin)
+              ? <button class="btn" style={{ minHeight: 44 }} onClick={() => unparkChannel(u, pin)}>{t("Unpark")}</button>
+              : <button class="btn on" style={{ minHeight: 44 }} onClick={() => parkChannel(u, pin, v)}>{t("Park at {v}", { v })}</button>)}
           </> : <span class="faint">{t("Hover a channel for details, click to pin and select its fixture.")}</span>}
         </div>
       </>}
+      {parkedOpen && <ParkedList onClose={() => setParkedOpen(false)} />}
     </div>
   );
 }

@@ -2,13 +2,15 @@
 // The server is authoritative: the UI only sends Commands and renders what comes back.
 import { signal } from "@preact/signals";
 import { tErr } from "./i18n/errors";
-import type { Command, FixtureProfile, MidiPortInfo, Runtime, ServerMsg, Show, ShowInfo, Source } from "./types";
+import type { ArtNode, BackupInfo, Command, FixtureProfile, MidiPortInfo, Runtime, ServerMsg, Show, ShowInfo, Source } from "./types";
 
 export const connected = signal(false);
 export const show = signal<Show | null>(null);
 export const rt = signal<Runtime | null>(null);
 export const library = signal<FixtureProfile[]>([]);
 export const shows = signal<ShowInfo[]>([]);
+export const backups = signal<BackupInfo[]>([]);
+export const nodes = signal<ArtNode[]>([]);
 export const serverLog = signal<{ level: string; msg: string; at: number }[]>([]);
 
 /** Fixture ids selected in the UI (client-side, shared across workspaces). */
@@ -94,6 +96,8 @@ function onMessage(ev: MessageEvent) {
     case "rt": rt.value = m.rt; break;
     case "library": library.value = m.profiles; break;
     case "shows": shows.value = m.shows; break;
+    case "backups": backups.value = m.items; break;
+    case "nodes": nodes.value = m.nodes; break;
     case "learned": learnedListeners.forEach((f) => f(m.source)); break;
     case "midi_ports": midiPorts.value = { native: m.native, inputs: m.inputs, outputs: m.outputs }; break;
     case "midi_out": hooks.midiOut?.(m.port, m.bytes); break;

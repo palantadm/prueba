@@ -13,3 +13,9 @@ export function pushColor(hex: string) {
   colorHistory.value = l;
   lsSet("lumos.colorHistory", l);
 }
+
+/** Live attribute area: faders/knobs or the fixture sheet. */
+export const attrView = signal<"faders" | "sheet">(lsGet("lumos.attrView", "faders"));
+export const setAttrView = (v: "faders" | "sheet") => { attrView.value = v; lsSet("lumos.attrView", v); };
+/** Palette to reveal in the Live pools (set from the cue editor's palette badges). */
+export const focusPalette = signal<number | null>(null);

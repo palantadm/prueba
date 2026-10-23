@@ -176,3 +176,12 @@ h2 { margin: 0; font-size: var(--fs-xl); font-weight: 700; }
 :root { color-scheme: dark; }
 select { background: var(--bg-3); color: var(--text); }
 select option { background: var(--bg-2); color: var(--text); }
+
+/* ── blind mode (programmer excluded from the output) ── */
+.btn.blind-on { background: var(--live-dim); border-color: var(--live); color: var(--live); animation: blindpulse 1.6s ease-in-out infinite; }
+@keyframes blindpulse { 50% { background: var(--bg-3); } }
+.blind-banner { background: var(--live-dim); color: var(--live); border-bottom: 1px solid var(--live); padding: 4px var(--s-4); font-size: var(--fs-sm); font-weight: 700; letter-spacing: .06em; text-align: center; }
+body.blind main { outline: 3px solid var(--live); outline-offset: -3px; }
+
+/* page-head actions wrap on narrow screens instead of overflowing */
+.page-head > .row { flex-wrap: wrap; min-width: 0; max-width: 100%; }

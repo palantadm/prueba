@@ -134,3 +134,26 @@
 
 .lv-ch .lv-fader { flex: 1 1 0; min-height: 160px; height: auto; }
 @media (max-width: 900px) { .lv-cuetbl { flex: none; max-height: 360px; } }
+
+/* ── wave 2: park, sheet, fan, cue editor ───────────────────── */
+.lv-ch-btn { background: none; border: 0; color: var(--text-dim); font-family: var(--font-mono); font-size: var(--fs-xs); min-height: 44px; width: 100%; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 3px; }
+.lv-ch-btn:hover { color: var(--text); }
+.lv-pal-cell.flash { animation: palflash 0.7s ease-in-out 3; border-color: var(--accent); }
+@keyframes palflash { 50% { background: var(--accent-dim); } }
+.lv-palbadge { background: var(--accent-dim); color: #d6f3fb; border: 1px solid var(--accent); border-radius: 10px; padding: 0 8px; font-size: var(--fs-xs); cursor: pointer; margin-left: 4px; }
+.lv-timing td { padding: 4px var(--s-3); }
+
+/* fixture sheet */
+.lv-sheet { border-collapse: separate; border-spacing: 0; }
+.lv-sheet th, .lv-sheet td { padding: 0; }
+.lv-sheet thead th { position: sticky; top: 0; z-index: 2; background: var(--bg-2); }
+.lv-sheet-row { position: sticky; left: 0; z-index: 1; background: var(--bg-2); text-align: left; }
+.lv-sheet-h { background: none; border: 0; color: inherit; font: inherit; text-transform: none; min-height: 44px; padding: 0 var(--s-3); cursor: pointer; white-space: nowrap; width: 100%; text-align: left; }
+.lv-sheet thead .lv-sheet-h { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .04em; text-transform: uppercase; text-align: center; }
+.lv-sheet-c { position: relative; min-width: 72px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line); }
+.lv-sheet-c.held { background: color-mix(in srgb, var(--live) 12%, transparent); }
+.lv-sheet-c.act { outline: 2px solid var(--accent); outline-offset: -2px; }
+.lv-sheet-c.na { text-align: center; background: var(--bg-1); }
+.lv-sheet-in { min-height: 44px; width: 100%; background: transparent; border: 0; padding: 0 8px; font-family: var(--font-mono); text-align: right; border-radius: 0; }
+.lv-sheet-in:focus { background: var(--bg-3); outline: none; }
+.lv-fillh { position: absolute; right: -1px; bottom: -1px; width: 22px; height: 22px; background: var(--accent); border: 2px solid var(--bg-1); cursor: crosshair; touch-action: none; border-radius: 3px; z-index: 3; }

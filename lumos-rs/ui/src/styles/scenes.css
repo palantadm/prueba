@@ -1,6 +1,6 @@
 /* Scenes pool, morph crossfader (touch-first: every control ≥ 44 px, no hover-only affordances) */
 .sc-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: var(--s-2); border-bottom: 1px solid var(--line); align-items: center; }
-.sc-bar .btn { min-height: 44px; padding: 0 var(--s-3); }
+.sc-bar .btn { min-height: 44px; min-width: 44px; padding: 0 var(--s-3); }
 .sc-scope { font-size: var(--fs-xs); color: var(--text-dim); padding: 0 var(--s-2) var(--s-1); }
 .sc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 8px; padding: var(--s-2); align-content: start; }
 .sc-tile { position: relative; min-height: 72px; display: flex; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--bg-2); overflow: hidden; }
@@ -21,7 +21,7 @@
 .sc-morph h4 { margin: 0; font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
 .sc-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .sc-chips .lbl { width: 20px; font-weight: 800; color: var(--text-dim); }
-.sc-chips .btn { min-height: 44px; }
+.sc-chips .btn { min-height: 44px; min-width: 44px; }
 .sc-readout { font-family: var(--font-mono); font-size: var(--fs-lg); min-width: 56px; text-align: right; }
 .sc-colors { display: flex; flex-wrap: wrap; gap: 8px; }
 .sc-colors button { width: 44px; height: 44px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; }
@@ -39,3 +39,6 @@
 .xfader-knob { position: absolute; top: 6px; bottom: 6px; width: 28px; margin-left: -14px; border-radius: 8px; background: var(--text); border: 3px solid var(--accent); pointer-events: none; box-shadow: var(--shadow-1); }
 .xfader-end { position: absolute; top: 50%; transform: translateY(-50%); font-weight: 800; color: var(--text-dim); pointer-events: none; font-size: var(--fs-lg); }
 .xfader-end.l { left: 12px; } .xfader-end.r { right: 12px; }
+
+/* the narrow (tablet) layout caps pool height at 300 px — scenes + morph need more room */
+.lv-col.pools > .lv-scroll.sc-scroll { max-height: min(62vh, 640px); }

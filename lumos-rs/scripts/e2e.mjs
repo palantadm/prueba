@@ -260,6 +260,165 @@ r = await cmd({ type: "fixture_morph", ids: [1], profile: "nope", mode: "x", rep
 ok(!r.ok, "fixture_morph with unknown profile rejected");
 await cmd({ type: "prog_release", fixtures: null, attrs: null });
 
+console.log("playback: speed masters, chases, 2-D effects, submasters");
+const sample = async (fn, ms, every = 25) => { const out = []; const t0 = Date.now(); while (Date.now() - t0 < ms) { out.push(fn()); await sleep(every); } return out; };
+await cmd({ type: "prog_release", fixtures: null, attrs: null });
+// speed master
+r = await cmd({ type: "speed_save", master: { id: 0, name: "Beat", bpm: 90 } });
+ok(r.ok, "speed_save");
+await until(() => state.show.speed_masters?.length === 1, "speed master in show");
+const smId = state.show.speed_masters[0].id;
+ok(await until(() => state.rt.speed?.find((m) => m.id === smId)?.bpm === 90, "rt speed 90"), "runtime reports the master BPM");
+await cmd({ type: "speed_set", id: smId, bpm: 130 });
+ok(await until(() => state.rt.speed?.find((m) => m.id === smId)?.bpm === 130, "rt speed 130"), "speed_set updates the live BPM");
+await cmd({ type: "speed_tap", id: smId }); await sleep(500); await cmd({ type: "speed_tap", id: smId });
+ok(await until(() => { const b = state.rt.speed?.find((m) => m.id === smId)?.bpm; return b > 105 && b < 135; }, "tap ~120"), "tap tempo lands near 120 BPM");
+r = await cmd({ type: "speed_set", id: 999, bpm: 100 });
+ok(!r.ok, "unknown speed master rejected");
+// chase: two steps alternating fixtures 1 and 2 at 240 BPM (0.25 s per beat)
+const step = (f) => ({ values: { [f]: { dimmer: 1 } }, refs: {}, scene: null, hold: 1, fade: 0 });
+r = await cmd({ type: "chase_save", chase: { id: 0, name: "Flip", steps: [step(1), step(2)], bpm: 240, speed_master: null, dir: "forward" } });
+ok(r.ok, "chase_save");
+await until(() => state.show.chases?.length === 1, "chase in show");
+const chId = state.show.chases[0].id;
+await cmd({ type: "chase_run", id: chId, on: true });
+ok(await until(() => state.rt.chases?.find((c) => c.id === chId)?.running === true, "chase running"), "chase_run starts it");
+const pats = await sample(() => `${state.frames.get(1)?.[0]}/${state.frames.get(1)?.[5]}`, 1400);
+ok(pats.includes("255/0") && pats.includes("0/255"), "DMX alternates between the two chase steps");
+ok(new Set(await sample(() => state.rt.chases.find((c) => c.id === chId).step, 1000)).size === 2, "runtime step cycles 0↔1");
+await cmd({ type: "chase_bpm", id: chId, bpm: 600 });
+ok(await until(() => state.rt.chases.find((c) => c.id === chId).bpm === 240, "bpm clamped"), "chase bpm is clamped to 240");
+// the speed master overrides the chase's own BPM
+await cmd({ type: "chase_save", chase: { ...state.show.chases[0], speed_master: smId } });
+ok(await until(() => Math.abs(state.rt.chases.find((c) => c.id === chId).bpm - state.rt.speed.find((m) => m.id === smId).bpm) < 0.01, "chase follows master"), "chase follows its speed master");
+// executor wiring: toggle + level
+await cmd({ type: "chase_run", id: chId, on: false });
+ok(await until(() => state.frames.get(1)?.[0] === 0 && state.frames.get(1)?.[5] === 0, "dark after stop"), "stopping the chase releases the output");
+r = await cmd({ type: "exec_save", executor: { id: 0, page: 0, slot: 9, label: "Flip", kind: { type: "chase", chase: chId } } });
+ok(r.ok, "exec_save chase");
+await until(() => state.show.executors.some((x) => x.kind.type === "chase"), "chase executor");
+const cx = state.show.executors.find((x) => x.kind.type === "chase").id;
+await cmd({ type: "exec_level", id: cx, level: 0.5 });
+await cmd({ type: "exec_go", id: cx });
+ok(await until(() => state.rt.executors.find((x) => x.id === cx)?.active === true, "exec active"), "chase executor toggles on");
+const lv = await sample(() => Math.max(state.frames.get(1)?.[0] ?? 0, state.frames.get(1)?.[5] ?? 0), 1500);
+ok(Math.max(...lv) > 120 && Math.max(...lv) < 135, `chase executor level 0.5 scales the dimmer (peak ${Math.max(...lv)})`);
+await cmd({ type: "exec_go", id: cx });
+ok(await until(() => state.rt.chases.find((c) => c.id === chId).running === false, "toggle off"), "second press stops the chase");
+await cmd({ type: "speed_remove", id: smId });
+await until(() => state.show.chases[0].speed_master === null, "chase unlinked");
+ok(true, "removing the master unlinks its chases");
+await cmd({ type: "chase_remove", id: chId });
+await until(() => state.show.executors.find((x) => x.id === cx)?.kind.type === "empty", "exec emptied");
+ok(true, "removing the chase empties its executor");
+// 2-D effect: circle on the mover (pan = ch100, tilt = ch102 coarse)
+r = await cmd({ type: "effect_save", effect: { id: 0, name: "Circle", attr: "pan", attr2: "tilt", shape: "circle", rate: 2, depth: 0.4, phase_spread: 0, fixtures: [3], speed_master: null, bpm: 0, rotation: 0 } });
+ok(r.ok, "effect_save circle");
+await until(() => state.show.effects.some((e) => e.shape === "circle"), "circle effect");
+const efId = state.show.effects.find((e) => e.shape === "circle").id;
+await cmd({ type: "effect_toggle", id: efId, on: true });
+await sleep(150);
+const pts = await sample(() => [state.frames.get(1)?.[99] - 128, state.frames.get(1)?.[101] - 128], 900, 15);
+const radii = pts.map(([x, y]) => Math.hypot(x, y));
+ok(radii.filter((rr) => Math.abs(rr - 51) < 10).length / radii.length > 0.85, `circle keeps a constant radius ≈51 DMX steps (min ${Math.min(...radii).toFixed(0)}, max ${Math.max(...radii).toFixed(0)})`);
+ok(Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0])) > 80, "pan sweeps both sides of the centre");
+await cmd({ type: "effect_toggle", id: efId, on: false });
+ok(await until(() => state.frames.get(1)?.[99] === 128 && state.frames.get(1)?.[101] === 128, "centre again"), "stopping the effect returns the mover to centre");
+// submasters
+await cmd({ type: "prog_set", fixtures: [1], attrs: { dimmer: 1 } });
+await cmd({ type: "scene_record", id: null, name: "Cap", from_output: false, fixtures: [1], merge: false });
+await until(() => state.show.scenes.some((x) => x.name === "Cap"), "Cap scene");
+let cap = state.show.scenes.find((x) => x.name === "Cap");
+await cmd({ type: "scene_save", scene: { ...cap, kind: "inhibitive", fade_out: 1 } });
+await until(() => state.show.scenes.find((x) => x.name === "Cap")?.kind === "inhibitive", "kind saved");
+ok(await until(() => state.frames.get(1)?.[0] === 255, "uncapped"), "an inhibitive sub that isn't engaged does not limit");
+await cmd({ type: "scene_level", id: cap.id, level: 0.5 });
+ok(await until(() => Math.abs(state.frames.get(1)?.[0] - 128) <= 1, "capped at 50%"), "inhibitive level caps the dimmer at 50%");
+ok(state.frames.get(1)?.[5] === 0, "other fixtures are untouched");
+await cmd({ type: "scene_level", id: cap.id, level: 0 });
+ok(await until(() => state.frames.get(1)?.[0] === 0, "held dark"), "inhibitive level 0 holds its fixtures dark");
+await cmd({ type: "scenes_release" });
+ok(await until(() => state.frames.get(1)?.[0] === 255, "released", 4000), "releasing lifts the cap again");
+await cmd({ type: "prog_release", fixtures: null, attrs: null });
+// intensity sub: only the dimmer of the scene is used
+await cmd({ type: "prog_set", fixtures: [2], attrs: { dimmer: 0.8, red: 1 } });
+await cmd({ type: "scene_record", id: null, name: "Int", from_output: false, fixtures: [2], merge: false });
+await until(() => state.show.scenes.some((x) => x.name === "Int"), "Int scene");
+const isc = state.show.scenes.find((x) => x.name === "Int");
+await cmd({ type: "prog_release", fixtures: null, attrs: null });
+await cmd({ type: "scene_save", scene: { ...isc, kind: "intensity" } });
+await until(() => state.show.scenes.find((x) => x.name === "Int")?.kind === "intensity", "intensity kind");
+await cmd({ type: "scene_level", id: isc.id, level: 0.5 });
+ok(await until(() => Math.abs(state.frames.get(1)?.[5] - 102) <= 1, "intensity .4"), "intensity sub: dimmer 0.8 × level 0.5 = 102");
+ok(state.frames.get(1)?.[6] === 0, "intensity sub ignores the colour of the scene");
+await cmd({ type: "scenes_release" });
+await sleep(1200);
+console.log("programming: palette links, undo/redo, blind, park, cue update, manual crossfade");
+{
+  const J = (number, changes) => ({ number, label: "", fade_in: 0, fade_out: 0, delay: 0, follow: null, timecode: null, changes, block: false, refs: {}, timing: {}, curve: "linear", stagger: 0, notes: "" });
+  await cmd({ type: "show_new", name: "prog" });
+  await until(() => state.show.name === "prog" && state.show.fixtures.length === 0, "fresh show");
+  r = await cmd({ type: "fixture_add", profile: "generic/rgb-par", mode: "4ch", count: 1, universe: 1, address: 1, name: null });
+  ok(r.ok, "prog: patch an RGB par (dimmer, r, g, b on ch1-4)");
+  await until(() => state.show.fixtures.length === 1, "fixture");
+  await cmd({ type: "prog_set", fixtures: [1], attrs: { red: 1, dimmer: 1 } });
+  r = await cmd({ type: "prog_record_palette", id: null, fixtures: [1], kind: "color", name: "Red" });
+  ok(r.ok, "prog: record colour palette");
+  await until(() => state.show.palettes.length === 1, "palette");
+  const pid = state.show.palettes[0].id;
+  await cmd({ type: "prog_release", fixtures: null, attrs: null });
+  await cmd({ type: "prog_apply_palette", fixtures: [1], palette: pid });
+  await cmd({ type: "prog_set", fixtures: [1], attrs: { dimmer: 1 } });
+  r = await cmd({ type: "prog_record_cue", cuelist: 1, number: null, mode: "merge", label: "", release: true, refs: true });
+  ok(r.ok, "prog: record cue with palette links");
+  await until(() => state.show.cuelists[0]?.cues.length === 1, "cue");
+  ok(state.show.cuelists[0].cues[0].refs["1"]?.red === pid, "cue stores the palette link (refs)");
+  const c1 = { ...state.show.cuelists[0].cues[0], fade_in: 0, fade_out: 0 };
+  await cmd({ type: "cue_save", cuelist: 1, cue: c1 });
+  await cmd({ type: "go", cuelist: 1 });
+  ok(await until(() => state.frames.get(1)?.[1] === 255, "red 255"), "cue plays the palette colour");
+  const pal = { ...state.show.palettes[0], values: { ...state.show.palettes[0].values, red: 0.5 } };
+  await cmd({ type: "palette_save", palette: pal });
+  ok(await until(() => state.frames.get(1)?.[1] === 128, "red 128"), "editing the palette changes the running cue live (128)");
+  ok(await until(() => state.rt.undo >= 1, "undo count"), "rt.undo counts the edit");
+  r = await cmd({ type: "undo" });
+  ok(r.ok && await until(() => state.frames.get(1)?.[1] === 255 && state.rt.redo >= 1, "undone"), "undo restores the palette value (255) and enables redo");
+  r = await cmd({ type: "redo" });
+  ok(r.ok && await until(() => state.frames.get(1)?.[1] === 128, "redone"), "redo re-applies it (128)");
+
+  await cmd({ type: "prog_set", fixtures: [1], attrs: { green: 1 } });
+  ok(await until(() => state.frames.get(1)?.[2] === 255, "green"), "programmer green on output");
+  await cmd({ type: "blind_set", on: true });
+  ok(await until(() => state.rt.blind === true && state.frames.get(1)?.[2] === 0, "blind"), "blind hides the programmer from the output");
+  await cmd({ type: "blind_set", on: false });
+  ok(await until(() => state.frames.get(1)?.[2] === 255, "unblind"), "unblind brings it back");
+  await cmd({ type: "prog_release", fixtures: null, attrs: null });
+
+  await cmd({ type: "dmx_set", universe: 1, channel: 20, value: 77 });
+  ok(await until(() => state.rt.parked?.some((p) => p.channel === 20 && p.value === 77), "parked"), "dmx_set shows up as parked");
+  await cmd({ type: "unpark", universe: null, channel: null });
+  ok(await until(() => state.rt.parked?.length === 0, "unparked"), "unpark clears it");
+
+  r = await cmd({ type: "cue_load", cuelist: 1, number: 1 });
+  ok(r.ok && await until(() => state.rt.programmer["1"]?.red === 0.5, "loaded"), "cue_load puts the cue look into the programmer");
+  await cmd({ type: "prog_set", fixtures: [1], attrs: { blue: 0.4 } });
+  r = await cmd({ type: "cue_update", cuelist: 1, number: 1, mode: "merge", refs: true });
+  ok(r.ok && await until(() => state.show.cuelists[0].cues[0].changes["1"]?.blue === 0.4, "updated"), "cue_update merges the programmer into the cue");
+  await cmd({ type: "prog_release", fixtures: null, attrs: null });
+  r = await cmd({ type: "cue_update", cuelist: 1, number: 99, mode: "merge", refs: true });
+  ok(!r.ok, "cue_update on a missing cue is rejected");
+
+  // manual crossfade
+  await cmd({ type: "cuelist_save", cuelist: { id: 2, name: "XF", cues: [J(1, { 1: { dimmer: 0.2 } }), J(2, { 1: { dimmer: 1 } })], looped: false, tracking: true, priority: 0, auto_mark: false } });
+  await cmd({ type: "go_to", cuelist: 2, number: 1 });
+  await cmd({ type: "cuelist_manual", cuelist: 2, progress: 0.5 });
+  ok(await until(() => state.rt.cuelists.find((c) => c.id === 2)?.manual === true, "manual"), "cuelist_manual starts a manual crossfade");
+  const p = state.rt.cuelists.find((c) => c.id === 2).progress;
+  ok(Math.abs(p - 0.5) < 0.05, `manual progress follows the fader (${p.toFixed(2)})`);
+  await cmd({ type: "cuelist_manual", cuelist: 2, progress: 1 });
+  ok(await until(() => state.rt.cuelists.find((c) => c.id === 2)?.manual === false && state.rt.cuelists.find((c) => c.id === 2)?.current === 2, "manual done"), "fader at the end completes the cue");
+}
+
 console.log("idle CPU");
 const cpu = () => { const f = readFileSync(`/proc/${proc.pid}/stat`, "utf8").split(") ")[1].split(" "); return (+f[11] + +f[12]) / 100; };
 await cmd({ type: "prog_release", fixtures: null, attrs: null });
