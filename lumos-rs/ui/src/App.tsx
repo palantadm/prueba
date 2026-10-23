@@ -11,7 +11,7 @@ import { releaseDmx, requestDmx } from "./lib/dmxsub";
 import { t, tp } from "./i18n";
 import { tErr } from "./i18n/errors";
 import { TestBanner } from "./workspaces/settings/OutputTest";
-import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/data/DataDialogs";
+import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
 
 export const current = signal(localStorage.getItem("ws") ?? "live");
 export function goto(id: string) {

@@ -670,4 +670,5 @@ export const shell: Record<string, string> = {
   "e.g. go cuelist 1": "p. ej. go cuelist 1",
   "{n} step": "{n} paso",
   "{n} steps": "{n} pasos",
+  "Replace the current patch (otherwise the fixtures are added)": "Reemplazar el patch actual (si no, los aparatos se añaden)",
 };

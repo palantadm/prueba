@@ -66,7 +66,7 @@ export async function initMidi() {
     return;
   }
   try {
-    access = await navigator.requestMIDIAccess({ sysex: false });
+    access = await navigator.requestMIDIAccess({ sysex: true });
     midiState.value = "ready";
     access.onstatechange = refresh;
     refresh();
