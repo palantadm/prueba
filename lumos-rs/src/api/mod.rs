@@ -1,5 +1,7 @@
 //! HTTP + WebSocket front-end for the engine.
 
+mod data;
+
 use crate::engine::{EngineIn, Handle, Out};
 use crate::model::*;
 use axum::{
@@ -29,6 +31,7 @@ pub fn router(h: Handle) -> Router {
         .route("/api/show", get(get_show).put(put_show).layer(DefaultBodyLimit::max(64 * 1024 * 1024)))
         .route("/api/morph/preview", post(morph_preview))
         .route("/api/library/import", post(library_import).layer(DefaultBodyLimit::max(256 * 1024 * 1024)))
+        .merge(data::routes())
         .nest_service("/media", ServeDir::new(media))
         .nest_service("/library", ServeDir::new(library))
         .fallback(static_handler)

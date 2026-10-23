@@ -35,6 +35,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub type Reply = oneshot::Sender<Result<(), String>>;
+pub type ShowEditFn = Box<dyn FnOnce(&mut Show, &HashMap<String, FixtureProfile>) -> Result<serde_json::Value, String> + Send>;
 
 pub enum EngineIn {
     Cmd { cmd: Command, reply: Option<Reply> },
@@ -44,6 +45,8 @@ pub enum EngineIn {
     ImportShow { show: Box<Show>, reply: Reply },
     /// Profiles parsed from uploaded GDTF/QLC+/OFL files (assets already on disk).
     ImportProfiles { profiles: Vec<FixtureProfile>, reply: Reply },
+    /// Atomic show edit run inside the engine (CSV/MVR import). On `Err` the show is left untouched.
+    ShowEdit { f: ShowEditFn, reply: oneshot::Sender<Result<serde_json::Value, String>> },
     /// Dry-run of a fixture morph (REST `POST /api/morph/preview`).
     MorphPreview { ids: Vec<u32>, profile: String, mode: String, reply: oneshot::Sender<Result<MorphPreview, String>> },
 }
@@ -91,6 +94,15 @@ impl Handle {
         self.tx
             .send(EngineIn::MorphPreview { ids, profile, mode, reply: r })
             .map_err(|_| "Engine stopped".to_string())?;
+        rx.await.map_err(|_| "Engine stopped".to_string())?
+    }
+    /// Run `f` on the live show inside the engine task. `Err` leaves the show unchanged.
+    pub async fn edit_show<F>(&self, f: F) -> Result<serde_json::Value, String>
+    where
+        F: FnOnce(&mut Show, &HashMap<String, FixtureProfile>) -> Result<serde_json::Value, String> + Send + 'static,
+    {
+        let (r, rx) = oneshot::channel();
+        self.tx.send(EngineIn::ShowEdit { f: Box::new(f), reply: r }).map_err(|_| "Engine stopped".to_string())?;
         rx.await.map_err(|_| "Engine stopped".to_string())?
     }
     pub async fn import_profiles(&self, profiles: Vec<FixtureProfile>) -> Result<(), String> {
@@ -356,6 +368,21 @@ impl Engine {
             }
             EngineIn::MorphPreview { ids, profile, mode, reply } => {
                 let _ = reply.send(self.morph_preview(&ids, &profile, &mode));
+            }
+            EngineIn::ShowEdit { f, reply } => {
+                let profiles: HashMap<String, FixtureProfile> = self.library_list().into_iter().map(|p| (p.id.clone(), p)).collect();
+                let before = self.show.clone();
+                match f(&mut self.show, &profiles) {
+                    Ok(v) => {
+                        self.library_dirty = true;
+                        self.touch_patch();
+                        let _ = reply.send(Ok(v));
+                    }
+                    Err(e) => {
+                        self.show = before;
+                        let _ = reply.send(Err(e));
+                    }
+                }
             }
             EngineIn::ImportProfiles { profiles, reply } => {
                 for p in profiles {

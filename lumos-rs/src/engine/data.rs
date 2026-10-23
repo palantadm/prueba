@@ -428,7 +428,6 @@ mod tests {
         e.handle(Command::Identify { fixture: 1, on: false }).unwrap();
         e.handle(Command::Identify { fixture: 2, on: false }).unwrap();
         e.render(0.0);
-        assert_eq!(**e.frames.get(&1).unwrap().get(0..3).map(|_| &e.frames[&1]).unwrap().as_ref().get(0..1).map(|_| &e.frames[&1]).unwrap(), *e.frames[&1].as_ref());
         assert_eq!(e.frames[&1][0], 0, "blackout applies again once identify is off");
         assert!(e.build_rt().identifying.is_empty());
     }
