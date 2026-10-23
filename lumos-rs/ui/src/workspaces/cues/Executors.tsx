@@ -6,7 +6,7 @@ import { ExecutorStrip } from "../../widgets";
 import { t } from "../../i18n";
 
 const SLOTS = 10;
-const TYPE_LABEL = { cuelist: "Cuelist", group: "Group", effect: "Effect", scene: "Scene", xfade: "Manual crossfade", master: "Grand master" } as const;
+const TYPE_LABEL = { cuelist: "Cuelist", group: "Group", effect: "Effect", scene: "Scene", x_fade: "Manual crossfade", master: "Grand master" } as const;
 
 function kindLabel(k: ExecKind): string {
   const s = show.value;
@@ -15,7 +15,7 @@ function kindLabel(k: ExecKind): string {
     case "group": return s?.groups.find((g) => g.id === k.group)?.name ?? `Grp ${k.group}`;
     case "effect": return s?.effects.find((e) => e.id === k.effect)?.name ?? `FX ${k.effect}`;
     case "scene": return s?.scenes?.find((x) => x.id === k.scene)?.name ?? `${t("Scene")} ${k.scene}`;
-    case "xfade": return `↔ ${s?.cuelists.find((c) => c.id === k.cuelist)?.name ?? `CL ${k.cuelist}`}`;
+    case "x_fade": return `↔ ${s?.cuelists.find((c) => c.id === k.cuelist)?.name ?? `CL ${k.cuelist}`}`;
     case "master": return t("Grand Master");
     default: return "";
   }
@@ -62,15 +62,15 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
   const s = show.value!;
   const k = exec?.kind;
   const [type, setType] = useState<ExecKind["type"]>(k && k.type !== "empty" ? k.type : "cuelist");
-  const [cuelist, setCuelist] = useState(k?.type === "cuelist" || k?.type === "xfade" ? k.cuelist : s.cuelists[0]?.id ?? 0);
+  const [cuelist, setCuelist] = useState(k?.type === "cuelist" || k?.type === "x_fade" ? k.cuelist : s.cuelists[0]?.id ?? 0);
   const [group, setGroup] = useState(k?.type === "group" ? k.group : s.groups[0]?.id ?? 0);
   const [effect, setEffect] = useState(k?.type === "effect" ? k.effect : s.effects[0]?.id ?? 0);
   const scenes = s.scenes ?? [];
   const [scene, setScene] = useState(k?.type === "scene" ? k.scene : scenes[0]?.id ?? 0);
   const [label, setLabel] = useState(exec?.label ?? "");
   const kind = (): ExecKind =>
-    type === "cuelist" ? { type, cuelist } : type === "group" ? { type, group } : type === "effect" ? { type, effect } : type === "scene" ? { type, scene } : type === "xfade" ? { type, cuelist } : { type: "master", master: "grand" };
-  const valid = type === "master" || ((type === "cuelist" || type === "xfade") && cuelist) || (type === "group" && group) || (type === "effect" && effect) || (type === "scene" && scene);
+    type === "cuelist" ? { type, cuelist } : type === "group" ? { type, group } : type === "effect" ? { type, effect } : type === "scene" ? { type, scene } : type === "x_fade" ? { type, cuelist } : { type: "master", master: "grand" };
+  const valid = type === "master" || ((type === "cuelist" || type === "x_fade") && cuelist) || (type === "group" && group) || (type === "effect" && effect) || (type === "scene" && scene);
   const save = () => {
     const id = exec?.id ?? Math.max(0, ...s.executors.map((e) => e.id)) + 1;
     send({ type: "exec_save", executor: { id, page, slot, label, kind: kind() } });
@@ -90,11 +90,11 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
       <button class="btn primary" disabled={!valid} onClick={save}>{t("Assign")}</button>
     </>}>
       <div class="row wrap" role="tablist" aria-label={t("Executor type")}>
-        {(["cuelist", "xfade", "group", "effect", "scene", "master"] as const).map((k) => (
+        {(["cuelist", "x_fade", "group", "effect", "scene", "master"] as const).map((k) => (
           <button key={k} role="tab" class={`btn ${type === k ? "sel" : ""}`} style={{ minHeight: 44 }} onClick={() => setType(k)}>{t(TYPE_LABEL[k])}</button>
         ))}
       </div>
-      {(type === "cuelist" || type === "xfade") && <div class="field"><label>{t("Cuelist")}</label>{sel(cuelist, setCuelist, s.cuelists)}</div>}
+      {(type === "cuelist" || type === "x_fade") && <div class="field"><label>{t("Cuelist")}</label>{sel(cuelist, setCuelist, s.cuelists)}</div>}
       {type === "group" && <div class="field"><label>{t("Group (dimmer master)")}</label>{sel(group, setGroup, s.groups)}</div>}
       {type === "effect" && <div class="field"><label>{t("Effect")}</label>{sel(effect, setEffect, s.effects)}</div>}
       {type === "scene" && <div class="field"><label>{t("Scene")}</label>{sel(scene, setScene, scenes)}</div>}

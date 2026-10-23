@@ -27,7 +27,7 @@ export function ExecutorStrip(p: {
   const level = p.rt?.level ?? 0;
   const isMaster = e.kind.type === "master";
   const isScene = e.kind.type === "scene";
-  const canGo = e.kind.type === "cuelist" || e.kind.type === "xfade" || e.kind.type === "effect" || isScene;
+  const canGo = e.kind.type === "cuelist" || e.kind.type === "x_fade" || e.kind.type === "effect" || isScene;
   const toggled = isScene ? !!p.rt?.active : !!p.effectOn;
   return (
     <div class={`lv-ex ${p.rt?.active || p.effectOn ? "active" : ""}`}>

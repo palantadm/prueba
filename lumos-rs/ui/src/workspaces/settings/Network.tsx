@@ -57,7 +57,7 @@ export function NodesPanel() {
   const unused = list.filter((x) => !used.has(x.ip)).length;
   return (
     <div class="panel">
-      <div class="panel-head row" style={{ gap: 8 }}>
+      <div class="panel-head row" style={{ gap: 8, height: "auto", minHeight: 52, paddingTop: 4, paddingBottom: 4 }}>
         <span class="grow">{t("Art-Net nodes")}</span>
         {list.length > 0 && <span class={`chip ${unused ? "warn" : "ok"}`}>{unused ? tp(unused, "{n} unused", "{n} unused") : t("all in use")}</span>}
         <button class="btn tall" style={{ minHeight: 44 }} onClick={() => { fire({ type: "nodes_scan" }); toast(t("Scanning the network…"), "info", 1200); }}>{t("Scan")}</button>

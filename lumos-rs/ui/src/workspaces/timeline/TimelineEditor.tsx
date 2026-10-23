@@ -349,7 +349,7 @@ export function TimelineEditor({ tl, onRename, onDelete }: { tl: Timeline; onRen
         <button class="btn au-btn" onClick={() => run(0)} title={t("Run from the start")} aria-label={t("Run from the start")}>⏮▶</button>
         <button class="btn au-btn" onClick={() => { base.current = { t: 0, at: performance.now(), running: base.current.running }; void send({ type: "timeline_seek", id: d.id, t: 0 }, { quiet: true }); scroller.current!.scrollLeft = 0; }} title={t("Go to start")} aria-label={t("Go to start")}>⏮</button>
         <div>
-          <div class="tl-clock" ref={clock} classList={{ idle: !running }} aria-live="off">00:00.0</div>
+          <div class={`tl-clock ${running ? "" : "idle"}`} ref={clock} aria-live="off">00:00.0</div>
           <div class="faint mono" style={{ fontSize: "var(--fs-xs)" }}>TC <span ref={tcOut}>00:00:00:00</span></div>
         </div>
         <span class="sp" />
