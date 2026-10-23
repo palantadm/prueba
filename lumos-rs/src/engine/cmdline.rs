@@ -269,7 +269,7 @@ fn lex(text: &str) -> R<Vec<Tok>> {
             it.next();
             continue;
         }
-        if c.is_whitespace() || c == '%' || c == '=' {
+        if c.is_whitespace() || c == '%' || c == '=' || c == '.' {
             it.next();
             continue;
         }
@@ -853,6 +853,11 @@ impl<'a> P<'a> {
             let on = !(self.eat_kw(KW_OFF) || self.eat_kw(KW_OUT));
             self.eat_kw(KW_ON);
             return Ok(Stmt::Locate { sel: None, on });
+        }
+        if is(w, KW_AT) {
+            self.i += 1;
+            let val = self.val()?;
+            return Ok(Stmt::Set { sel: None, attr: "dimmer".into(), val });
         }
         if is(w, KW_COLOUR) {
             self.i += 1;
@@ -1635,9 +1640,11 @@ pub fn complete(prefix: &str) -> Vec<String> {
         all_keywords()
     };
     let mut v: Vec<String> = pool.into_iter().filter(|k| k.starts_with(&frag) && *k != frag).map(|s| s.to_string()).collect();
-    v.sort_by(|a, b| a.len().cmp(&b.len()).then(a.cmp(b)));
+    if !frag.is_empty() {
+        v.sort_by(|a, b| a.len().cmp(&b.len()).then(a.cmp(b)));
+    }
     v.dedup();
-    v.truncate(16);
+    v.truncate(if frag.is_empty() { 40 } else { 16 });
     v
 }
 
@@ -2356,7 +2363,7 @@ mod tests {
         let text = "go; fixture 99 at 50";
         let e = run(text).unwrap_err();
         assert!(e.contains("fixture 99 does not exist"), "{e}");
-        assert!(e.contains("col 16") || e.contains("col 12"), "{e}");
+        assert!(e.contains("col 5"), "{e}");
     }
 
     #[test]
