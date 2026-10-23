@@ -260,6 +260,100 @@ r = await cmd({ type: "fixture_morph", ids: [1], profile: "nope", mode: "x", rep
 ok(!r.ok, "fixture_morph with unknown profile rejected");
 await cmd({ type: "prog_release", fixtures: null, attrs: null });
 
+console.log("playback: speed masters, chases, 2-D effects, submasters");
+const sample = async (fn, ms, every = 25) => { const out = []; const t0 = Date.now(); while (Date.now() - t0 < ms) { out.push(fn()); await sleep(every); } return out; };
+await cmd({ type: "prog_release", fixtures: null, attrs: null });
+// speed master
+r = await cmd({ type: "speed_save", master: { id: 0, name: "Beat", bpm: 90 } });
+ok(r.ok, "speed_save");
+await until(() => state.show.speed_masters?.length === 1, "speed master in show");
+const smId = state.show.speed_masters[0].id;
+ok(await until(() => state.rt.speed?.find((m) => m.id === smId)?.bpm === 90, "rt speed 90"), "runtime reports the master BPM");
+await cmd({ type: "speed_set", id: smId, bpm: 130 });
+ok(await until(() => state.rt.speed?.find((m) => m.id === smId)?.bpm === 130, "rt speed 130"), "speed_set updates the live BPM");
+await cmd({ type: "speed_tap", id: smId }); await sleep(500); await cmd({ type: "speed_tap", id: smId });
+ok(await until(() => { const b = state.rt.speed?.find((m) => m.id === smId)?.bpm; return b > 105 && b < 135; }, "tap ~120"), "tap tempo lands near 120 BPM");
+r = await cmd({ type: "speed_set", id: 999, bpm: 100 });
+ok(!r.ok, "unknown speed master rejected");
+// chase: two steps alternating fixtures 1 and 2 at 240 BPM (0.25 s per beat)
+const step = (f) => ({ values: { [f]: { dimmer: 1 } }, refs: {}, scene: null, hold: 1, fade: 0 });
+r = await cmd({ type: "chase_save", chase: { id: 0, name: "Flip", steps: [step(1), step(2)], bpm: 240, speed_master: null, dir: "forward" } });
+ok(r.ok, "chase_save");
+await until(() => state.show.chases?.length === 1, "chase in show");
+const chId = state.show.chases[0].id;
+await cmd({ type: "chase_run", id: chId, on: true });
+ok(await until(() => state.rt.chases?.find((c) => c.id === chId)?.running === true, "chase running"), "chase_run starts it");
+const pats = await sample(() => `${state.frames.get(1)?.[0]}/${state.frames.get(1)?.[5]}`, 1400);
+ok(pats.includes("255/0") && pats.includes("0/255"), "DMX alternates between the two chase steps");
+ok(new Set(await sample(() => state.rt.chases.find((c) => c.id === chId).step, 1000)).size === 2, "runtime step cycles 0↔1");
+await cmd({ type: "chase_bpm", id: chId, bpm: 600 });
+ok(await until(() => state.rt.chases.find((c) => c.id === chId).bpm === 240, "bpm clamped"), "chase bpm is clamped to 240");
+// the speed master overrides the chase's own BPM
+await cmd({ type: "chase_save", chase: { ...state.show.chases[0], speed_master: smId } });
+ok(await until(() => Math.abs(state.rt.chases.find((c) => c.id === chId).bpm - state.rt.speed.find((m) => m.id === smId).bpm) < 0.01, "chase follows master"), "chase follows its speed master");
+// executor wiring: toggle + level
+await cmd({ type: "chase_run", id: chId, on: false });
+ok(await until(() => state.frames.get(1)?.[0] === 0 && state.frames.get(1)?.[5] === 0, "dark after stop"), "stopping the chase releases the output");
+r = await cmd({ type: "exec_save", executor: { id: 0, page: 0, slot: 9, label: "Flip", kind: { type: "chase", chase: chId } } });
+ok(r.ok, "exec_save chase");
+await until(() => state.show.executors.some((x) => x.kind.type === "chase"), "chase executor");
+const cx = state.show.executors.find((x) => x.kind.type === "chase").id;
+await cmd({ type: "exec_level", id: cx, level: 0.5 });
+await cmd({ type: "exec_go", id: cx });
+ok(await until(() => state.rt.executors.find((x) => x.id === cx)?.active === true, "exec active"), "chase executor toggles on");
+const lv = await sample(() => Math.max(state.frames.get(1)?.[0] ?? 0, state.frames.get(1)?.[5] ?? 0), 1500);
+ok(Math.max(...lv) > 120 && Math.max(...lv) < 135, `chase executor level 0.5 scales the dimmer (peak ${Math.max(...lv)})`);
+await cmd({ type: "exec_go", id: cx });
+ok(await until(() => state.rt.chases.find((c) => c.id === chId).running === false, "toggle off"), "second press stops the chase");
+await cmd({ type: "speed_remove", id: smId });
+await until(() => state.show.chases[0].speed_master === null, "chase unlinked");
+ok(true, "removing the master unlinks its chases");
+await cmd({ type: "chase_remove", id: chId });
+await until(() => state.show.executors.find((x) => x.id === cx)?.kind.type === "empty", "exec emptied");
+ok(true, "removing the chase empties its executor");
+// 2-D effect: circle on the mover (pan = ch100, tilt = ch102 coarse)
+r = await cmd({ type: "effect_save", effect: { id: 0, name: "Circle", attr: "pan", attr2: "tilt", shape: "circle", rate: 2, depth: 0.4, phase_spread: 0, fixtures: [3], speed_master: null, bpm: 0, rotation: 0 } });
+ok(r.ok, "effect_save circle");
+await until(() => state.show.effects.some((e) => e.shape === "circle"), "circle effect");
+const efId = state.show.effects.find((e) => e.shape === "circle").id;
+await cmd({ type: "effect_toggle", id: efId, on: true });
+await sleep(150);
+const pts = await sample(() => [state.frames.get(1)?.[99] - 128, state.frames.get(1)?.[101] - 128], 900, 15);
+const radii = pts.map(([x, y]) => Math.hypot(x, y));
+ok(radii.filter((rr) => Math.abs(rr - 51) < 10).length / radii.length > 0.85, `circle keeps a constant radius ≈51 DMX steps (min ${Math.min(...radii).toFixed(0)}, max ${Math.max(...radii).toFixed(0)})`);
+ok(Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0])) > 80, "pan sweeps both sides of the centre");
+await cmd({ type: "effect_toggle", id: efId, on: false });
+ok(await until(() => state.frames.get(1)?.[99] === 128 && state.frames.get(1)?.[101] === 128, "centre again"), "stopping the effect returns the mover to centre");
+// submasters
+await cmd({ type: "prog_set", fixtures: [1], attrs: { dimmer: 1 } });
+await cmd({ type: "scene_record", id: null, name: "Cap", from_output: false, fixtures: [1], merge: false });
+await until(() => state.show.scenes.some((x) => x.name === "Cap"), "Cap scene");
+let cap = state.show.scenes.find((x) => x.name === "Cap");
+await cmd({ type: "scene_save", scene: { ...cap, kind: "inhibitive", fade_out: 1 } });
+await until(() => state.show.scenes.find((x) => x.name === "Cap")?.kind === "inhibitive", "kind saved");
+ok(await until(() => state.frames.get(1)?.[0] === 255, "uncapped"), "an inhibitive sub that isn't engaged does not limit");
+await cmd({ type: "scene_level", id: cap.id, level: 0.5 });
+ok(await until(() => Math.abs(state.frames.get(1)?.[0] - 128) <= 1, "capped at 50%"), "inhibitive level caps the dimmer at 50%");
+ok(state.frames.get(1)?.[5] === 0, "other fixtures are untouched");
+await cmd({ type: "scene_level", id: cap.id, level: 0 });
+ok(await until(() => state.frames.get(1)?.[0] === 0, "held dark"), "inhibitive level 0 holds its fixtures dark");
+await cmd({ type: "scenes_release" });
+ok(await until(() => state.frames.get(1)?.[0] === 255, "released", 4000), "releasing lifts the cap again");
+await cmd({ type: "prog_release", fixtures: null, attrs: null });
+// intensity sub: only the dimmer of the scene is used
+await cmd({ type: "prog_set", fixtures: [2], attrs: { dimmer: 0.8, red: 1 } });
+await cmd({ type: "scene_record", id: null, name: "Int", from_output: false, fixtures: [2], merge: false });
+await until(() => state.show.scenes.some((x) => x.name === "Int"), "Int scene");
+const isc = state.show.scenes.find((x) => x.name === "Int");
+await cmd({ type: "prog_release", fixtures: null, attrs: null });
+await cmd({ type: "scene_save", scene: { ...isc, kind: "intensity" } });
+await until(() => state.show.scenes.find((x) => x.name === "Int")?.kind === "intensity", "intensity kind");
+await cmd({ type: "scene_level", id: isc.id, level: 0.5 });
+ok(await until(() => Math.abs(state.frames.get(1)?.[5] - 102) <= 1, "intensity .4"), "intensity sub: dimmer 0.8 × level 0.5 = 102");
+ok(state.frames.get(1)?.[6] === 0, "intensity sub ignores the colour of the scene");
+await cmd({ type: "scenes_release" });
+await sleep(1200);
+
 console.log("idle CPU");
 const cpu = () => { const f = readFileSync(`/proc/${proc.pid}/stat`, "utf8").split(") ")[1].split(" "); return (+f[11] + +f[12]) / 100; };
 await cmd({ type: "prog_release", fixtures: null, attrs: null });
