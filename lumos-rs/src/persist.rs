@@ -39,6 +39,11 @@ impl Store {
         self.dir.join("media")
     }
 
+    /// Show backups: `<data>/backups/`.
+    pub fn backups_dir(&self) -> PathBuf {
+        self.dir.join("backups")
+    }
+
     /// Extracted fixture-library assets (GDTF models, gobo images): `<data>/library/<profile dir>/…`.
     pub fn library_dir(&self) -> PathBuf {
         self.dir.join("library")

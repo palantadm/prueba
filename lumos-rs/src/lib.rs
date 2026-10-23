@@ -1,6 +1,7 @@
 //! Lumos engine + web console as a library (used by the CLI binary and the desktop app).
 
 pub mod api;
+pub mod backups;
 pub mod engine;
 pub mod gdtf;
 pub mod glb;

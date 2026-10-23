@@ -2,6 +2,7 @@
 
 mod bindings;
 mod chases;
+mod data;
 mod effects;
 mod history;
 mod morph;
@@ -23,6 +24,7 @@ use bindings::*;
 use chases::ChasesState;
 use patch::*;
 use playback::*;
+use data::DataRt;
 use scenes::ScenesState;
 use speed::SpeedState;
 use vconsole::VcRt;
@@ -188,6 +190,8 @@ struct Engine {
     speed: SpeedState,
     /// Accumulated phase (cycles) and last update time per running effect.
     fx_clock: HashMap<u32, (f64, f64)>,
+    /// Backups, node discovery, output test, identify (see data.rs).
+    data: DataRt,
 }
 
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
@@ -218,6 +222,7 @@ impl Engine {
         let show = store.load_autosave().unwrap_or_default();
         let now = Instant::now();
         let mut e = Engine {
+            data: DataRt::new(&store),
             store,
             t0: now,
             out,
@@ -273,6 +278,7 @@ impl Engine {
             fx_clock: HashMap::new(),
         };
         e.hz = e.show.settings.tick_hz.clamp(10, 100);
+        e.blackout = e.show.settings.start_blackout;
         e.rebuild_derived();
         e
     }
@@ -302,6 +308,7 @@ impl Engine {
                 Some(ev) = io_rx.recv() => self.on_io(ev),
             }
         }
+        self.data_on_exit();
         let _ = self.store.autosave(&self.show);
     }
 
@@ -334,6 +341,8 @@ impl Engine {
                     json(&ServerMsg::Show { rev: self.rev, show: self.show.clone() }),
                     json(&ServerMsg::Shows { shows: self.store.list() }),
                     self.midi_ports_json(),
+                    self.backups_json(),
+                    self.nodes_json(),
                 ];
                 v.push(json(&ServerMsg::Rt { rt: self.build_rt() }));
                 let _ = reply.send(v);
@@ -428,6 +437,7 @@ impl Engine {
 
     /// Mark the show document changed (broadcast + autosave).
     fn touch(&mut self) {
+        self.data.changed = true;
         self.rev = self.rev.wrapping_add(1);
         self.show_pending = true;
         self.dirty = true;
@@ -442,6 +452,7 @@ impl Engine {
     }
 
     fn set_show(&mut self, show: Show) {
+        self.data_before_replace();
         self.prog = Default::default();
         self.show = show;
         self.programmer.clear();
@@ -849,7 +860,9 @@ impl Engine {
             CommandLine { .. } | MacroSave { .. } | MacroRemove { .. } | MacroRun { .. } | MacroStop { .. } => {}
             TimelineSave { .. } | TimelineRemove { .. } | TimelineRun { .. } | TimelineStop { .. } | TimelineSeek { .. } => {}
             // be-data
-            BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. } => {}
+            c @ (BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. }) => {
+                self.data_command(c)?
+            }
             SceneRecord { id, name, from_output, fixtures, merge, refs: _ } => self.scene_record(id, name, from_output, fixtures, merge)?,
             SceneSave { scene } => self.scene_save(scene)?,
             SceneRemove { id } => self.scene_remove(id),
@@ -1671,6 +1684,7 @@ impl Engine {
                 }
             }
         }
+        self.identify_layer(&mut merged, now);
         // 5. patch → DMX
         let mut frames: BTreeMap<u16, Box<[u8; 512]>> = self.frames.keys().map(|u| (*u, Box::new([0u8; 512]))).collect();
         let empty = Attrs::new();
@@ -1692,6 +1706,7 @@ impl Engine {
                 fr[*ch as usize - 1] = *v;
             }
         }
+        self.apply_output_test(&mut frames);
         for (u, fr) in frames {
             let changed = self.frames.get(&u).map_or(true, |old| **old != *fr);
             if changed {
@@ -1707,6 +1722,7 @@ impl Engine {
             || self.runs.values().any(|r| !r.settled)
             || self.scenes.ramping()
             || self.chases.any_running()
+            || self.data_continuous()
     }
 
     // ───────────── tick ─────────────
@@ -1724,6 +1740,7 @@ impl Engine {
 
         self.update_timecode(now, dt);
         self.update_playback(now);
+        self.data_tick();
 
         let before = self.ext_dmx.len();
         self.ext_dmx.retain(|_, (t, _)| t.elapsed() < Duration::from_secs(3));
@@ -1927,8 +1944,8 @@ impl Engine {
             speed: self.speed_rt(),
             timelines: vec![],
             macros_running: vec![],
-            testing: false,
-            identifying: vec![],
+            testing: self.data.test.is_some(),
+            identifying: self.data.identifying.iter().copied().collect(),
             vc: self.vc_states(),
         }
     }
