@@ -260,6 +260,72 @@ r = await cmd({ type: "fixture_morph", ids: [1], profile: "nope", mode: "x", rep
 ok(!r.ok, "fixture_morph with unknown profile rejected");
 await cmd({ type: "prog_release", fixtures: null, attrs: null });
 
+console.log("programming: palette links, undo/redo, blind, park, cue update, manual crossfade");
+{
+  const J = (number, changes) => ({ number, label: "", fade_in: 0, fade_out: 0, delay: 0, follow: null, timecode: null, changes, block: false, refs: {}, timing: {}, curve: "linear", stagger: 0, notes: "" });
+  await cmd({ type: "show_new", name: "prog" });
+  await until(() => state.show.name === "prog" && state.show.fixtures.length === 0, "fresh show");
+  r = await cmd({ type: "fixture_add", profile: "generic/rgb-par", mode: "4ch", count: 1, universe: 1, address: 1, name: null });
+  ok(r.ok, "prog: patch an RGB par (dimmer, r, g, b on ch1-4)");
+  await until(() => state.show.fixtures.length === 1, "fixture");
+  await cmd({ type: "prog_set", fixtures: [1], attrs: { red: 1, dimmer: 1 } });
+  r = await cmd({ type: "prog_record_palette", id: null, fixtures: [1], kind: "color", name: "Red" });
+  ok(r.ok, "prog: record colour palette");
+  await until(() => state.show.palettes.length === 1, "palette");
+  const pid = state.show.palettes[0].id;
+  await cmd({ type: "prog_release", fixtures: null, attrs: null });
+  await cmd({ type: "prog_apply_palette", fixtures: [1], palette: pid });
+  await cmd({ type: "prog_set", fixtures: [1], attrs: { dimmer: 1 } });
+  r = await cmd({ type: "prog_record_cue", cuelist: 1, number: null, mode: "merge", label: "", release: true, refs: true });
+  ok(r.ok, "prog: record cue with palette links");
+  await until(() => state.show.cuelists[0]?.cues.length === 1, "cue");
+  ok(state.show.cuelists[0].cues[0].refs["1"]?.red === pid, "cue stores the palette link (refs)");
+  const c1 = { ...state.show.cuelists[0].cues[0], fade_in: 0, fade_out: 0 };
+  await cmd({ type: "cue_save", cuelist: 1, cue: c1 });
+  await cmd({ type: "go", cuelist: 1 });
+  ok(await until(() => state.frames.get(1)?.[1] === 255, "red 255"), "cue plays the palette colour");
+  const pal = { ...state.show.palettes[0], values: { ...state.show.palettes[0].values, red: 0.5 } };
+  await cmd({ type: "palette_save", palette: pal });
+  ok(await until(() => state.frames.get(1)?.[1] === 128, "red 128"), "editing the palette changes the running cue live (128)");
+  ok(await until(() => state.rt.undo >= 1, "undo count"), "rt.undo counts the edit");
+  r = await cmd({ type: "undo" });
+  ok(r.ok && await until(() => state.frames.get(1)?.[1] === 255 && state.rt.redo >= 1, "undone"), "undo restores the palette value (255) and enables redo");
+  r = await cmd({ type: "redo" });
+  ok(r.ok && await until(() => state.frames.get(1)?.[1] === 128, "redone"), "redo re-applies it (128)");
+
+  await cmd({ type: "prog_set", fixtures: [1], attrs: { green: 1 } });
+  ok(await until(() => state.frames.get(1)?.[2] === 255, "green"), "programmer green on output");
+  await cmd({ type: "blind_set", on: true });
+  ok(await until(() => state.rt.blind === true && state.frames.get(1)?.[2] === 0, "blind"), "blind hides the programmer from the output");
+  await cmd({ type: "blind_set", on: false });
+  ok(await until(() => state.frames.get(1)?.[2] === 255, "unblind"), "unblind brings it back");
+  await cmd({ type: "prog_release", fixtures: null, attrs: null });
+
+  await cmd({ type: "dmx_set", universe: 1, channel: 20, value: 77 });
+  ok(await until(() => state.rt.parked?.some((p) => p.channel === 20 && p.value === 77), "parked"), "dmx_set shows up as parked");
+  await cmd({ type: "unpark", universe: null, channel: null });
+  ok(await until(() => state.rt.parked?.length === 0, "unparked"), "unpark clears it");
+
+  r = await cmd({ type: "cue_load", cuelist: 1, number: 1 });
+  ok(r.ok && await until(() => state.rt.programmer["1"]?.red === 0.5, "loaded"), "cue_load puts the cue look into the programmer");
+  await cmd({ type: "prog_set", fixtures: [1], attrs: { blue: 0.4 } });
+  r = await cmd({ type: "cue_update", cuelist: 1, number: 1, mode: "merge", refs: true });
+  ok(r.ok && await until(() => state.show.cuelists[0].cues[0].changes["1"]?.blue === 0.4, "updated"), "cue_update merges the programmer into the cue");
+  await cmd({ type: "prog_release", fixtures: null, attrs: null });
+  r = await cmd({ type: "cue_update", cuelist: 1, number: 99, mode: "merge", refs: true });
+  ok(!r.ok, "cue_update on a missing cue is rejected");
+
+  // manual crossfade
+  await cmd({ type: "cuelist_save", cuelist: { id: 2, name: "XF", cues: [J(1, { 1: { dimmer: 0.2 } }), J(2, { 1: { dimmer: 1 } })], looped: false, tracking: true, priority: 0, auto_mark: false } });
+  await cmd({ type: "go_to", cuelist: 2, number: 1 });
+  await cmd({ type: "cuelist_manual", cuelist: 2, progress: 0.5 });
+  ok(await until(() => state.rt.cuelists.find((c) => c.id === 2)?.manual === true, "manual"), "cuelist_manual starts a manual crossfade");
+  const p = state.rt.cuelists.find((c) => c.id === 2).progress;
+  ok(Math.abs(p - 0.5) < 0.05, `manual progress follows the fader (${p.toFixed(2)})`);
+  await cmd({ type: "cuelist_manual", cuelist: 2, progress: 1 });
+  ok(await until(() => state.rt.cuelists.find((c) => c.id === 2)?.manual === false && state.rt.cuelists.find((c) => c.id === 2)?.current === 2, "manual done"), "fader at the end completes the cue");
+}
+
 console.log("idle CPU");
 const cpu = () => { const f = readFileSync(`/proc/${proc.pid}/stat`, "utf8").split(") ")[1].split(" "); return (+f[11] + +f[12]) / 100; };
 await cmd({ type: "prog_release", fixtures: null, attrs: null });
