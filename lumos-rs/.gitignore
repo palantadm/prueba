@@ -1,7 +1,7 @@
 target/
 ui/node_modules/
 ui/dist/
-data/
+/data/
 desktop/node_modules/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
