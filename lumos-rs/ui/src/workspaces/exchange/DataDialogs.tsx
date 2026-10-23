@@ -52,7 +52,7 @@ export function CsvImportDialog(props: { onClose: () => void }) {
     setBusy(true); setRes(null);
     try {
       const r = await uploadFile<CsvResult>(`/api/import/patch.csv${replace ? "?replace=1" : ""}`, f);
-      setRes({ imported: r.imported ?? 0, errors: r.errors ?? [] });
+      setRes({ imported: r.imported ?? 0, created: r.created, updated: r.updated, removed: r.removed, errors: r.errors ?? [] });
       if (!(r.errors?.length)) toast(tp(r.imported ?? 0, "{n} fixture imported", "{n} fixtures imported"), "ok");
     } catch (e) {
       // 4xx bodies may carry {errors:[…]}
@@ -75,6 +75,9 @@ export function CsvImportDialog(props: { onClose: () => void }) {
           <div class={`chip ${res.errors.length ? "err" : "ok"}`} style={{ alignSelf: "flex-start", minHeight: 32 }}>
             {res.errors.length ? t("Not imported — {n} error(s)", { n: res.errors.length }) : tp(res.imported, "{n} fixture imported", "{n} fixtures imported")}
           </div>
+          {!res.errors.length && res.created !== undefined && (
+            <div class="dim">{t("{c} created · {u} updated · {r} removed", { c: res.created ?? 0, u: res.updated ?? 0, r: res.removed ?? 0 })}</div>
+          )}
           {res.errors.length > 0 && (
             <div class="scroll" style={{ maxHeight: 260 }}>
               <table class="tbl"><thead><tr><th style={{ width: 70 }}>{t("Line")}</th><th>{t("Error")}</th></tr></thead>
@@ -117,6 +120,15 @@ export function MvrDialog(props: { onClose: () => void }) {
             <b>{t("Unmatched fixtures")} ({list(res.unmatched).length})</b>
             <div class="dim" style={{ fontSize: "var(--fs-sm)" }}>{t("No library profile matched. Import the GDTF files first (Patch → Import fixtures) and import the MVR again.")}</div>
             <div class="scroll mono" style={{ maxHeight: 180, fontSize: "var(--fs-sm)" }}>{list(res.unmatched).map((u, i) => <div key={i}>{u}</div>)}</div>
+          </>}
+          {res.created !== undefined && <div class="dim">{t("{c} created · {u} updated · {r} removed", { c: res.created ?? 0, u: res.updated ?? 0, r: 0 })}</div>}
+          {list(res.skipped).length > 0 && <>
+            <b>{t("Skipped")} ({list(res.skipped).length})</b>
+            <div class="scroll mono" style={{ maxHeight: 120, fontSize: "var(--fs-sm)" }}>{list(res.skipped).map((u, i) => <div key={i}>{u}</div>)}</div>
+          </>}
+          {list(res.warnings).length > 0 && <>
+            <b>{t("Warnings")} ({list(res.warnings).length})</b>
+            <div class="scroll mono" style={{ maxHeight: 120, color: "var(--live)", fontSize: "var(--fs-sm)" }}>{list(res.warnings).map((u, i) => <div key={i}>{u}</div>)}</div>
           </>}
           {list(res.errors).length > 0 && <div class="scroll mono" style={{ maxHeight: 140, color: "var(--stop)", fontSize: "var(--fs-sm)" }}>{list(res.errors).map((u, i) => <div key={i}>{u}</div>)}</div>}
         </div>

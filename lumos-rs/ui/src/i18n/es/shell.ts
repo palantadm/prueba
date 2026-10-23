@@ -671,4 +671,8 @@ export const shell: Record<string, string> = {
   "{n} step": "{n} paso",
   "{n} steps": "{n} pasos",
   "Replace the current patch (otherwise the fixtures are added)": "Reemplazar el patch actual (si no, los aparatos se añaden)",
+  "Engine syntax": "Sintaxis del motor",
+  "{c} created · {u} updated · {r} removed": "{c} creados · {u} actualizados · {r} eliminados",
+  "Skipped": "Omitidos",
+  "Warnings": "Avisos",
 };

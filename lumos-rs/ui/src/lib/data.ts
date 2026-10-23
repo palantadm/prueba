@@ -26,8 +26,8 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
   try { return JSON.parse(txt) as T; } catch { return {} as T; }
 }
 
-export type CsvResult = { imported: number; errors: { line: number; error: string }[] };
-export type MvrResult = { imported?: number; unmatched?: unknown[]; errors?: unknown[]; [k: string]: unknown };
+export type CsvResult = { imported: number; created?: number; updated?: number; removed?: number; errors: { line: number; error: string }[] };
+export type MvrResult = { imported?: number; created?: number; updated?: number; unmatched?: unknown[]; skipped?: unknown[]; warnings?: unknown[]; errors?: unknown[]; [k: string]: unknown };
 
 export const fmtBytes = (n: number) => (n < 1024 ? `${n} B` : n < 1048576 ? `${(n / 1024).toFixed(1)} KB` : `${(n / 1048576).toFixed(1)} MB`);
 export const fmtWhen = (unix: number) => new Date(unix * 1000).toLocaleString();
