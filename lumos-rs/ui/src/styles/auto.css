@@ -30,7 +30,7 @@
 @media (max-width: 1300px) { .lv-cues.has-macros { grid-template-columns: 200px 1fr; } .lv-cues.has-macros > .au-macros { grid-column: 1 / -1; max-height: 260px; } }
 @media (max-width: 900px) { .lv-cues.has-macros { grid-template-columns: 1fr; } }
 .au-macros { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
-.au-mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: var(--s-2); padding: var(--s-2); overflow: auto; align-content: start; }
+.au-mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-2); padding: var(--s-2); overflow: auto; align-content: start; }
 .au-macro { position: relative; min-height: 68px; display: flex; align-items: stretch; background: var(--bg-3); border: 1px solid var(--line-strong); border-radius: var(--r-md); overflow: hidden; }
 .au-macro .au-main { flex: 1; min-width: 0; background: none; border: 0; color: var(--text); cursor: pointer; padding: 6px 8px 6px 14px; text-align: left; display: flex; flex-direction: column; justify-content: center; gap: 2px; font-weight: 700; }
 .au-macro .au-main small { color: var(--text-dim); font-weight: 500; font-size: var(--fs-xs); }

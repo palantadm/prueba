@@ -28,7 +28,7 @@ function CommitInput(p: { value: string; onCommit: (v: string) => void; mono?: b
 }
 
 function evWidth(e: TlEvent): number {
-  return Math.min(220, Math.max(60, 28 + (e.label || e.text).length * 7.5));
+  return Math.min(220, Math.max(112, 84 + (e.label || e.text).length * 7.5));
 }
 
 export function TimelineEditor({ tl, onRename, onDelete }: { tl: Timeline; onRename: () => void; onDelete: () => void }) {
@@ -376,6 +376,7 @@ export function TimelineEditor({ tl, onRename, onDelete }: { tl: Timeline; onRen
         <span class="sp" />
         <input ref={file} type="file" accept="audio/*" hidden onChange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; (e.target as HTMLInputElement).value = ""; void onAudio(f); }} />
         <button class="btn au-btn" onClick={() => file.current?.click()}>{d.audio ? t("Replace audio…") : t("Attach audio…")}</button>
+        {d.audio && peaks.error && <span class="chip err" title={peaks.error}>{t("Could not read the audio file")}</span>}
         {d.audio && <>
           <button class={`btn au-btn ${audioOn ? "sel" : ""}`} aria-pressed={audioOn} onClick={() => setAudioOn(!audioOn)} aria-label={t("Play audio with the timeline")} title={t("Play audio with the timeline")}>{audioOn ? "🔊" : "🔇"}</button>
           {peaks.data && Math.abs(peaks.data.duration - d.length) > 0.5 && <button class="btn au-btn" onClick={() => commit({ ...d, length: Math.ceil(peaks.data!.duration * 10) / 10 })}>{t("Length = audio ({s} s)", { s: peaks.data.duration.toFixed(1) })}</button>}

@@ -675,4 +675,5 @@ export const shell: Record<string, string> = {
   "{c} created · {u} updated · {r} removed": "{c} creados · {u} actualizados · {r} eliminados",
   "Skipped": "Omitidos",
   "Warnings": "Avisos",
+  "Could not read the audio file": "No se pudo leer el archivo de audio",
 };
