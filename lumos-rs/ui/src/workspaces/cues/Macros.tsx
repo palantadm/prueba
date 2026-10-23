@@ -40,7 +40,7 @@ export function Macros() {
       <div class="panel-head">
         <span>{t("Macros")}</span><span class="sp" />
         {running.size > 0 && <button class="btn sm danger" onClick={() => send({ type: "macro_stop", id: null })}>{t("Stop all")}</button>}
-        <button class="btn sm primary" style={{ minHeight: 36 }} onClick={create} aria-label={t("New macro")}>{t("+ New")}</button>
+        <button class="btn sm primary" onClick={create} aria-label={t("New macro")}>{t("+ New")}</button>
       </div>
       {macros.length === 0 && <div class="dim" style={{ padding: 12 }}>{t("No macros yet. A macro is a sequence of command-line statements with optional waits.")}</div>}
       <div class="au-mgrid">

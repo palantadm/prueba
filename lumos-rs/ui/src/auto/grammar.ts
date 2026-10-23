@@ -3,7 +3,8 @@ import { signal } from "@preact/signals";
 import { t } from "../i18n";
 
 export type HelpEntry = { text: string; desc: string };
-export type CmdHelp = { keywords: string[]; examples: HelpEntry[]; raw: unknown };
+export type Statement = { name: string; description: string; syntax: string; examples: string[] };
+export type CmdHelp = { keywords: string[]; examples: HelpEntry[]; statements: Statement[]; raw: unknown };
 
 /** Fallback vocabulary when the engine's /api/cmdline/help is unavailable (English + Spanish aliases). */
 export const LOCAL_KEYWORDS: string[] = [
@@ -38,9 +39,18 @@ export function loadHelp(): Promise<void> {
     helpPromise = fetch("/api/cmdline/help")
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((j) => {
-        const kw = arr(j, "keywords", "words", "vocabulary").map(entry).filter(Boolean).map((e) => (e as HelpEntry).text);
-        const ex = arr(j, "examples", "samples").map(entry).filter(Boolean) as HelpEntry[];
-        helpData.value = { keywords: kw, examples: ex, raw: j };
+        const words = new Set<string>();
+        const kwj = j?.keywords;
+        if (Array.isArray(kwj)) kwj.map(entry).forEach((e: HelpEntry | null) => e && words.add(e.text));
+        else if (kwj && typeof kwj === "object") Object.values(kwj).forEach((v) => (Array.isArray(v) ? v : [v]).forEach((w) => typeof w === "string" && words.add(w)));
+        for (const a of arr(j, "attributes")) { if (a?.name) words.add(a.name); (a?.aliases ?? []).forEach((w: string) => words.add(w)); }
+        for (const c of arr(j, "colours", "colors")) (c?.names ?? []).forEach((w: string) => words.add(w));
+        const statements: Statement[] = arr(j, "statements").filter((x) => x && typeof x.syntax === "string").map((x) => ({
+          name: String(x.name ?? ""), description: String(x.description ?? ""), syntax: String(x.syntax), examples: Array.isArray(x.examples) ? x.examples.map(String) : [],
+        }));
+        const ex: HelpEntry[] = arr(j, "examples", "samples").map(entry).filter(Boolean) as HelpEntry[];
+        for (const st of statements) for (const e of st.examples) ex.push({ text: e, desc: st.description });
+        helpData.value = { keywords: [...words].filter((w) => /^[A-Za-zÀ-ÿ_]+$/.test(w)).sort((a, b) => a.length - b.length || a.localeCompare(b)), examples: ex, statements, raw: j };
       })
       .catch(() => { helpPromise = null; /* retry on next open */ });
   }

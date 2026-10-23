@@ -73,3 +73,9 @@
 /* MSC page */
 .msc-test { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
 .msc-recent { max-height: 220px; overflow: auto; font-family: var(--font-mono); font-size: var(--fs-sm); display: flex; flex-direction: column; gap: 2px; }
+
+/* touch sizing inside the automation workspaces */
+.tl-root .seg-btn, .tl-root .input, .au-macros .input, .msc-test .input { min-height: 44px; }
+.tl-root .check { min-height: 44px; }
+.tl-root .panel-head, .au-macros .panel-head { height: auto; min-height: 44px; padding-top: 4px; padding-bottom: 4px; }
+.tl-root .panel-head .btn, .au-macros .panel-head .btn { min-height: 44px; }

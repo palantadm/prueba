@@ -39,7 +39,7 @@ export function Timeline() {
     <div class="tl-root">
       <div class="panel lv-col">
         <div class="panel-head"><span>{t("Timelines")}</span><span class="sp" />
-          <button class="btn sm primary" style={{ minHeight: 36 }} onClick={create} aria-label={t("New timeline")}>{t("+ New")}</button></div>
+          <button class="btn sm primary" onClick={create} aria-label={t("New timeline")}>{t("+ New")}</button></div>
         <div class="lv-scroll" role="listbox" aria-label={t("Timelines")}>
           {list.length === 0 && <div class="dim" style={{ padding: 12 }}>{t("No timelines yet.")}</div>}
           {list.map((x) => {

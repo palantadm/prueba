@@ -46,7 +46,18 @@ function HelpSheet({ onClose }: { onClose: () => void }) {
           </tbody></table>
         </div>
       ))}
-      {h && h.examples.length > 0 && (
+      {h && h.statements.length > 0 && (
+        <div class="panel">
+          <div class="panel-head">{t("Engine syntax")}</div>
+          <table class="tbl"><tbody>
+            {h.statements.map((s) => (
+              <tr key={s.name}><td><code class="au-code">{s.syntax}</code></td><td class="dim">{s.description}</td>
+                <td style={{ width: 90 }}>{s.examples[0] && <button class="btn sm au-use" onClick={() => { cmdText.value = s.examples[0]; setCmdOpen(true); onClose(); }}>{t("Use")}</button>}</td></tr>
+            ))}
+          </tbody></table>
+        </div>
+      )}
+      {h && h.statements.length === 0 && h.examples.length > 0 && (
         <div class="panel">
           <div class="panel-head">{t("Examples from the engine")}</div>
           <table class="tbl"><tbody>

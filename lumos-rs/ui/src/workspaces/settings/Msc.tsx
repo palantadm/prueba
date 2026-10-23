@@ -44,7 +44,7 @@ export function MscPage() {
 
       <div class="panel">
         <div class="panel-head"><span>{t("Cue list mapping")}</span><span class="sp" />
-          <button class="btn sm" style={{ minHeight: 36 }} onClick={() => patch((s) => { s.msc ??= { enabled: false, device_id: 127, map: [] }; s.msc.map.push({ msc_list: String(s.msc.map.length + 1), cuelist: cuelists[0]?.id ?? 1 }); })}>{t("+ Add mapping")}</button></div>
+          <button class="btn sm" onClick={() => patch((s) => { s.msc ??= { enabled: false, device_id: 127, map: [] }; s.msc.map.push({ msc_list: String(s.msc.map.length + 1), cuelist: cuelists[0]?.id ?? 1 }); })}>{t("+ Add mapping")}</button></div>
         <div class="panel-body col">
           <div class="dim">{t("An MSC cue list id (text) is routed to a Lumos cuelist. Messages without a list go to the first cuelist.")}</div>
           {msc.map.length === 0 && <div class="faint">{t("No mappings — everything goes to the first cuelist.")}</div>}
