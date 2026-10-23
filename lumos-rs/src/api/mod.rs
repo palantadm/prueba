@@ -28,6 +28,8 @@ pub fn router(h: Handle) -> Router {
         .route("/api/media", post(upload).layer(DefaultBodyLimit::max(512 * 1024 * 1024)))
         .route("/api/show", get(get_show).put(put_show).layer(DefaultBodyLimit::max(64 * 1024 * 1024)))
         .route("/api/morph/preview", post(morph_preview))
+        .route("/api/cmdline/help", get(cmdline_help))
+        .route("/api/cmdline/complete", get(cmdline_complete))
         .route("/api/library/import", post(library_import).layer(DefaultBodyLimit::max(256 * 1024 * 1024)))
         .nest_service("/media", ServeDir::new(media))
         .nest_service("/library", ServeDir::new(library))
@@ -71,6 +73,20 @@ async fn morph_preview(State(h): State<Handle>, Json(req): Json<MorphReq>) -> Re
         Ok(p) => Json(p).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
     }
+}
+
+async fn cmdline_help() -> Json<serde_json::Value> {
+    Json(crate::engine::cmdline_help())
+}
+
+#[derive(serde::Deserialize)]
+struct CompleteQuery {
+    #[serde(default)]
+    q: String,
+}
+
+async fn cmdline_complete(axum::extract::Query(q): axum::extract::Query<CompleteQuery>) -> Json<serde_json::Value> {
+    Json(serde_json::json!({ "suggestions": crate::engine::cmdline_complete(&q.q) }))
 }
 
 async fn get_show(State(h): State<Handle>) -> Response {

@@ -1,12 +1,18 @@
 //! The engine task: owns all show/runtime state, executes commands, renders DMX at `tick_hz`.
 
 mod bindings;
+mod cmdline;
 mod effects;
+mod macros;
 mod morph;
+mod msc;
 mod patch;
 mod playback;
 mod scenes;
+mod timeline;
 mod vconsole;
+
+pub use cmdline::{complete as cmdline_complete, help_json as cmdline_help};
 
 use crate::io::{IoEvent, IoHub, MtcDecoder};
 use crate::library;
@@ -15,6 +21,7 @@ use crate::persist::Store;
 use bindings::*;
 use patch::*;
 use playback::*;
+use macros::Automation;
 use scenes::ScenesState;
 use vconsole::VcRt;
 
@@ -173,6 +180,7 @@ struct Engine {
     osc_fb: HashMap<String, f32>,
     vc: VcRt,
     scenes: ScenesState,
+    auto: Automation,
 }
 
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
@@ -252,6 +260,7 @@ impl Engine {
             osc_fb: HashMap::new(),
             vc: VcRt::default(),
             scenes: ScenesState::default(),
+            auto: Automation::default(),
         };
         e.hz = e.show.settings.tick_hz.clamp(10, 100);
         e.rebuild_derived();
@@ -434,6 +443,7 @@ impl Engine {
         self.bind_last.clear();
         self.vc = VcRt::default();
         self.scenes = ScenesState::default();
+        self.auto.reset();
         self.last_merged.clear();
         self.ext_dmx.clear();
         self.hz = self.show.settings.tick_hz.clamp(10, 100);
@@ -806,8 +816,16 @@ impl Engine {
             ChaseSave { .. } | ChaseRemove { .. } | ChaseRun { .. } | ChaseBpm { .. } | ChaseTap { .. } | ChaseNudge { .. } => {}
             SpeedSave { .. } | SpeedRemove { .. } | SpeedSet { .. } | SpeedTap { .. } | CuelistManual { .. } => {}
             // be-auto
-            CommandLine { .. } | MacroSave { .. } | MacroRemove { .. } | MacroRun { .. } | MacroStop { .. } => {}
-            TimelineSave { .. } | TimelineRemove { .. } | TimelineRun { .. } | TimelineStop { .. } | TimelineSeek { .. } => {}
+            CommandLine { text } => self.run_cmdline_new(&text)?,
+            MacroSave { r#macro } => self.macro_save(r#macro)?,
+            MacroRemove { id } => self.macro_remove(id),
+            MacroRun { id } => self.macro_run(id)?,
+            MacroStop { id } => self.macro_stop(id),
+            TimelineSave { timeline } => self.timeline_save(timeline)?,
+            TimelineRemove { id } => self.timeline_remove(id),
+            TimelineRun { id, from } => self.timeline_run(id, from)?,
+            TimelineStop { id } => self.timeline_stop(id)?,
+            TimelineSeek { id, t } => self.timeline_seek(id, t)?,
             // be-data
             BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. } => {}
             SceneRecord { id, name, from_output, fixtures, merge, refs: _ } => self.scene_record(id, name, from_output, fixtures, merge)?,
@@ -1322,9 +1340,19 @@ impl Engine {
                 self.tc.last_mtc = Some(self.now());
             }
         }
+        if msc::is_msc(bytes) {
+            self.msc_in(port, bytes);
+            return;
+        }
         if let Some(msg) = parse_midi(bytes) {
             self.handle_input(InEvent::Midi { port, msg });
         }
+    }
+
+    /// Macros + timelines (called once per tick, after the timecode update).
+    fn update_automation(&mut self, now: f64, dt: f64) {
+        self.update_macros(now);
+        self.update_timelines(dt);
     }
 
     fn handle_input(&mut self, ev: InEvent) {
@@ -1631,6 +1659,7 @@ impl Engine {
         }
 
         self.update_timecode(now, dt);
+        self.update_automation(now, dt);
         self.update_playback(now);
 
         let before = self.ext_dmx.len();
@@ -1827,11 +1856,11 @@ impl Engine {
             undo: 0,
             redo: 0,
             parked: vec![],
-            cmd_log: vec![],
+            cmd_log: self.auto.log.0.iter().cloned().collect(),
             chases: vec![],
             speed: vec![],
-            timelines: vec![],
-            macros_running: vec![],
+            timelines: self.timelines_rt(),
+            macros_running: self.macros_running_ids(),
             testing: false,
             identifying: vec![],
             vc: self.vc_states(),
