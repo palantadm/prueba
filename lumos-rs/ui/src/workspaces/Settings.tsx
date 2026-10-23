@@ -4,6 +4,7 @@ import { MidiPage } from "./settings/Midi";
 import { BindingsPage } from "./settings/Bindings";
 import { ArtNetInPage, OscPage } from "./settings/Inputs";
 import { GeneralPage, NetworkPage, TimecodePage } from "./settings/Misc";
+import { MscPage } from "./settings/Msc";
 import { t } from "../i18n";
 
 const cats = [
@@ -13,6 +14,7 @@ const cats = [
   { id: "osc", icon: "≋", label: "OSC", c: OscPage },
   { id: "artnet", icon: "⇄", label: "Art-Net input", c: ArtNetInPage },
   { id: "timecode", icon: "⏱", label: "Timecode", c: TimecodePage },
+  { id: "msc", icon: "🎬", label: "Show Control (MSC)", c: MscPage },
   { id: "network", icon: "🌐", label: "Network", c: NetworkPage },
   { id: "general", icon: "⚙", label: "General", c: GeneralPage },
 ];

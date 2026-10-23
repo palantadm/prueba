@@ -1,4 +1,4 @@
-import { useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { rt, selection, send, show } from "../../store";
 import type { Effect, Palette, PaletteKind, Shape } from "../../types";
 import { ALL_ATTRS, attrLabel, fixtureById, rgbToHex } from "../../lib/attrs";
@@ -7,6 +7,7 @@ import { Modal } from "../../ui";
 import { ConfirmDialog, PromptDialog } from "./dialogs";
 import { ScenePool } from "./Scenes";
 import { t, tp } from "../../i18n";
+import { focusPalette } from "../../lib/state";
 
 const KINDS: { id: PaletteKind; label: string }[] = [
   { id: "intensity", label: "Intensity" }, { id: "position", label: "Position" },
@@ -15,6 +16,7 @@ const KINDS: { id: PaletteKind; label: string }[] = [
 
 export function Pools() {
   const [tab, setTab] = useState<"palettes" | "effects" | "scenes">("palettes");
+  useEffect(() => { if (focusPalette.value !== null) setTab("palettes"); }, [focusPalette.value]);
   return (
     <div class="panel lv-col pools">
       <div class="tabs" role="tablist">
@@ -42,11 +44,11 @@ function summary(p: Palette): string {
   return tp(n, "{n} value", "{n} values");
 }
 
-function PaletteCell({ p, onEdit }: { p: Palette; onEdit: () => void }) {
+function PaletteCell({ p, onEdit, flash }: { p: Palette; onEdit: () => void; flash?: boolean }) {
   const lp = useLongPress(onEdit);
   const sw = swatch(p);
   return (
-    <button class="lv-pal-cell" {...lp as any} title={t("{name} — right-click / long-press to edit", { name: p.name })}
+    <button class={`lv-pal-cell ${flash ? "flash" : ""}`} {...lp as any} title={t("{name} — right-click / long-press to edit", { name: p.name })}
       onClick={() => { if (!lp.wasLong() && selection.value.length) send({ type: "prog_apply_palette", fixtures: selection.value, palette: p.id }); }}>
       {sw && <span class="lv-pal-sw" style={{ background: sw }} />}
       <span>{p.name}</span><span class="dim">{summary(p)}</span>
@@ -59,6 +61,15 @@ function PalettePool() {
   const [naming, setNaming] = useState(false);
   const [edit, setEdit] = useState<Palette | null>(null);
   const pals = (show.value?.palettes ?? []).filter((p) => p.kind === kind || kind === "all");
+  // Reveal a palette linked from the cue editor: switch to its kind, flash it, then clear.
+  useEffect(() => {
+    const id = focusPalette.value;
+    if (id === null) return;
+    const pal = show.value?.palettes.find((x) => x.id === id);
+    if (pal) setKind(pal.kind);
+    const tm = setTimeout(() => { if (focusPalette.value === id) focusPalette.value = null; }, 2600);
+    return () => clearTimeout(tm);
+  }, [focusPalette.value]);
   const held = selection.value.some((id) => rt.value?.programmer[id] && Object.keys(rt.value.programmer[id]!).length);
   return (
     <>
@@ -70,7 +81,7 @@ function PalettePool() {
       <div class="lv-scroll">
         <div class="lv-pal">
           {pals.length === 0 && <div class="dim" style={{ gridColumn: "1/-1" }}>{t("No {kind} palettes. Set values, select fixtures, then Record.", { kind: t(KINDS.find((k) => k.id === kind)!.label).toLowerCase() })}</div>}
-          {pals.map((p) => <PaletteCell key={p.id} p={p} onEdit={() => setEdit(p)} />)}
+          {pals.map((p) => <PaletteCell key={p.id} p={p} flash={focusPalette.value === p.id} onEdit={() => setEdit(p)} />)}
         </div>
       </div>
       {naming && <PromptDialog title={t("Record {kind} palette", { kind: t(KINDS.find((k) => k.id === kind)!.label).toLowerCase() })} label={t("Name")} ok={t("Record")} initial={`${t(KINDS.find((k) => k.id === kind)!.label)} ${pals.length + 1}`}

@@ -1,21 +1,37 @@
 import "../styles/live.css";
-import { signal } from "@preact/signals";
 import { useMemo, useState } from "preact/hooks";
-import { dmx, fire, library, show } from "../store";
+import { dmx, fire, library, rt, show } from "../store";
+import { Modal, ParkedButton, ParkedList } from "../ui";
+import { okey, overrides, parkedList, parkedValue, setOverride, unparkChannel } from "../lib/park";
 import { attrColor, attrLabel, fixtureAttrs, modeOf } from "../lib/attrs";
 import { useDmxTick } from "../lib/hooks";
 import { Fader } from "../widgets";
 import { t } from "../i18n";
 
 const PAGE = 32;
-const overrides = signal<Record<string, number>>({});
-const key = (u: number, c: number) => `${u}:${c}`;
+const key = okey;
+const setOv = setOverride;
 
-function setOv(u: number, c: number, v: number | null) {
-  const o = { ...overrides.value };
-  if (v === null) delete o[key(u, c)]; else o[key(u, c)] = v;
-  overrides.value = o;
-  fire({ type: "dmx_set", universe: u, channel: c, value: v });
+/** Channel actions: park at a value, unpark, flash — big touch targets. */
+function ChannelDialog(p: { uni: number; ch: number; live: number; parked: number | undefined; onClose: () => void }) {
+  const [v, setV] = useState(String(p.parked ?? p.live));
+  const n = Math.max(0, Math.min(255, Math.round(Number(v) || 0)));
+  return (
+    <Modal title={t("Channel U{u}.{c}", { u: p.uni, c: p.ch })} onClose={p.onClose} footer={<button class="btn" style={{ minHeight: 44 }} onClick={p.onClose}>{t("Close")}</button>}>
+      <div class="dim">{p.parked !== undefined ? t("Parked at {v}", { v: p.parked }) : t("Output now: {v}", { v: p.live })}</div>
+      <div class="field"><label>{t("Value (0–255)")}</label>
+        <div class="row">
+          <input class="input num" style={{ minHeight: 44 }} type="number" min={0} max={255} autoFocus value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
+          <button class="btn lg primary" style={{ minHeight: 44 }} onClick={() => { setOv(p.uni, p.ch, n); p.onClose(); }}>{t("Park at {v}", { v: n })}</button>
+        </div>
+      </div>
+      <div class="row wrap">
+        {[0, 64, 128, 255].map((x) => <button key={x} class="btn" style={{ minHeight: 44, minWidth: 64 }} onClick={() => setV(String(x))}>{x}</button>)}
+      </div>
+      <button class="btn lg" style={{ minHeight: 44 }} disabled={p.parked === undefined && overrides.value[key(p.uni, p.ch)] === undefined}
+        onClick={() => { unparkChannel(p.uni, p.ch); p.onClose(); }}>{t("Unpark")}</button>
+    </Modal>
+  );
 }
 
 export function Desk() {
@@ -24,6 +40,8 @@ export function Desk() {
   const [uni, setUni] = useState<number>(universes[0]?.id ?? 1);
   const [page, setPage] = useState(0);
   const [pct, setPct] = useState(false);
+  const [chDlg, setChDlg] = useState<number | null>(null);
+  const [parkedOpen, setParkedOpen] = useState(false);
   const frame = dmx.get(uni);
 
   const owners = useMemo(() => {
@@ -40,6 +58,7 @@ export function Desk() {
   }, [uni, show.value?.fixtures, library.value]);
   void fixtureAttrs;
 
+  void rt.value?.parked;
   const heldOnPage = Object.keys(overrides.value).filter((k) => { const [u, c] = k.split(":").map(Number); return u === uni && c > page * PAGE && c <= (page + 1) * PAGE; });
   const fmt = (v: number) => (pct ? `${Math.round((v / 255) * 100)}%` : String(v));
   return (
@@ -55,19 +74,20 @@ export function Desk() {
           ))}
         </div>
         <span class="sp" />
+        <ParkedButton onOpen={() => setParkedOpen(true)} />
         <button class={`btn sm ${pct ? "sel" : ""}`} onClick={() => setPct(!pct)}>{pct ? "%" : "0–255"}</button>
         <button class="btn sm danger" disabled={!heldOnPage.length} onClick={() => heldOnPage.forEach((k) => { const [u, c] = k.split(":").map(Number); setOv(u, c, null); })}>{t("Release page")}</button>
       </div>
       <div class="lv-desk-strips" role="group" aria-label={t("DMX faders")}>
         {Array.from({ length: PAGE }, (_, i) => {
           const ch = page * PAGE + i + 1;
-          const ov = overrides.value[key(uni, ch)];
+          const ov = overrides.value[key(uni, ch)] ?? parkedValue(uni, ch);
           const live = frame ? frame[ch - 1] : 0;
           const v = ov ?? live;
           const o = owners.get(ch);
           return (
             <div key={ch} class={`lv-ch ${ov !== undefined ? "held" : ""}`}>
-              <div class="lv-ch-n">{ch}</div>
+              <button class="lv-ch-n lv-ch-btn" aria-label={t("Channel {n} actions (park / unpark)", { n: ch })} onClick={() => setChDlg(ch)}>{ov !== undefined ? <b style={{ color: "var(--live)" }}>P</b> : null}{ch}</button>
               <Fader value={v / 255} held={ov !== undefined} color={o ? attrColor(o.attr) : "var(--accent)"} width={36} height="auto"
                 ariaLabel={t("Channel {n}", { n: ch })} onChange={(x) => setOv(uni, ch, Math.round(x * 255))} />
               <div class="lv-ch-v" style={{ color: ov !== undefined ? "var(--live)" : undefined }}>{fmt(v)}</div>
@@ -83,6 +103,8 @@ export function Desk() {
           );
         })}
       </div>
+      {chDlg !== null && <ChannelDialog uni={uni} ch={chDlg} live={frame ? frame[chDlg - 1] : 0} parked={overrides.value[key(uni, chDlg)] ?? parkedValue(uni, chDlg)} onClose={() => setChDlg(null)} />}
+      {parkedOpen && <ParkedList onClose={() => setParkedOpen(false)} />}
     </div>
   );
 }

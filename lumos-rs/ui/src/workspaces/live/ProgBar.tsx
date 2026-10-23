@@ -61,6 +61,7 @@ function RecordCue({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<RecordMode>("merge");
   const [label, setLabel] = useState("");
   const [release, setRelease] = useState(true);
+  const [refs, setRefs] = useState(true);
   const cl = lists.find((l) => l.id === list);
 
   const createList = async () => {
@@ -73,7 +74,7 @@ function RecordCue({ onClose }: { onClose: () => void }) {
     const n = number.trim() === "" ? null : parseFloat(number);
     if (n !== null && !Number.isFinite(n)) return toast(t("Invalid cue number"), "err");
     try {
-      await send({ type: "prog_record_cue", cuelist: list, number: n, mode, label, release, refs: true });
+      await send({ type: "prog_record_cue", cuelist: list, number: n, mode, label, release, refs });
       activeCuelist.value = list;
       toast(t("Recorded cue {n} in {name}", { n: n ?? t("(next)"), name: cl?.name ?? list }), "ok");
       onClose();
@@ -107,8 +108,10 @@ function RecordCue({ onClose }: { onClose: () => void }) {
         <button class={`btn ${mode === "merge" ? "sel" : ""}`} onClick={() => setMode("merge")}>{t("Merge")}</button>
         <button class={`btn ${mode === "replace" ? "sel" : ""}`} onClick={() => setMode("replace")}>{t("Replace")}</button>
         <span class="sp" />
-        <label class="check"><input type="checkbox" checked={release} onChange={(e) => setRelease((e.target as HTMLInputElement).checked)} />{t("Release programmer after")}</label>
+        <label class="check" style={{ minHeight: 44 }}><input type="checkbox" checked={release} onChange={(e) => setRelease((e.target as HTMLInputElement).checked)} />{t("Release programmer after")}</label>
       </div>
+      <label class="check" style={{ minHeight: 44 }} title={t("Attributes applied from palettes stay linked: editing the palette later updates this cue")}>
+        <input type="checkbox" checked={refs} onChange={(e) => setRefs((e.target as HTMLInputElement).checked)} />{t("Save palette links")}</label>
     </Modal>
   );
 }

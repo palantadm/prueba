@@ -60,7 +60,7 @@ export function ScenePool() {
           <button role="tab" aria-selected={view === "faders"} class={`btn ${view === "faders" ? "sel" : ""}`} onClick={() => setView("faders")}>{t("Faders")}</button>
         </div>
       </div>
-      <div class="lv-scroll">
+      <div class="lv-scroll sc-scroll">
         {scenes.length === 0 && <div class="dim" style={{ padding: 12 }}>{t("No scenes yet. Set a look, then record it with “From programmer” or “From output”.")}</div>}
         {view === "tiles" ? (
           <div class="sc-grid">
@@ -194,12 +194,14 @@ function MorphPanel({ scenes }: { scenes: Scene[] }) {
   const dragging = useRef(false);
   const last = useRef(0);
 
-  // keep the A/B choice valid as scenes come and go
+  // keep the A/B choice valid and distinct as scenes come and go
   useEffect(() => {
-    const ids = scenes.map((s) => s.id);
-    if (!ids.includes(a)) setA(ids[0] ?? 0);
-    if (!ids.includes(b)) setB(ids[1] ?? ids[0] ?? 0);
-  }, [scenes.map((s) => s.id).join(",")]);
+    const ids = scenes.map((x) => x.id);
+    const na = ids.includes(a) ? a : ids[0] ?? 0;
+    const nb = ids.includes(b) && b !== na ? b : ids.find((i) => i !== na) ?? na;
+    if (na !== a) setA(na);
+    if (nb !== b) setB(nb);
+  }, [scenes.map((x) => x.id).join(","), a, b]);
   // follow the engine (another client, MIDI, VC slider…)
   useEffect(() => {
     if (m && !dragging.current) { setA(m[0]); setB(m[1]); setT(m[2]); }
@@ -212,8 +214,10 @@ function MorphPanel({ scenes }: { scenes: Scene[] }) {
     if (force || now - last.current >= 33) { last.current = now; fire({ type: "scene_morph", a: na, b: nb, t: v }); }
   };
   const pick = (which: "a" | "b", id: number) => {
-    const na = which === "a" ? id : a, nb = which === "b" ? id : b;
-    which === "a" ? setA(id) : setB(id);
+    // choosing the scene already used on the other side swaps them
+    let na = which === "a" ? id : a, nb = which === "b" ? id : b;
+    if (na === nb) { if (which === "a") nb = a; else na = b; }
+    setA(na); setB(nb);
     if (m && na !== nb) fire({ type: "scene_morph", a: na, b: nb, t: tv });
   };
   const chips = (which: "a" | "b") => scenes.map((s) => {
