@@ -80,7 +80,7 @@ export function Sheet() {
   const menuAttr = colMenu;
   return (
     <div class="panel lv-col">
-      <div class="panel-head">
+      <div class="panel-head" style={{ height: "auto", minHeight: 52, flexWrap: "wrap", padding: "4px var(--s-3)" }}>
         <span>{t("Fixture sheet")}</span><span class="sp" />
         <span class="chip">{scoped ? t("{n} selected", { n: rows.length }) : t("All fixtures ({n})", { n: rows.length })}</span>
         <button class="btn sm" style={{ minHeight: 44 }} onClick={() => setUnit(unit === "pct" ? "dmx" : "pct")} aria-label={t("Switch units")}>{unit === "pct" ? "%" : "0–255"}</button>

@@ -67,7 +67,7 @@ function AttrFaders() {
   const fxs = sel();
   const [fanOpen, setFanOpen] = useState(false);
   if (!fxs.length) {
-    return <div class="panel lv-col"><div class="panel-head"><span>{t("Attributes")}</span><span class="sp" /><ViewSwitch /></div>
+    return <div class="panel lv-col"><div class="panel-head" style={{ height: "auto", minHeight: 52, flexWrap: "wrap", padding: "4px var(--s-3)" }}><span>{t("Attributes")}</span><span class="sp" /><ViewSwitch /></div>
       <div class="panel-body dim">{t("Select fixtures in the pool to edit their attributes.")}</div></div>;
   }
   const has = unionAttrs(fxs);
@@ -84,7 +84,7 @@ function AttrFaders() {
 
   return (
     <div class="panel lv-col">
-      <div class="panel-head"><span>{t("Attributes")}</span><span class="sp" /><span class="chip">{t("{n} selected", { n: fxs.length })}</span>
+      <div class="panel-head" style={{ height: "auto", minHeight: 52, flexWrap: "wrap", padding: "4px var(--s-3)" }}><span>{t("Attributes")}</span><span class="sp" /><span class="chip">{t("{n} selected", { n: fxs.length })}</span>
         <button class="btn sm" style={{ minHeight: 44 }} disabled={fxs.length < 2} onClick={() => setFanOpen(true)} title={t("Spread any attribute across the selection")}>{t("↔ Fan")}</button>
         <ViewSwitch />
       </div>

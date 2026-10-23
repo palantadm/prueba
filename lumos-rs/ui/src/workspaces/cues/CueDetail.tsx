@@ -40,7 +40,7 @@ export function CueDetail({ list, number }: { list: Cuelist; number: number | nu
         { value: "timing", label: t("Timing"), badge: nTiming || undefined },
         { value: "notes", label: t("Notes"), badge: cue.notes ? "•" : undefined },
       ]} />
-      <div class="panel-body lv-detail">
+      <div class="panel-body lv-detail" style={{ maxHeight: tab === "content" ? 180 : "none" }}>
         {tab === "content" && <Content list={list} cue={cue} entries={entries} save={save} />}
         {tab === "timing" && <Timing cue={cue} save={save} />}
         {tab === "notes" && <Notes cue={cue} save={save} />}
