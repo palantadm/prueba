@@ -11,6 +11,7 @@ import { ColorPicker, Fader, Knob, XYPad } from "../../widgets";
 import { t } from "../../i18n";
 import { FanDialog } from "./FanDialog";
 import { Sheet } from "./Sheet";
+import { ViewSwitch } from "./ViewSwitch";
 
 const sel = (): Fixture[] => selection.value.map((i) => fixtureById(i)).filter((f): f is Fixture => !!f);
 
@@ -53,17 +54,6 @@ function AttrFader({ fxs, attr, height = 190 }: { fxs: Fixture[]; attr: string; 
       <Fader value={s.value} held={s.held} height={height} width={56} color={attrColor(attr)} ariaLabel={attrLabel(attr)}
         defaultValue={attrHome(attr)} onChange={(v) => setAttrs(selection.value, { [attr]: v })} />
       <div class="mono" style={{ color: s.held ? "var(--live)" : undefined }}>{pct(s.value)}</div>
-    </div>
-  );
-}
-
-/** Faders/knobs ↔ fixture sheet switch shown in the attribute panel header. */
-function ViewSwitch() {
-  const v = attrView.value;
-  return (
-    <div class="row" style={{ gap: 2 }} role="tablist" aria-label={t("Attribute view")}>
-      <button role="tab" aria-selected={v === "faders"} class={`btn sm ${v === "faders" ? "sel" : ""}`} style={{ minHeight: 44 }} onClick={() => setAttrView("faders")}>{t("Faders")}</button>
-      <button role="tab" aria-selected={v === "sheet"} class={`btn sm ${v === "sheet" ? "sel" : ""}`} style={{ minHeight: 44 }} onClick={() => setAttrView("sheet")}>{t("Sheet")}</button>
     </div>
   );
 }

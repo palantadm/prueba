@@ -1,6 +1,7 @@
 //! Lumos engine + web console as a library (used by the CLI binary and the desktop app).
 
 pub mod api;
+pub mod backups;
 pub mod engine;
 pub mod gdtf;
 pub mod glb;
@@ -8,8 +9,12 @@ pub mod io;
 pub mod library;
 pub mod midi;
 pub mod model;
+pub mod csv;
+pub mod mvr;
+pub mod pdf;
 pub mod persist;
 pub mod qxf;
+pub mod reports;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;

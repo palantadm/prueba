@@ -3,6 +3,7 @@
 mod bindings;
 mod chases;
 mod cmdline;
+mod data;
 mod effects;
 mod history;
 mod macros;
@@ -30,6 +31,7 @@ use chases::ChasesState;
 use patch::*;
 use playback::*;
 use macros::Automation;
+use data::DataRt;
 use scenes::ScenesState;
 use speed::SpeedState;
 use vconsole::VcRt;
@@ -40,6 +42,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::{broadcast, mpsc, oneshot};
 
 pub type Reply = oneshot::Sender<Result<(), String>>;
+pub type ShowEditFn = Box<dyn FnOnce(&mut Show, &HashMap<String, FixtureProfile>) -> Result<serde_json::Value, String> + Send>;
 
 pub enum EngineIn {
     Cmd { cmd: Command, reply: Option<Reply> },
@@ -49,6 +52,8 @@ pub enum EngineIn {
     ImportShow { show: Box<Show>, reply: Reply },
     /// Profiles parsed from uploaded GDTF/QLC+/OFL files (assets already on disk).
     ImportProfiles { profiles: Vec<FixtureProfile>, reply: Reply },
+    /// Atomic show edit run inside the engine (CSV/MVR import). On `Err` the show is left untouched.
+    ShowEdit { f: ShowEditFn, reply: oneshot::Sender<Result<serde_json::Value, String>> },
     /// Dry-run of a fixture morph (REST `POST /api/morph/preview`).
     MorphPreview { ids: Vec<u32>, profile: String, mode: String, reply: oneshot::Sender<Result<MorphPreview, String>> },
 }
@@ -96,6 +101,15 @@ impl Handle {
         self.tx
             .send(EngineIn::MorphPreview { ids, profile, mode, reply: r })
             .map_err(|_| "Engine stopped".to_string())?;
+        rx.await.map_err(|_| "Engine stopped".to_string())?
+    }
+    /// Run `f` on the live show inside the engine task. `Err` leaves the show unchanged.
+    pub async fn edit_show<F>(&self, f: F) -> Result<serde_json::Value, String>
+    where
+        F: FnOnce(&mut Show, &HashMap<String, FixtureProfile>) -> Result<serde_json::Value, String> + Send + 'static,
+    {
+        let (r, rx) = oneshot::channel();
+        self.tx.send(EngineIn::ShowEdit { f: Box::new(f), reply: r }).map_err(|_| "Engine stopped".to_string())?;
         rx.await.map_err(|_| "Engine stopped".to_string())?
     }
     pub async fn import_profiles(&self, profiles: Vec<FixtureProfile>) -> Result<(), String> {
@@ -196,6 +210,8 @@ struct Engine {
     speed: SpeedState,
     /// Accumulated phase (cycles) and last update time per running effect.
     fx_clock: HashMap<u32, (f64, f64)>,
+    /// Backups, node discovery, output test, identify (see data.rs).
+    data: DataRt,
 }
 
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
@@ -226,6 +242,7 @@ impl Engine {
         let show = store.load_autosave().unwrap_or_default();
         let now = Instant::now();
         let mut e = Engine {
+            data: DataRt::new(&store),
             store,
             t0: now,
             out,
@@ -282,6 +299,7 @@ impl Engine {
             fx_clock: HashMap::new(),
         };
         e.hz = e.show.settings.tick_hz.clamp(10, 100);
+        e.blackout = e.show.settings.start_blackout;
         e.rebuild_derived();
         e
     }
@@ -311,6 +329,7 @@ impl Engine {
                 Some(ev) = io_rx.recv() => self.on_io(ev),
             }
         }
+        self.data_on_exit();
         let _ = self.store.autosave(&self.show);
     }
 
@@ -343,6 +362,8 @@ impl Engine {
                     json(&ServerMsg::Show { rev: self.rev, show: self.show.clone() }),
                     json(&ServerMsg::Shows { shows: self.store.list() }),
                     self.midi_ports_json(),
+                    self.backups_json(),
+                    self.nodes_json(),
                 ];
                 v.push(json(&ServerMsg::Rt { rt: self.build_rt() }));
                 let _ = reply.send(v);
@@ -356,6 +377,21 @@ impl Engine {
             }
             EngineIn::MorphPreview { ids, profile, mode, reply } => {
                 let _ = reply.send(self.morph_preview(&ids, &profile, &mode));
+            }
+            EngineIn::ShowEdit { f, reply } => {
+                let profiles: HashMap<String, FixtureProfile> = self.library_list().into_iter().map(|p| (p.id.clone(), p)).collect();
+                let before = self.show.clone();
+                match f(&mut self.show, &profiles) {
+                    Ok(v) => {
+                        self.library_dirty = true;
+                        self.touch_patch();
+                        let _ = reply.send(Ok(v));
+                    }
+                    Err(e) => {
+                        self.show = before;
+                        let _ = reply.send(Err(e));
+                    }
+                }
             }
             EngineIn::ImportProfiles { profiles, reply } => {
                 for p in profiles {
@@ -437,6 +473,7 @@ impl Engine {
 
     /// Mark the show document changed (broadcast + autosave).
     fn touch(&mut self) {
+        self.data.changed = true;
         self.rev = self.rev.wrapping_add(1);
         self.show_pending = true;
         self.dirty = true;
@@ -451,6 +488,7 @@ impl Engine {
     }
 
     fn set_show(&mut self, show: Show) {
+        self.data_before_replace();
         self.prog = Default::default();
         self.show = show;
         self.programmer.clear();
@@ -867,7 +905,9 @@ impl Engine {
             TimelineStop { id } => self.timeline_stop(id)?,
             TimelineSeek { id, t } => self.timeline_seek(id, t)?,
             // be-data
-            BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. } => {}
+            c @ (BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. }) => {
+                self.data_command(c)?
+            }
             SceneRecord { id, name, from_output, fixtures, merge, refs: _ } => self.scene_record(id, name, from_output, fixtures, merge)?,
             SceneSave { scene } => self.scene_save(scene)?,
             SceneRemove { id } => self.scene_remove(id),
@@ -1699,6 +1739,7 @@ impl Engine {
                 }
             }
         }
+        self.identify_layer(&mut merged, now);
         // 5. patch → DMX
         let mut frames: BTreeMap<u16, Box<[u8; 512]>> = self.frames.keys().map(|u| (*u, Box::new([0u8; 512]))).collect();
         let empty = Attrs::new();
@@ -1720,6 +1761,7 @@ impl Engine {
                 fr[*ch as usize - 1] = *v;
             }
         }
+        self.apply_output_test(&mut frames);
         for (u, fr) in frames {
             let changed = self.frames.get(&u).map_or(true, |old| **old != *fr);
             if changed {
@@ -1735,6 +1777,7 @@ impl Engine {
             || self.runs.values().any(|r| !r.settled)
             || self.scenes.ramping()
             || self.chases.any_running()
+            || self.data_continuous()
     }
 
     // ───────────── tick ─────────────
@@ -1753,6 +1796,7 @@ impl Engine {
         self.update_timecode(now, dt);
         self.update_automation(now, dt);
         self.update_playback(now);
+        self.data_tick();
 
         let before = self.ext_dmx.len();
         self.ext_dmx.retain(|_, (t, _)| t.elapsed() < Duration::from_secs(3));
@@ -1956,8 +2000,8 @@ impl Engine {
             speed: self.speed_rt(),
             timelines: self.timelines_rt(),
             macros_running: self.macros_running_ids(),
-            testing: false,
-            identifying: vec![],
+            testing: self.data.test.is_some(),
+            identifying: self.data.identifying.iter().copied().collect(),
             vc: self.vc_states(),
         }
     }

@@ -297,26 +297,6 @@ export const live: Record<string, string> = {
   "Crossfades every recorded value": "Funde todos los valores grabados",
   "Level scales only the dimmer, like a submaster": "El nivel escala solo el dimmer, como un submaster",
   "Level caps the dimmer of its fixtures": "El nivel limita el dimmer de sus aparatos",
-};
-
-/** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */
-export const capLabelsEs: Record<string, string> = {
-  "Open": "Abierto",
-  "Closed": "Cerrado",
-  "White": "Blanco",
-  "Red": "Rojo",
-  "Orange": "Naranja",
-  "Yellow": "Amarillo",
-  "Green": "Verde",
-  "Cyan": "Cian",
-  "Blue": "Azul",
-  "Magenta": "Magenta",
-  "Prism": "Prisma",
-  "Rotation": "Rotación",
-  "Shake / scroll": "Vibración / desplazamiento",
-  "Strobe slow→fast": "Strobe lento→rápido",
-  "Fog output": "Salida de niebla",
-  "Haze output": "Salida de haze",
   "Add the programmer's values to the cue; keep everything else.": "Añade los valores del programador al cue y conserva el resto.",
   "Adds this delay for each fixture in number order, so the look rolls across the rig.": "Añade este retardo por cada aparato, por orden de número, para que el look recorra la instalación.",
   "All fixtures ({n})": "Todos los aparatos ({n})",
@@ -403,4 +383,24 @@ export const capLabelsEs: Record<string, string> = {
   "{n} channels held at fixed values": "{n} canales fijos en park",
   "↔ Fan": "↔ Abanico",
   "↻ Re-roll": "↻ Otra vez",
+};
+
+/** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */
+export const capLabelsEs: Record<string, string> = {
+  "Open": "Abierto",
+  "Closed": "Cerrado",
+  "White": "Blanco",
+  "Red": "Rojo",
+  "Orange": "Naranja",
+  "Yellow": "Amarillo",
+  "Green": "Verde",
+  "Cyan": "Cian",
+  "Blue": "Azul",
+  "Magenta": "Magenta",
+  "Prism": "Prisma",
+  "Rotation": "Rotación",
+  "Shake / scroll": "Vibración / desplazamiento",
+  "Strobe slow→fast": "Strobe lento→rápido",
+  "Fog output": "Salida de niebla",
+  "Haze output": "Salida de haze",
 };

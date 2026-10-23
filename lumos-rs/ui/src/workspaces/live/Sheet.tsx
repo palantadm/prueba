@@ -6,6 +6,7 @@ import { releaseAttrs, setAttrs } from "../../lib/program";
 import { useDmxTick } from "../../lib/hooks";
 import { Modal } from "../../ui";
 import { FanDialog } from "./FanDialog";
+import { ViewSwitch } from "./ViewSwitch";
 import { t } from "../../i18n";
 
 type Unit = "pct" | "dmx";
@@ -84,6 +85,7 @@ export function Sheet() {
         <span class="chip">{scoped ? t("{n} selected", { n: rows.length }) : t("All fixtures ({n})", { n: rows.length })}</span>
         <button class="btn sm" style={{ minHeight: 44 }} onClick={() => setUnit(unit === "pct" ? "dmx" : "pct")} aria-label={t("Switch units")}>{unit === "pct" ? "%" : "0–255"}</button>
         <button class="btn sm" style={{ minHeight: 44 }} disabled={!anchor} onClick={fillDown} title={t("Copy the active cell down the column")}>{t("Fill ↓")}</button>
+        <ViewSwitch />
       </div>
       <div class="lv-scroll" style={{ padding: 0 }}>
         {rows.length === 0 ? <div class="panel-body dim">{t("No fixtures patched.")}</div> : (

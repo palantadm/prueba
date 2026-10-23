@@ -39,6 +39,9 @@ pub fn slug(s: &str) -> String {
     out.trim_end_matches('-').to_string()
 }
 
+/// Original `.gdtf` bytes kept next to the extracted assets (`<data>/library/<asset_dir>/source.gdtf`).
+pub const SOURCE_FILE: &str = "source.gdtf";
+
 /// Directory name (inside `<data>/library`) for a profile id.
 pub fn asset_dir(id: &str) -> String {
     id.chars().map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' }).collect()
@@ -732,6 +735,8 @@ pub fn import_gdtf(bytes: &[u8]) -> Result<Imported, String> {
         "other"
     };
 
+    // keep the original archive so MVR export can embed it
+    files.push((SOURCE_FILE.to_string(), bytes.to_vec()));
     // de-duplicate / sort outputs
     files.sort_by(|a, b| a.0.cmp(&b.0));
     files.dedup_by(|a, b| a.0 == b.0);
@@ -759,7 +764,7 @@ pub fn import_gdtf(bytes: &[u8]) -> Result<Imported, String> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::io::Write;
 
@@ -822,7 +827,7 @@ mod tests {
  </FixtureType>
 </GDTF>"#;
 
-    fn build_zip(extra: &[(&str, Vec<u8>)]) -> Vec<u8> {
+    pub(crate) fn build_zip(extra: &[(&str, Vec<u8>)]) -> Vec<u8> {
         let mut buf = Cursor::new(Vec::new());
         {
             let mut z = zip::ZipWriter::new(&mut buf);
