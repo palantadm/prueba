@@ -2,11 +2,16 @@
 
 mod bindings;
 mod effects;
+mod history;
 mod morph;
 mod patch;
 mod playback;
+#[cfg(test)]
+mod prog_tests;
+mod refs;
 mod scenes;
 mod vconsole;
+mod xfade;
 
 use crate::io::{IoEvent, IoHub, MtcDecoder};
 use crate::library;
@@ -142,6 +147,8 @@ struct Engine {
     effect_flash: BTreeSet<u32>,
     go_seq: u64,
     last_merged: PerFixture,
+    /// Undo history, palette links, blind, manual-crossfader ends (see `refs.rs`, `history.rs`, `xfade.rs`).
+    prog: refs::ProgState,
 
     frames: BTreeMap<u16, Box<[u8; 512]>>,
     bcast_pending: BTreeSet<u16>,
@@ -225,6 +232,7 @@ impl Engine {
             effect_flash: BTreeSet::new(),
             go_seq: 0,
             last_merged: PerFixture::new(),
+            prog: Default::default(),
             frames: BTreeMap::new(),
             bcast_pending: BTreeSet::new(),
             bcast_at: HashMap::new(),
@@ -423,6 +431,7 @@ impl Engine {
     }
 
     fn set_show(&mut self, show: Show) {
+        self.prog = Default::default();
         self.show = show;
         self.programmer.clear();
         self.runs.clear();
@@ -453,7 +462,7 @@ impl Engine {
 
     // ───────────── commands ─────────────
 
-    fn handle(&mut self, cmd: Command) -> Result<(), String> {
+    fn handle_inner(&mut self, cmd: Command) -> Result<(), String> {
         use Command::*;
         match cmd {
             ProgSet { fixtures, attrs } => {
@@ -801,7 +810,15 @@ impl Engine {
             SubscribeDmx { .. } => {}
             // ── wave-2 stubs, one group per owner (replace as features land) ──
             // be-prog
-            Undo | Redo | BlindSet { .. } | CueLoad { .. } | CueUpdate { .. } | Unpark { .. } => {}
+            Undo => self.undo()?,
+            Redo => self.redo()?,
+            BlindSet { on } => {
+                self.prog.blind = on;
+                self.dirty = true;
+            }
+            CueLoad { cuelist, number } => self.cue_load(cuelist, number)?,
+            CueUpdate { cuelist, number, mode, refs } => self.cue_update(cuelist, number, mode, refs)?,
+            Unpark { universe, channel } => self.unpark(universe, channel),
             // be-play
             ChaseSave { .. } | ChaseRemove { .. } | ChaseRun { .. } | ChaseBpm { .. } | ChaseTap { .. } | ChaseNudge { .. } => {}
             SpeedSave { .. } | SpeedRemove { .. } | SpeedSet { .. } | SpeedTap { .. } | CuelistManual { .. } => {}
@@ -942,15 +959,18 @@ impl Engine {
         for f in fixtures {
             let Some(pf) = self.patch.get(*f) else { continue };
             let e = self.programmer.entry(*f).or_default();
+            let links = self.prog.links.entry(*f).or_default();
             for (a, v) in &pal.values {
                 if pf.has_attr(a) {
                     e.insert(a.clone(), clamp01(*v));
+                    links.insert(a.clone(), (pal_id, clamp01(*v)));
                 }
             }
             if let Some(o) = pal.per_fixture.get(f) {
                 for (a, v) in o {
                     if pf.has_attr(a) {
                         e.insert(a.clone(), clamp01(*v));
+                        links.insert(a.clone(), (pal_id, clamp01(*v)));
                     }
                 }
             }
@@ -1067,6 +1087,7 @@ impl Engine {
     // ───────────── playback ─────────────
 
     fn go(&mut self, id: u32) -> Result<(), String> {
+        self.finish_manual(id);
         let now = self.now();
         let cl = self.require_cuelist(id)?;
         if cl.cues.is_empty() {
@@ -1179,10 +1200,17 @@ impl Engine {
         let now = self.now();
         let Some(cl) = self.show.cuelists.iter().find(|c| c.id == id) else { return };
         let Some(cue) = cl.cues.get(idx).cloned() else { return };
-        let to = tracked_state(cl, idx);
+        let mut to = tracked_state(cl, idx);
+        // auto-mark: dark fixtures take the next cue's non-intensity attributes early
+        let marks = self.compute_marks(cl, idx, &to);
+        for (f, a, v) in &marks {
+            to.entry(*f).or_default().insert(a.clone(), *v);
+        }
         self.go_seq += 1;
         let seq = self.go_seq;
         let run = self.runs.entry(id).or_insert_with(|| CueRun::new(id));
+        run.prev_values = run.values.clone();
+        run.prev_current = run.current;
         let mut from = run.values.clone();
         for (f, attrs) in &to {
             for a in attrs.keys() {
@@ -1221,6 +1249,13 @@ impl Engine {
         run.settled = false;
         run.releasing = false;
         run.progress = 0.0;
+        run.timing = cue.timing.clone();
+        run.curve = cue.curve;
+        run.stagger = if cue.stagger.is_finite() { cue.stagger.max(0.0) } else { 0.0 };
+        run.marks = marks.iter().map(|(f, a, _)| (*f, a.clone())).collect();
+        run.mark_fade = cue.fade_in.max(cue.fade_out).max(1.0);
+        run.manual = None;
+        run.compute_span();
         self.dirty = true;
     }
 
@@ -1261,6 +1296,7 @@ impl Engine {
             }
             ExecKind::Master { master: MasterKind::Grand } => self.grand_master = l,
             ExecKind::Scene { scene } => self.scene_level(scene, l)?,
+            ExecKind::XFade { cuelist } => self.cuelist_manual(cuelist, Some(l))?,
             _ => {}
         }
         self.dirty = true;
@@ -1278,13 +1314,14 @@ impl Engine {
                 Ok(())
             }
             ExecKind::Scene { scene } => self.scene_toggle(scene),
+            ExecKind::XFade { cuelist } => self.go(cuelist),
             _ => Ok(()),
         }
     }
 
     fn exec_back(&mut self, id: u32) -> Result<(), String> {
         match self.exec_kind(id)? {
-            ExecKind::Cuelist { cuelist } => self.back(cuelist),
+            ExecKind::Cuelist { cuelist } | ExecKind::XFade { cuelist } => self.back(cuelist),
             ExecKind::Scene { scene } => self.scene_go(scene, false),
             _ => Ok(()),
         }
@@ -1482,11 +1519,13 @@ impl Engine {
         // 1b. scenes and scene morph
         self.apply_scenes(&mut merged);
         self.last_merged = merged.clone();
-        // 2. programmer
-        for (f, attrs) in &self.programmer {
-            let e = merged.entry(*f).or_default();
-            for (a, v) in attrs {
-                e.insert(a.clone(), *v);
+        // 2. programmer (excluded while blind)
+        if !self.prog.blind {
+            for (f, attrs) in &self.programmer {
+                let e = merged.entry(*f).or_default();
+                for (a, v) in attrs {
+                    e.insert(a.clone(), *v);
+                }
             }
         }
         // 3. effects
@@ -1771,7 +1810,8 @@ impl Engine {
                     ExecKind::Group { .. } => st.level > 0.0,
                     ExecKind::Master { .. } => true,
                     ExecKind::Scene { scene } => self.scenes.is_active(*scene),
-                    ExecKind::Chase { .. } | ExecKind::Speed { .. } | ExecKind::XFade { .. } => false, // be-play
+                    ExecKind::XFade { cuelist } => self.manual_active(*cuelist),
+                    ExecKind::Chase { .. } | ExecKind::Speed { .. } => false, // be-play
                     ExecKind::Empty => false,
                 };
                 let level = match &e.kind {
@@ -1802,7 +1842,7 @@ impl Engine {
                     next,
                     progress: run.map_or(0.0, |r| r.progress),
                     level: self.cl_levels.get(&cl.id).copied().unwrap_or(1.0),
-                    manual: false,
+                    manual: self.manual_active(cl.id),
                 }
             })
             .collect();
@@ -1823,10 +1863,10 @@ impl Engine {
             timecode: TimecodeRt { running: self.tc.running, frames, text: fmt_tc(frames, fps) },
             learn: self.learn,
             fps: self.fps,
-            blind: false,
-            undo: 0,
-            redo: 0,
-            parked: vec![],
+            blind: self.prog.blind,
+            undo: self.prog.hist.counts().0,
+            redo: self.prog.hist.counts().1,
+            parked: self.parked_rt(),
             cmd_log: vec![],
             chases: vec![],
             speed: vec![],

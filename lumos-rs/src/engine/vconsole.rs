@@ -91,7 +91,8 @@ impl Engine {
             ExecKind::Group { .. } => st.level > 0.0,
             ExecKind::Master { .. } => true,
             ExecKind::Scene { scene } => self.scenes.is_active(*scene),
-            ExecKind::Chase { .. } | ExecKind::Speed { .. } | ExecKind::XFade { .. } => false, // be-play
+            ExecKind::XFade { cuelist } => self.manual_active(*cuelist),
+            ExecKind::Chase { .. } | ExecKind::Speed { .. } => false, // be-play
             ExecKind::Empty => false,
         }
     }
