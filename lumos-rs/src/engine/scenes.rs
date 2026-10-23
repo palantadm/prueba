@@ -5,6 +5,14 @@
 //! * Continuous attributes are LTP blended by the scene level: `lerp(below, scene, level)` — the most
 //!   recently activated scene wins and fading a scene crossfades colour/position too.
 //! * Discrete attributes (those backed by a channel with named capabilities) snap at level ≥ 0.5.
+//!
+//! Submaster kinds (`Scene.kind`):
+//! * `Look` — all of the above.
+//! * `Intensity` — only the scene's `dimmer` is used (× level, HTP); other attributes are ignored.
+//! * `Inhibitive` — the scene's values are ignored; its level *caps* the dimmer of the fixtures it
+//!   lists (`min(dimmer, level)`), applied after all merges and before the masters. Fixtures stay
+//!   uncapped until the sub is engaged (`SceneGo on` or any `SceneLevel`); level 0 keeps it engaged and
+//!   blacks the fixtures out; `SceneGo off` lifts the cap back to 1 over `fade_out` and then drops it.
 
 use super::{clamp01, next_id, Engine};
 use crate::model::*;
@@ -20,6 +28,10 @@ pub struct SceneRun {
     pub dur: f32,
     /// Activation order (higher = more recent = wins LTP).
     pub seq: u64,
+    /// Inhibitive submaster: `level` is a dimmer cap, not a fade-in amount.
+    pub inhib: bool,
+    /// Inhibitive sub being released (cap rising to 1 before it is dropped).
+    pub rel: bool,
 }
 
 #[derive(Default)]
@@ -51,7 +63,7 @@ impl ScenesState {
     }
 
     pub fn is_active(&self, id: u32) -> bool {
-        self.flash.contains(&id) || self.runs.get(&id).map_or(false, |r| r.level > 0.0 || r.to > 0.0)
+        self.flash.contains(&id) || self.runs.get(&id).map_or(false, |r| if r.inhib { !r.rel } else { r.level > 0.0 || r.to > 0.0 })
     }
 }
 
@@ -76,18 +88,21 @@ impl Engine {
 
     pub(super) fn scene_go_at(&mut self, id: u32, on: bool, now: f64) -> Result<(), String> {
         let sc = self.require_scene(id)?;
+        let inhib = sc.kind == SceneKind::Inhibitive;
         let dur = if on { sc.fade_in } else { sc.fade_out };
         let dur = if dur.is_finite() { dur.max(0.0) } else { 0.0 };
-        let cur = self.scenes.runs.get(&id).map_or(0.0, |r| r.level);
+        // a freshly engaged inhibitive sub starts uncapped (level 1)
+        let cur = self.scenes.runs.get(&id).map_or(if inhib { 1.0 } else { 0.0 }, |r| r.level);
         if !on && !self.scenes.runs.contains_key(&id) {
             return Ok(());
         }
-        let target = if on { 1.0 } else { 0.0 };
+        // releasing an inhibitive sub lifts its cap to 1 instead of fading it to 0
+        let target = if on || inhib { 1.0 } else { 0.0 };
         let seq = match self.scenes.runs.get(&id) {
             Some(r) if !on || r.to > 0.0 => r.seq,
             _ => self.scenes.next_seq(),
         };
-        self.scenes.runs.insert(id, SceneRun { level: cur, from: cur, to: target, start: now, dur, seq });
+        self.scenes.runs.insert(id, SceneRun { level: cur, from: cur, to: target, start: now, dur, seq, inhib, rel: inhib && !on });
         self.scene_update(now);
         self.dirty = true;
         Ok(())
@@ -104,12 +119,12 @@ impl Engine {
     }
 
     pub(super) fn scene_active(&self, id: u32) -> bool {
-        self.scenes.runs.get(&id).map_or(false, |r| r.to > 0.0)
+        self.scenes.runs.get(&id).map_or(false, |r| if r.inhib { !r.rel } else { r.to > 0.0 })
     }
 
     pub(super) fn scene_solo_at(&mut self, id: u32, now: f64) -> Result<(), String> {
         self.require_scene(id)?;
-        let others: Vec<u32> = self.scenes.runs.iter().filter(|(k, r)| **k != id && r.to > 0.0).map(|(k, _)| *k).collect();
+        let others: Vec<u32> = self.scenes.runs.iter().filter(|(k, r)| **k != id && !r.inhib && r.to > 0.0).map(|(k, _)| *k).collect();
         for o in others {
             self.scene_go_at(o, false, now)?;
         }
@@ -117,16 +132,17 @@ impl Engine {
     }
 
     pub(super) fn scene_level(&mut self, id: u32, level: f32) -> Result<(), String> {
-        self.require_scene(id)?;
+        let inhib = self.require_scene(id)?.kind == SceneKind::Inhibitive;
         let l = clamp01(level);
-        if l <= 0.0 {
+        if l <= 0.0 && !inhib {
             self.scenes.runs.remove(&id);
         } else {
             let seq = match self.scenes.runs.get(&id) {
                 Some(r) if r.to > 0.0 => r.seq,
                 _ => self.scenes.next_seq(),
             };
-            self.scenes.runs.insert(id, SceneRun { level: l, from: l, to: l, start: 0.0, dur: 0.0, seq });
+            // an inhibitive sub at level 0 stays engaged (everything it lists is held dark)
+            self.scenes.runs.insert(id, SceneRun { level: l, from: l, to: l, start: 0.0, dur: 0.0, seq, inhib, rel: false });
         }
         self.dirty = true;
         Ok(())
@@ -160,7 +176,7 @@ impl Engine {
     }
 
     pub(super) fn scenes_release_at(&mut self, now: f64) {
-        let ids: Vec<u32> = self.scenes.runs.iter().filter(|(_, r)| r.to > 0.0).map(|(k, _)| *k).collect();
+        let ids: Vec<u32> = self.scenes.runs.iter().filter(|(_, r)| if r.inhib { !r.rel } else { r.to > 0.0 }).map(|(k, _)| *k).collect();
         for id in ids {
             let _ = self.scene_go_at(id, false, now);
         }
@@ -182,7 +198,8 @@ impl Engine {
                 }
                 r.level = nl;
             }
-            if r.level == 0.0 && r.to == 0.0 {
+            let finished = if r.inhib { r.rel && r.level >= 1.0 } else { r.level == 0.0 && r.to == 0.0 };
+            if finished {
                 done.push(*id);
             }
         }
@@ -216,10 +233,17 @@ impl Engine {
         layers.sort_by_key(|l| l.0);
         for (_, id, level) in layers {
             let Some(sc) = self.show.scenes.iter().find(|s| s.id == id) else { continue };
+            if sc.kind == SceneKind::Inhibitive {
+                continue; // caps dimmers in `apply_inhibit`, contributes no values
+            }
+            let dimmer_only = sc.kind == SceneKind::Intensity;
             for (f, attrs) in &sc.values {
                 let discrete = |a: &str| self.patch.get(*f).map_or(false, |p| p.is_discrete(a));
                 let e = merged.entry(*f).or_default();
                 for (a, v) in attrs {
+                    if dimmer_only && a != "dimmer" {
+                        continue;
+                    }
                     if a == "dimmer" {
                         let nv = v * level;
                         let cur = e.entry(a.clone()).or_insert(0.0);
@@ -277,6 +301,28 @@ impl Engine {
                         };
                         e.insert(attr.clone(), v);
                     }
+                }
+            }
+        }
+    }
+
+    /// Inhibitive submasters: cap the dimmer of the fixtures they list at their level.
+    pub(super) fn apply_inhibit(&self, merged: &mut PerFixture) {
+        for (id, r) in &self.scenes.runs {
+            if !r.inhib || r.level >= 1.0 {
+                continue;
+            }
+            let Some(sc) = self.show.scenes.iter().find(|s| s.id == *id) else { continue };
+            for f in sc.values.keys() {
+                let Some(pf) = self.patch.get(*f) else { continue };
+                let e = merged.entry(*f).or_default();
+                match e.get_mut("dimmer") {
+                    Some(d) => *d = d.min(r.level),
+                    // no dimmer value: a real dimmer channel stays at 0, a virtual dimmer (RGB-only) is full
+                    None if !pf.has_dimmer => {
+                        e.insert("dimmer".into(), r.level);
+                    }
+                    None => {}
                 }
             }
         }
@@ -368,6 +414,9 @@ impl Engine {
         }
         if scene.name.trim().is_empty() {
             scene.name = format!("Scene {}", scene.id);
+        }
+        if self.show.scenes.iter().any(|s| s.id == scene.id && s.kind != scene.kind) {
+            self.scenes.runs.remove(&scene.id); // a running sub of the old kind would be mis-interpreted
         }
         match self.show.scenes.iter_mut().find(|s| s.id == scene.id) {
             Some(s) => *s = scene,
@@ -778,5 +827,131 @@ mod tests {
         .unwrap();
         let Command::SceneSave { scene } = c.cmd else { panic!() };
         assert_eq!(scene.values[&1]["red"], 1.0);
+    }
+
+    // ───────────── submaster kinds ─────────────
+
+    fn kind_of(e: &mut Engine, id: u32, kind: SceneKind) {
+        let mut sc = e.show.scenes.iter().find(|s| s.id == id).unwrap().clone();
+        sc.kind = kind;
+        e.handle(Command::SceneSave { scene: sc }).unwrap();
+    }
+
+    fn record_scene(e: &mut Engine, f: u32, attrs: &[(&str, f32)]) -> u32 {
+        for (a, v) in attrs {
+            set(e, f, a, *v);
+        }
+        e.handle(Command::SceneRecord { id: None, name: "S".into(), from_output: false, fixtures: Some(vec![f]), merge: false, refs: true }).unwrap();
+        e.handle(Command::ProgRelease { fixtures: None, attrs: None }).unwrap();
+        e.show.scenes.last().unwrap().id
+    }
+
+    fn chan(e: &mut Engine, f: u32, attr: &str) -> u8 {
+        let fr = frame(e);
+        let pf = e.patch.get(f).unwrap();
+        fr[pf.address as usize - 1 + pf.chans.iter().find(|c| c.attr == attr).unwrap().offset as usize]
+    }
+
+    #[test]
+    fn intensity_sub_takes_only_the_dimmer() {
+        let mut e = engine();
+        add(&mut e, "generic/rgb-par-dimstrobe", "6ch", 1);
+        let id = record_scene(&mut e, 1, &[("dimmer", 0.8), ("red", 1.0)]);
+        kind_of(&mut e, id, SceneKind::Intensity);
+        e.scene_level(id, 0.5).unwrap();
+        assert_eq!(chan(&mut e, 1, "dimmer"), 102); // 0.8 · 0.5
+        assert_eq!(chan(&mut e, 1, "red"), 0); // colour ignored
+        // a Look sub of the same content does apply the colour
+        kind_of(&mut e, id, SceneKind::Look);
+        e.scene_level(id, 1.0).unwrap();
+        assert_eq!(chan(&mut e, 1, "red"), 255);
+    }
+
+    #[test]
+    fn intensity_sub_is_htp_against_a_look() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 1);
+        let a = record_scene(&mut e, 1, &[("dimmer", 0.3)]);
+        let b = record_scene(&mut e, 1, &[("dimmer", 0.9)]);
+        kind_of(&mut e, b, SceneKind::Intensity);
+        e.scene_level(a, 1.0).unwrap();
+        e.scene_level(b, 0.5).unwrap(); // 0.45 beats 0.3
+        assert_eq!(dimmer(&mut e, 1), 115);
+        e.scene_level(b, 0.2).unwrap(); // 0.18 loses to 0.3
+        assert_eq!(dimmer(&mut e, 1), 77);
+    }
+
+    #[test]
+    fn inhibitive_sub_caps_its_fixtures() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 2);
+        set(&mut e, 1, "dimmer", 1.0);
+        set(&mut e, 2, "dimmer", 1.0);
+        e.show.scenes.clear();
+        // the sub lists fixture 1 only (programmer values double as the sub's content)
+        e.handle(Command::SceneRecord { id: None, name: "Cap".into(), from_output: false, fixtures: Some(vec![1]), merge: false, refs: true }).unwrap();
+        let id = e.show.scenes[0].id;
+        kind_of(&mut e, id, SceneKind::Inhibitive);
+        // not engaged → no limit
+        assert_eq!((dimmer(&mut e, 1), dimmer(&mut e, 2)), (255, 255));
+        assert!(!e.scene_rt()[0].active);
+        // engaging it (go on) starts uncapped
+        e.scene_go_at(id, true, 0.0).unwrap();
+        e.scene_update(5.0);
+        assert_eq!(dimmer(&mut e, 1), 255);
+        assert!(e.scene_rt()[0].active);
+        // level caps the listed fixture only
+        e.scene_level(id, 0.5).unwrap();
+        assert_eq!((dimmer(&mut e, 1), dimmer(&mut e, 2)), (128, 255));
+        // level 0 keeps it engaged: fixture held dark
+        e.scene_level(id, 0.0).unwrap();
+        assert_eq!((dimmer(&mut e, 1), dimmer(&mut e, 2)), (0, 255));
+        assert!(e.scene_rt()[0].active);
+        // releasing lifts the cap back to 1 over fade_out, then drops the sub
+        e.scene_level(id, 0.25).unwrap();
+        let mut sc = e.show.scenes[0].clone();
+        sc.fade_out = 2.0;
+        e.handle(Command::SceneSave { scene: sc }).unwrap();
+        e.scene_go_at(id, false, 10.0).unwrap();
+        e.scene_update(11.0); // halfway: 0.25 → 1.0 = 0.625
+        assert_eq!(dimmer(&mut e, 1), 159);
+        assert!(!e.scene_rt()[0].active, "a releasing sub is no longer 'active'");
+        e.scene_update(12.0);
+        assert!(e.scenes.runs.is_empty());
+        assert_eq!(dimmer(&mut e, 1), 255);
+    }
+
+    #[test]
+    fn inhibitive_sub_dims_rgb_only_fixtures_and_wires_to_executors() {
+        let mut e = engine();
+        add(&mut e, "generic/rgb-par", "3ch", 1);
+        set(&mut e, 1, "red", 1.0);
+        e.handle(Command::SceneRecord { id: None, name: "Cap".into(), from_output: false, fixtures: Some(vec![1]), merge: false, refs: true }).unwrap();
+        let id = e.show.scenes[0].id;
+        kind_of(&mut e, id, SceneKind::Inhibitive);
+        e.handle(Command::ExecSave { executor: Executor { id: 0, page: 0, slot: 0, label: "Cap".into(), kind: ExecKind::Scene { scene: id } } }).unwrap();
+        let eid = e.show.executors[0].id;
+        assert_eq!(frame(&mut e)[0], 255);
+        e.handle(Command::ExecLevel { id: eid, level: 0.4 }).unwrap();
+        assert_eq!(frame(&mut e)[0], 102); // virtual dimmer scales red
+        let rt = e.build_rt();
+        assert!((rt.scenes[0].level - 0.4).abs() < 1e-4 && rt.scenes[0].active);
+        // solo of another scene does not release an inhibitive sub
+        let other = {
+            set(&mut e, 1, "green", 0.5);
+            e.handle(Command::SceneRecord { id: None, name: "L".into(), from_output: false, fixtures: Some(vec![1]), merge: false, refs: true }).unwrap();
+            e.handle(Command::ProgRelease { fixtures: None, attrs: None }).unwrap();
+            e.show.scenes.last().unwrap().id
+        };
+        e.handle(Command::SceneSolo { id: other }).unwrap();
+        assert!(e.scenes.runs.get(&id).map_or(false, |r| r.inhib && !r.rel));
+        // releasing everything drops the cap
+        e.handle(Command::ScenesRelease).unwrap();
+        e.scene_update(1000.0);
+        assert_eq!(e.scenes.runs.get(&id).map(|r| r.level), None);
+        // changing a running sub's kind discards its (now meaningless) run
+        e.scene_level(id, 0.1).unwrap();
+        kind_of(&mut e, id, SceneKind::Look);
+        assert!(!e.scenes.runs.contains_key(&id));
     }
 }

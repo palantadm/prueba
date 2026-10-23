@@ -91,7 +91,9 @@ impl Engine {
             ExecKind::Group { .. } => st.level > 0.0,
             ExecKind::Master { .. } => true,
             ExecKind::Scene { scene } => self.scenes.is_active(*scene),
-            ExecKind::Chase { .. } | ExecKind::Speed { .. } | ExecKind::XFade { .. } => false, // be-play
+            ExecKind::Chase { chase } => self.chases.is_running(*chase),
+            ExecKind::Speed { master } => self.speed_bpm(*master).is_some(),
+            ExecKind::XFade { .. } => false, // be-prog
             ExecKind::Empty => false,
         }
     }
@@ -474,8 +476,10 @@ impl Engine {
                     _ => self.exec_go(*exec),
                 },
                 VcOp::Release => {
-                    if let ExecKind::Cuelist { cuelist } = self.exec_kind(*exec)? {
-                        self.release_cuelist(cuelist);
+                    match self.exec_kind(*exec)? {
+                        ExecKind::Cuelist { cuelist } => self.release_cuelist(cuelist),
+                        ExecKind::Chase { chase } => self.chase_run(chase, false)?,
+                        _ => {}
                     }
                     Ok(())
                 }
