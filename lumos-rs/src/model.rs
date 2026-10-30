@@ -555,6 +555,8 @@ pub enum Action {
     EffectToggle { effect: u32 },
     PaletteApply { palette: u32, group: Option<u32> },
     ProgClear,
+    /// Run any command-line statement(s).
+    Command { text: String },
 }
 
 /// Input → action mapping. Continuous sources deliver a normalised value
@@ -940,6 +942,129 @@ pub struct Timeline {
     pub audio: Option<String>,
 }
 
+// ───────────────────────────── Script / running order ─────────────────────────────
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ScriptKind {
+    /// Act / scene title.
+    Heading,
+    /// Spoken text (with `speaker`).
+    Speech,
+    /// Stage direction / acotación.
+    Direction,
+    /// Private note for the stage manager.
+    Note,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum MarkKind {
+    Light,
+    Sound,
+    Video,
+    Set,
+    Other,
+}
+
+/// Something a cue mark does when it fires. Executed by the engine (works with the UI closed).
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum ScriptAction {
+    /// Command-line statement(s), e.g. `go cuelist 1`, `scene 3 on`, `macro 2`.
+    Console { text: String },
+    /// OSC message to an external app (QLab, Resolume, ProPresenter…). `args` are typed by content: int, float, true/false, else string.
+    Osc { host: String, port: u16, address: String, args: Vec<String> },
+    /// MIDI message (port `None` = every enabled output).
+    Midi { port: Option<String>, kind: MidiKind, channel: u8, number: u8, value: u8 },
+    /// HTTP request (e.g. VLC / OBS / webhook).
+    Http { method: String, url: String, body: String },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CueLink {
+    pub cuelist: u32,
+    pub number: f64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct CueMark {
+    pub id: u32,
+    #[serde(default)]
+    pub label: String,
+    pub kind: MarkKind,
+    /// Word index inside the block text where the cue is called (0 = block start).
+    #[serde(default)]
+    pub at_word: u32,
+    #[serde(default)]
+    pub actions: Vec<ScriptAction>,
+    /// Linked Lumos cue: firing the mark GOes it; and when this cue fires from anywhere
+    /// (follow mode) the script moves to this mark.
+    #[serde(default)]
+    pub link: Option<CueLink>,
+    /// Show STANDBY this many blocks before the mark.
+    #[serde(default)]
+    pub standby_blocks: u32,
+    #[serde(default)]
+    pub note: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ScriptBlock {
+    pub id: u32,
+    pub kind: ScriptKind,
+    #[serde(default)]
+    pub speaker: String,
+    pub text: String,
+    /// Page in the original PDF (1-based, 0 = unknown).
+    #[serde(default)]
+    pub page: u32,
+    #[serde(default)]
+    pub marks: Vec<CueMark>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Script {
+    pub id: u32,
+    pub name: String,
+    pub blocks: Vec<ScriptBlock>,
+    /// Uploaded original (`/media/<file>.pdf`) shown next to the reader.
+    #[serde(default)]
+    pub pdf: Option<String>,
+}
+
+/// Result of `POST /api/script/import` (multipart: .pdf .txt .md .fountain .docx? text) — a draft, not saved.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ScriptImport {
+    pub name: String,
+    pub blocks: Vec<ScriptBlock>,
+    pub pages: u32,
+    pub warnings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ScriptRt {
+    pub id: u32,
+    /// Block id the reader is on (0 = before the start).
+    pub block: u32,
+    /// Last fired mark id.
+    pub mark: Option<u32>,
+    /// Next mark that GO will fire: (block id, mark id).
+    pub next: Option<(u32, u32)>,
+    pub follow: bool,
+    /// Label of the last fired mark, for the status line.
+    pub last_label: String,
+}
+
 // ───────────────────────────── Show ─────────────────────────────
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -958,6 +1083,8 @@ pub struct Show {
     pub speed_masters: Vec<SpeedMaster>,
     #[serde(default)]
     pub macros: Vec<Macro>,
+    #[serde(default)]
+    pub scripts: Vec<Script>,
     #[serde(default)]
     pub timelines: Vec<Timeline>,
     pub cuelists: Vec<Cuelist>,
@@ -988,6 +1115,7 @@ impl Default for Show {
             chases: vec![],
             speed_masters: vec![],
             macros: vec![],
+            scripts: vec![],
             timelines: vec![],
             cuelists: vec![],
             executors: vec![],
@@ -1072,6 +1200,8 @@ pub enum VcAction {
     EffectRate { effect: u32 },
     PaletteApply { palette: u32, group: Option<u32> },
     ProgClear,
+    /// Run any command-line statement(s) (tap = run).
+    Command { text: String },
     /// Jump to a virtual-console page.
     Page { page: u32 },
     /// Scene button (Go/Toggle/Flash/Release) or level slider (Level).
@@ -1343,6 +1473,8 @@ pub struct Runtime {
     #[serde(default)]
     pub timelines: Vec<TimelineRt>,
     #[serde(default)]
+    pub scripts: Vec<ScriptRt>,
+    #[serde(default)]
     pub macros_running: Vec<u32>,
     /// Output test pattern running.
     #[serde(default)]
@@ -1493,6 +1625,20 @@ pub enum Command {
     TimelineRun { id: u32, from: Option<f32> },
     TimelineStop { id: u32 },
     TimelineSeek { id: u32, t: f32 },
+    // ── script / running order (be-script) ──
+    ScriptSave { script: Script },
+    ScriptRemove { id: u32 },
+    /// Fire the next mark and move the reader to it.
+    ScriptGo { id: u32 },
+    /// Move back to the previous mark (does not re-fire).
+    ScriptBack { id: u32 },
+    /// Place the reader without firing. `mark: None` = block start.
+    ScriptGoto { id: u32, block: u32, mark: Option<u32> },
+    /// Fire one specific mark now (test / jump) and move the reader there.
+    ScriptFire { id: u32, block: u32, mark: u32 },
+    /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
+    ScriptFollow { id: u32, on: bool },
+    ScriptReset { id: u32 },
     // ── data & network (be-data) ──
     BackupCreate { label: String },
     BackupRestore { id: String },

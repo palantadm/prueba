@@ -7,6 +7,7 @@ import type { InputStatus } from "./InputStatus";
 import type { OutputStatus } from "./OutputStatus";
 import type { ParkedChannel } from "./ParkedChannel";
 import type { SceneRt } from "./SceneRt";
+import type { ScriptRt } from "./ScriptRt";
 import type { SpeedRt } from "./SpeedRt";
 import type { TimecodeRt } from "./TimecodeRt";
 import type { TimelineRt } from "./TimelineRt";
@@ -44,7 +45,7 @@ undo: number, redo: number, parked: Array<ParkedChannel>,
 /**
  * Last command-line results (newest last, ≤ 30).
  */
-cmd_log: Array<CmdLogLine>, chases: Array<ChaseRt>, speed: Array<SpeedRt>, timelines: Array<TimelineRt>, macros_running: Array<number>, 
+cmd_log: Array<CmdLogLine>, chases: Array<ChaseRt>, speed: Array<SpeedRt>, timelines: Array<TimelineRt>, scripts: Array<ScriptRt>, macros_running: Array<number>, 
 /**
  * Output test pattern running.
  */

@@ -904,6 +904,8 @@ impl Engine {
             TimelineRun { id, from } => self.timeline_run(id, from)?,
             TimelineStop { id } => self.timeline_stop(id)?,
             TimelineSeek { id, t } => self.timeline_seek(id, t)?,
+            // be-script
+            ScriptSave { .. } | ScriptRemove { .. } | ScriptGo { .. } | ScriptBack { .. } | ScriptGoto { .. } | ScriptFire { .. } | ScriptFollow { .. } | ScriptReset { .. } => {}
             // be-ai
             AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } => {}
             // be-data
@@ -1542,6 +1544,9 @@ impl Engine {
                 self.programmer.clear();
                 self.dirty = true;
             }
+            Action::Command { text } if edge => {
+                self.run_cmdline_new(&text)?;
+            }
             _ => {}
         }
         Ok(())
@@ -1993,6 +1998,7 @@ impl Engine {
             timecode: TimecodeRt { running: self.tc.running, frames, text: fmt_tc(frames, fps) },
             learn: self.learn,
             fps: self.fps,
+            scripts: vec![],
             blind: self.prog.blind,
             undo: self.prog.hist.counts().0,
             redo: self.prog.hist.counts().1,
