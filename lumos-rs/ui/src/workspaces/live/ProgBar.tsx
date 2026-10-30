@@ -5,13 +5,13 @@ import { Modal } from "../../ui";
 import { t } from "../../i18n";
 import { activeCuelist } from "../../lib/state";
 import { releaseAttrs, setAttrs } from "../../lib/program";
+import { PromptDialog } from "./dialogs";
 
 const KIND_LABEL: Record<PaletteKind, string> = { intensity: "Intensity", position: "Position", color: "Color", beam: "Beam", all: "All" };
 const heldCount = () => Object.values(rt.value?.programmer ?? {}).filter((a) => a && Object.keys(a).length).length;
 
-export function ProgBar() {
-  const [recCue, setRecCue] = useState(false);
-  const [recPal, setRecPal] = useState(false);
+/** Programmer note under the attribute card: held count + clear / release / highlight. */
+export function ProgNote() {
   const [hl, setHl] = useState(false);
   const saved = useRef<Map<number, number | undefined>>(new Map());
   const hlIds = useRef<number[]>([]);
@@ -38,18 +38,36 @@ export function ProgBar() {
     return restore;
   }, [hl, selection.value.join(",")]);
 
+  const n = heldCount();
   return (
     <div class="lv-progbar" role="toolbar" aria-label={t("Programmer")}>
       <span class="label">{t("Programmer")}</span>
-      <span class="chip warn" title={t("Fixtures holding programmer values")}>{t("{n} held", { n: heldCount() })}</span>
+      <span class={`chip ${n ? "warn" : ""}`} title={t("Fixtures holding programmer values")}>{t("{n} held", { n })}</span>
+      <span class="sp" />
       <button class="btn" onClick={() => releaseAttrs(selection.value.length ? selection.value : null, null)} title={t("Release the selection's programmer values")}>{t("Clear sel")}</button>
       <button class="btn danger" onClick={() => releaseAttrs(null, null)} title={t("Release everything (Ctrl+Backspace)")}>{t("Release all")}</button>
-      <span class="sp" />
       <button class={`btn ${hl ? "on" : ""}`} aria-pressed={hl} disabled={!selection.value.length && !hl} onClick={() => setHl(!hl)} title={t("Full dimmer on selection, not recorded")}>{t("☼ Highlight")}</button>
-      <button class="btn" disabled={!heldCount()} onClick={() => setRecPal(true)}>{t("● Palette")}</button>
-      <button class="btn primary" disabled={!heldCount()} onClick={() => setRecCue(true)}>{t("● Record cue")}</button>
+    </div>
+  );
+}
+
+/** Record bar under the pools: palette, scene, cue. */
+export function RecordBar() {
+  const [recCue, setRecCue] = useState(false);
+  const [recPal, setRecPal] = useState(false);
+  const [recScene, setRecScene] = useState(false);
+  const scenes = show.value?.scenes ?? [];
+  const n = heldCount();
+  return (
+    <div class="lv-recbar" role="toolbar" aria-label={t("Record")}>
+      <button class="btn lg grow" disabled={!n} onClick={() => setRecPal(true)}>{t("● Palette")}</button>
+      <button class="btn lg grow" disabled={!n} onClick={() => setRecScene(true)}>{t("● Scene")}</button>
+      <button class="btn lg primary grow2" disabled={!n} onClick={() => setRecCue(true)}><span class="rec-dot" />{t("● Record cue")}</button>
       {recCue && <RecordCue onClose={() => setRecCue(false)} />}
       {recPal && <RecordPalette onClose={() => setRecPal(false)} />}
+      {recScene && <PromptDialog title={t("Record scene from programmer")} label={t("Name")} ok={t("Record")} initial={t("Scene {n}", { n: Math.max(0, ...scenes.map((x) => x.id)) + 1 })}
+        onClose={() => setRecScene(false)}
+        onSubmit={(name) => send({ type: "scene_record", id: null, name, from_output: false, fixtures: selection.value.length ? [...selection.value] : null, merge: false, refs: true })} />}
     </div>
   );
 }

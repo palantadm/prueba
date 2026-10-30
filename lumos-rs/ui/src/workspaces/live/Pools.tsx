@@ -20,11 +20,11 @@ export function Pools() {
   useEffect(() => { if (focusPalette.value !== null) setTab("palettes"); }, [focusPalette.value]);
   return (
     <div class="panel lv-col pools">
-      <div class="tabs" role="tablist">
-        <button role="tab" aria-selected={tab === "palettes"} class={`tab ${tab === "palettes" ? "active" : ""}`} onClick={() => setTab("palettes")}>{t("Palettes")}</button>
-        <button role="tab" aria-selected={tab === "effects"} class={`tab ${tab === "effects" ? "active" : ""}`} onClick={() => setTab("effects")}>{t("Effects")}</button>
-        <button role="tab" aria-selected={tab === "scenes"} class={`tab ${tab === "scenes" ? "active" : ""}`} onClick={() => setTab("scenes")}>{t("Scenes")}</button>
-        <button role="tab" aria-selected={tab === "chases"} class={`tab ${tab === "chases" ? "active" : ""}`} onClick={() => setTab("chases")}>{t("Chases")}</button>
+      <div class="lv-pooltabs" role="tablist">
+        <button role="tab" aria-selected={tab === "palettes"} class={`seg-btn ${tab === "palettes" ? "active" : ""}`} onClick={() => setTab("palettes")}>{t("Palettes")}</button>
+        <button role="tab" aria-selected={tab === "effects"} class={`seg-btn ${tab === "effects" ? "active" : ""}`} onClick={() => setTab("effects")}>{t("Effects")}</button>
+        <button role="tab" aria-selected={tab === "scenes"} class={`seg-btn ${tab === "scenes" ? "active" : ""}`} onClick={() => setTab("scenes")}>{t("Scenes")}</button>
+        <button role="tab" aria-selected={tab === "chases"} class={`seg-btn ${tab === "chases" ? "active" : ""}`} onClick={() => setTab("chases")}>{t("Chases")}</button>
       </div>
       {tab === "palettes" ? <PalettePool /> : tab === "effects" ? <EffectPool /> : tab === "scenes" ? <ScenePool /> : <ChasePool />}
     </div>
@@ -76,9 +76,9 @@ function PalettePool() {
   return (
     <>
       <div class="lv-selbar" role="tablist" aria-label={t("Palette kind")}>
-        {KINDS.map((k) => <button key={k.id} role="tab" class={`btn sm ${kind === k.id ? "sel" : ""}`} onClick={() => setKind(k.id)}>{t(k.label)}</button>)}
+        {KINDS.map((k) => <button key={k.id} role="tab" class={`btn pill ${kind === k.id ? "sel" : ""}`} onClick={() => setKind(k.id)}>{t(k.label)}</button>)}
         <span class="sp" />
-        <button class="btn sm primary" disabled={!held} onClick={() => setNaming(true)} title={t("Record palette from programmer values of the selection")}>{t("● Record")}</button>
+        <button class="btn primary" disabled={!held} onClick={() => setNaming(true)} title={t("Record palette from programmer values of the selection")}>{t("● Record")}</button>
       </div>
       <div class="lv-scroll">
         <div class="lv-pal">

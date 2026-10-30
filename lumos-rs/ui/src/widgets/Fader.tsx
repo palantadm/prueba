@@ -13,6 +13,8 @@ export type FaderProps = {
   disabled?: boolean;
   label?: string;
   ariaLabel?: string;
+  /** CSS gradient painted on the track (e.g. black→red); the fill is hidden. */
+  gradient?: string;
 };
 
 /** Pointer-driven fader (mouse + touch). Shift = fine (relative, ×0.1). Double-click resets. */
@@ -59,12 +61,12 @@ export function Fader(p: FaderProps) {
     if (e.key === "ArrowUp" || e.key === "ArrowRight") { p.onChange(clamp(v + step)); e.preventDefault(); }
     if (e.key === "ArrowDown" || e.key === "ArrowLeft") { p.onChange(clamp(v - step)); e.preventDefault(); }
   };
-  const size = p.horizontal ? { width: p.width ?? 200, height: p.height ?? 40 } : { height: p.height ?? 200, width: p.width ?? 44 };
+  const size = p.horizontal ? { width: p.width ?? 200, height: p.height ?? 56 } : { height: p.height ?? 200, width: p.width ?? 56 };
   return (
     <div
       ref={track}
-      class={`lv-fader ${p.horizontal ? "h" : ""} ${p.held ? "held" : ""} ${p.disabled ? "disabled" : ""}`}
-      style={{ ...size, "--fc": color } as any}
+      class={`lv-fader ${p.horizontal ? "h" : ""} ${p.held ? "held" : ""} ${p.disabled ? "disabled" : ""} ${p.gradient ? "grad" : ""}`}
+      style={{ ...size, "--fc": color, ...(p.gradient ? { background: p.gradient } : {}) } as any}
       role="slider"
       tabIndex={p.disabled ? -1 : 0}
       aria-label={p.ariaLabel ?? p.label}

@@ -11,12 +11,16 @@ import { releaseDmx, requestDmx } from "./lib/dmxsub";
 import { t, tp } from "./i18n";
 import { tErr } from "./i18n/errors";
 import { TestBanner } from "./workspaces/settings/OutputTest";
+import { Icon, ICONS } from "./ui/Icon";
+import { NewWindowButton, WorkspaceGrid } from "./ui/NewWindow";
+import { closeThisWindow, initWindowSync, initialWorkspace, isDesktopApp, isSecondary, moveToNextMonitor, saveWorkspace, toggleFullscreen, winId } from "./lib/windows";
+import "./styles/windows.css";
 import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
 
-export const current = signal(localStorage.getItem("ws") ?? "live");
+export const current = signal(initialWorkspace());
 export function goto(id: string) {
   current.value = id;
-  localStorage.setItem("ws", id);
+  saveWorkspace(id);
 }
 
 const SHORTCUTS: [string, string][] = [
@@ -102,27 +106,6 @@ function ShowMenu() {
   );
 }
 
-const ICONS: Record<string, string> = {
-  live: "M13 2 4 14h7l-1 8 9-12h-7l1-8z",
-  desk: "M6 3v18M12 3v18M18 3v18M4 8h4M10 15h4M16 6h4",
-  cues: "M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01",
-  patch: "M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z",
-  stage: "M12 2 3 7v10l9 5 9-5V7l-9-5zM3 7l9 5 9-5M12 12v10",
-  plan: "M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2zM9 4v14M15 6v14",
-  monitor: "M3 4h18v12H3zM8 20h8M12 16v4M7 12l3-3 3 2 4-4",
-  vc: "M3 5h18v14H3zM7 9h2M11 9h2M15 9h2M7 13h2M11 13h2M15 13h2",
-  timeline: "M3 12h18M7 8v8M12 5v14M17 9v6",
-  settings: "M12 15a3 3 0 100-6 3 3 0 000 6zM4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4",
-};
-
-function Icon({ d, size = 26 }: { d: string; size?: number }) {
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d={d} />
-    </svg>
-  );
-}
-
 function GrandMaster() {
   const v = rt.value?.grand_master ?? 1;
   const track = useRef<HTMLDivElement>(null);
@@ -194,11 +177,11 @@ function StatusChip() {
   );
 }
 
-export function App() {
+function MainApp() {
   const [help, setHelp] = useState(false);
   const bo = rt.value?.blackout ?? false;
 
-  useEffect(() => { autoInitMidi(); }, []);
+  useEffect(() => { autoInitMidi(); initWindowSync(); }, []);
   useEffect(() => {
     const ids = (show.value?.universes ?? []).map((u) => u.id).sort((a, b) => a - b).slice(0, 12);
     requestDmx("shell", ids);
@@ -239,6 +222,7 @@ export function App() {
           <span class="hide-narrow">LUMOS</span>
         </div>
         <ShowMenu />
+        <NewWindowButton />
         <span class="sp" />
         <ProgChips />
         <CmdChip />
@@ -275,4 +259,69 @@ export function App() {
       <Toasts />
     </div>
   );
+}
+
+function SecondaryApp() {
+  const [pick, setPick] = useState(false);
+  const bo = rt.value?.blackout ?? false;
+  useEffect(() => { initWindowSync(); }, []);
+  useEffect(() => {
+    // ?fs=1 → ask for fullscreen on the first tap (browsers require a user gesture)
+    if (new URLSearchParams(location.search).get("fs") !== "1" || isDesktopApp) return;
+    toast(t("Tap to go fullscreen"), "info", 6000);
+    const h = () => { void document.documentElement.requestFullscreen?.().catch(() => undefined); };
+    window.addEventListener("pointerdown", h, { once: true });
+    return () => window.removeEventListener("pointerdown", h);
+  }, []);
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); void send({ type: "blackout", on: !rt.value?.blackout }); return; }
+      if ((e.target as HTMLElement)?.matches?.("input,textarea,select")) return;
+      if (mod && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); void send({ type: e.shiftKey ? "redo" : "undo" }).catch(() => {}); return; }
+      if (mod && !e.altKey && e.key.toLowerCase() === "y") { e.preventDefault(); void send({ type: "redo" }).catch(() => {}); return; }
+      if (e.key === "F11") { e.preventDefault(); toggleFullscreen(); return; }
+      if (mod || e.altKey) return;
+      const w = workspaces.find((w) => w.key === e.key);
+      if (w) goto(w.id);
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+  const ws = workspaces.find((w) => w.id === current.value) ?? workspaces[0];
+  const Cur = ws.component;
+  return (
+    <div class="col" style={{ height: "100%", gap: 0 }}>
+      {!connected.value && <div class="banner" role="alert">{t("Connection to the Lumos engine lost — reconnecting…")}</div>}
+      <header class="topbar sec-bar">
+        <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true"><polygon points="16,2 29,9 29,23 16,30 3,23 3,9" fill="var(--amber)" /><polygon points="16,10 22,13.5 22,20.5 16,24 10,20.5 10,13.5" fill="var(--ink-1)" /></svg>
+        <button class="btn lg ws-pick" aria-haspopup="dialog" title={t("Switch workspace")} onClick={() => setPick(true)}>
+          <span class="row" style={{ gap: 10 }}><Icon d={ICONS[ws.id] ?? ICONS.patch} size={22} />{ws.label}</span>
+          <Icon d={ICONS.chevron} size={16} />
+        </button>
+        <span class="win-chip">{t("Window {n}", { n: winId ?? "" })}</span>
+        <NewWindowButton compact />
+        <span class="sp" />
+        <GrandMaster />
+        <button class={`btn-blackout ${bo ? "active" : ""}`} aria-pressed={bo} onClick={() => send({ type: "blackout", on: !bo })} title={t("Blackout (Ctrl+B)")}>BLACKOUT</button>
+        {isDesktopApp && <button class="btn lg icon" aria-label={t("Move to next monitor")} title={t("Move to next monitor")} onClick={moveToNextMonitor}><Icon d="M4 12h14M13 6l6 6-6 6" size={20} /></button>}
+        <button class="btn lg icon" aria-label={t("Fullscreen")} title={`${t("Fullscreen")} (F11)`} onClick={toggleFullscreen}><Icon d={ICONS.fullscreen} size={20} /></button>
+        <button class="btn lg icon" aria-label={t("Close window")} title={t("Close window")} onClick={closeThisWindow}><Icon d={ICONS.close} size={20} /></button>
+      </header>
+      <TestBanner />
+      <BlindBanner />
+      <main class="grow" style={{ minHeight: 0, overflow: "hidden" }}><Cur /></main>
+      {pick && (
+        <Modal title={t("Switch workspace")} onClose={() => setPick(false)} width={620}>
+          <WorkspaceGrid value={ws.id} onPick={(id) => { goto(id); setPick(false); }} />
+        </Modal>
+      )}
+      <DialogHost />
+      <Toasts />
+    </div>
+  );
+}
+
+export function App() {
+  return isSecondary ? <SecondaryApp /> : <MainApp />;
 }

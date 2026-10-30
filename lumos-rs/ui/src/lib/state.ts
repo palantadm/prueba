@@ -1,8 +1,10 @@
+import { shareSignal } from "./windows";
 // UI-only shared state for Live / Cues.
 import { signal } from "@preact/signals";
 
 /** Cuelist targeted by transport, Space=GO and "record cue". */
 export const activeCuelist = signal<number | null>(null);
+shareSignal("cuelist", activeCuelist);
 export const lsGet = <T,>(k: string, d: T): T => {
   try { const v = localStorage.getItem(k); return v ? (JSON.parse(v) as T) : d; } catch { return d; }
 };

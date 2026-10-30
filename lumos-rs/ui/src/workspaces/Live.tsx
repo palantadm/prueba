@@ -7,7 +7,7 @@ import { releaseAttrs } from "../lib/program";
 import { FixturePool } from "./live/FixturePool";
 import { AttrPanels } from "./live/AttrPanels";
 import { Pools } from "./live/Pools";
-import { ProgBar } from "./live/ProgBar";
+import { ProgNote, RecordBar } from "./live/ProgBar";
 
 export function Live() {
   useDmxTick(10);
@@ -24,10 +24,9 @@ export function Live() {
     <div class="lv-live">
       <div class="lv-live-main">
         <FixturePool />
-        <AttrPanels />
-        <Pools />
+        <div class="lv-stack"><AttrPanels /><ProgNote /></div>
+        <div class="lv-stack"><Pools /><RecordBar /></div>
       </div>
-      <ProgBar />
     </div>
   );
 }

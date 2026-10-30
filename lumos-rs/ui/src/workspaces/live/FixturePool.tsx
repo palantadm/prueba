@@ -75,13 +75,13 @@ export function FixturePool() {
         <span class="chip"><span class="lv-chipsel">{selection.value.length}</span> / {fixtures.length}</span>
       </div>
       <div class="lv-selbar" role="toolbar" aria-label={t("Selection")}>
-        <button class="btn sm" onClick={() => (selection.value = ids)}>{t("All")}</button>
-        <button class="btn sm" onClick={() => (selection.value = [])}>{t("None")}</button>
-        <button class="btn sm" onClick={() => (selection.value = ids.filter((i) => !sel.has(i)))}>{t("Invert")}</button>
-        <button class="btn sm" onClick={() => (selection.value = selection.value.filter((_, i) => i % 2 === 0))}>{t("Odd")}</button>
-        <button class="btn sm" onClick={() => (selection.value = selection.value.filter((_, i) => i % 2 === 1))}>{t("Even")}</button>
-        <button class="btn sm" onClick={() => step(-1)} aria-label={t("Previous fixture")}>{t("◀ Prev")}</button>
-        <button class="btn sm" onClick={() => step(1)} aria-label={t("Next fixture")}>{t("Next ▶")}</button>
+        <button class="btn" onClick={() => (selection.value = ids)}>{t("All")}</button>
+        <button class="btn" onClick={() => (selection.value = [])}>{t("None")}</button>
+        <button class="btn" onClick={() => (selection.value = ids.filter((i) => !sel.has(i)))}>{t("Invert")}</button>
+        <button class="btn" onClick={() => (selection.value = selection.value.filter((_, i) => i % 2 === 0))}>{t("Odd")}</button>
+        <button class="btn" onClick={() => (selection.value = selection.value.filter((_, i) => i % 2 === 1))}>{t("Even")}</button>
+        <button class="btn icon" onClick={() => step(-1)} aria-label={t("Previous fixture")}>◀</button>
+        <button class="btn icon" onClick={() => step(1)} aria-label={t("Next fixture")}>▶</button>
       </div>
       <GroupsRow />
       <div class="lv-scroll">
@@ -118,7 +118,7 @@ function GroupsRow() {
   return (
     <div class="lv-groups" role="toolbar" aria-label={t("Groups")}>
       {groups.map((g) => <GroupBtn key={g.id} g={g} onEdit={() => setEdit(g)} />)}
-      <button class="btn sm" disabled={!selection.value.length} onClick={() => setNaming(true)} title={t("Record group from selection")}>{t("+ Group")}</button>
+      <button class="btn pill" disabled={!selection.value.length} onClick={() => setNaming(true)} title={t("Record group from selection")}>{t("+ Group")}</button>
       {naming && (
         <PromptDialog title={t("Record group")} label={t("Group name")} initial={t("Group {n}", { n: nextId() })} ok={t("Record")} onClose={() => setNaming(false)}
           onSubmit={(name) => send({ type: "group_save", group: { id: nextId(), name, fixtures: [...selection.value].sort((a, b) => a - b) } })} />
@@ -132,7 +132,7 @@ function GroupBtn({ g, onEdit }: { g: Group; onEdit: () => void }) {
   const lp = useLongPress(onEdit);
   const active = g.fixtures.length > 0 && g.fixtures.length === selection.value.length && g.fixtures.every((f) => selection.value.includes(f));
   return (
-    <button class={`btn sm ${active ? "sel" : ""}`} {...lp as any}
+    <button class={`btn pill ${active ? "sel" : ""}`} {...lp as any}
       onClick={() => { if (!lp.wasLong()) selection.value = [...g.fixtures]; }}
       title={t("{n} fixtures — right-click / long-press to edit", { n: g.fixtures.length })}>
       {g.name} <span class="faint">{g.fixtures.length}</span>

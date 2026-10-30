@@ -26,7 +26,7 @@ export function Knob(p: KnobProps) {
   const [drag, setDrag] = useState<number | null>(null);
   const st = useRef({ y: 0, v: 0 });
   const v = drag ?? p.value;
-  const size = p.size ?? 56, c = size / 2, r = c - 6;
+  const size = p.size ?? 96, c = size / 2, r = c - 9;
   const color = p.held ? "var(--live)" : p.color ?? "var(--accent)";
   const clamp = (x: number) => Math.max(0, Math.min(1, x));
   const down = (e: PointerEvent) => {
@@ -52,7 +52,7 @@ export function Knob(p: KnobProps) {
   };
   const ang = A0 + SWEEP * v;
   return (
-    <div class={`lv-knob ${p.held ? "held" : ""}`} style={{ width: size + 16 }}>
+    <div class={`lv-knob ${p.held ? "held" : ""}`} style={{ width: size + 24 }}>
       <svg
         width={size} height={size} viewBox={`0 0 ${size} ${size}`}
         role="slider" tabIndex={0} aria-label={p.label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(v * 100)}
@@ -60,11 +60,11 @@ export function Knob(p: KnobProps) {
         onWheel={wheel} onKeyDown={key}
         onDblClick={() => { p.onChange(p.defaultValue ?? 0); p.onEnd?.(); }}
       >
-        <path d={arc(c, c, r, A0, A0 + SWEEP)} stroke="var(--bg-4)" stroke-width="5" fill="none" stroke-linecap="round" />
-        {v > 0.002 && <path d={arc(c, c, r, A0, ang)} stroke={color} stroke-width="5" fill="none" stroke-linecap="round" />}
-        <line x1={c + (r - 12) * Math.cos((ang * Math.PI) / 180)} y1={c + (r - 12) * Math.sin((ang * Math.PI) / 180)}
+        <path d={arc(c, c, r, A0, A0 + SWEEP)} stroke="var(--ink-4)" stroke-width="9" fill="none" stroke-linecap="round" />
+        {v > 0.002 && <path d={arc(c, c, r, A0, ang)} stroke={color} stroke-width="9" fill="none" stroke-linecap="round" />}
+        <line x1={c + (r - 20) * Math.cos((ang * Math.PI) / 180)} y1={c + (r - 20) * Math.sin((ang * Math.PI) / 180)}
           x2={c + (r - 3) * Math.cos((ang * Math.PI) / 180)} y2={c + (r - 3) * Math.sin((ang * Math.PI) / 180)}
-          stroke="var(--text)" stroke-width="2.5" stroke-linecap="round" />
+          stroke="var(--text)" stroke-width="3.5" stroke-linecap="round" />
       </svg>
       <div class="lv-knob-val mono">{p.format ? p.format(v) : `${Math.round(v * 100)}`}</div>
       <div class="lv-knob-label">
