@@ -15,7 +15,7 @@ fixture 4 locate
 record cue 3 name Entrada
 record cue 5 cuelist 2 name Fondo replace
 record scene 2 Azul output
-record palette color 3 name Ámbar
+record palette color 3 Ámbar
 fixture 1 thru 4 ; record group 5 Frontales
 update cue 3
 delete cue 4 ; delete scene 2

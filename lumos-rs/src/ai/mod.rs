@@ -385,6 +385,9 @@ impl Inner {
 }
 
 #[cfg(test)]
+mod e2e_tests;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 

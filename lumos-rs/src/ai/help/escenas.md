@@ -1,7 +1,7 @@
 Una **escena** es un look grabado (una foto de valores por aparato) que se puede encender y apagar con fundidos, mezclar con un nivel y fundir hacia otra escena (morph).
 
 ## Crear
-- Desde el programador: `record scene 3 name Amanecer` (añade `output` para grabar lo que sale ahora en lugar del programador).
+- Desde el programador: `record scene 3 Amanecer` (añade `output` para grabar lo que sale ahora en lugar del programador).
 - Por protocolo: `scene_record` (con `from_output`, `fixtures`, `merge`) o `scene_save` con la escena completa.
 
 ## Usar

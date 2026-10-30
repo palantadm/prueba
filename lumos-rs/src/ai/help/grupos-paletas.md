@@ -6,7 +6,7 @@ Un grupo es una lista con nombre de aparatos (`id`, `name`, `fixtures`).
 
 ## Paletas
 Una paleta guarda valores reutilizables de un tipo: **intensidad, posición, color, haz** o **todo** (`kind`). Se aplican a cualquier aparato que tenga esos atributos.
-- Grabar: selecciona, pon valores y `record palette color 3 name Ámbar` (el tipo filtra qué atributos se guardan).
+- Grabar: selecciona, pon valores y `record palette color 3 Ámbar` (el tipo filtra qué atributos se guardan).
 - Aplicar: `group 1 apply palette 3`, o `prog_apply_palette`.
 - Valores universales (`values`) más ajustes por aparato (`per_fixture`), que tienen prioridad.
 - **Enlaces**: cuando una cue o escena se graba con paletas aplicadas, guarda una referencia (`refs`); si luego editas la paleta, todas las cues que la usan cambian. Para congelar los valores graba sin referencias.

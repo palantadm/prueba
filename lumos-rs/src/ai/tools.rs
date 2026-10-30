@@ -199,7 +199,7 @@ pub fn definitions() -> Vec<ToolDef> {
     vec![
         tool(
             "console_command",
-            "Run console command-line text (the same language as the command bar), e.g. `fixture 1 thru 4 at 70; red at 100`, `record scene 3 name Amanecer`, `go`, `scene 2 on`, `gm 80`. \
+            "Run console command-line text (the same language as the command bar), e.g. `fixture 1 thru 4 at 70; red at 100`, `record scene 3 Amanecer`, `go`, `scene 2 on`, `gm 80`. \
              Statements are separated by `;` or newlines and share a selection. Returns one result line per statement. See get_help topic `linea-de-comandos` for the grammar.",
             json!({ "text": { "type": "string", "description": "Command text. Spanish or English keywords." } }),
             &["text"],
@@ -859,7 +859,7 @@ mod tests {
             ("fixture 1 thru 4 at 50", true, Edit),
             ("fixture 1 thru 4", false, Edit),
             ("record cue 5 name Hola", false, Edit),
-            ("record scene 3 name Amanecer", false, Edit),
+            ("record scene 3 Amanecer", false, Edit),
             ("delete cue 3", false, Live),
             ("scene 2 on", false, Live),
             ("blackout on", true, Live),
