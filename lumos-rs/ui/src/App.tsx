@@ -15,6 +15,10 @@ import { Icon, ICONS } from "./ui/Icon";
 import { NewWindowButton, WorkspaceGrid } from "./ui/NewWindow";
 import { closeThisWindow, initWindowSync, initialWorkspace, isDesktopApp, isSecondary, moveToNextMonitor, saveWorkspace, toggleFullscreen, winId } from "./lib/windows";
 import "./styles/windows.css";
+import { AiPanel, QuickAsk } from "./ai/Panel";
+import { AiButton, HelpButton } from "./ai/Buttons";
+import { aiWorkspace, nav, toggleQuick } from "./ai/state";
+import { setSettingsCat } from "./workspaces/Settings";
 import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
 
 export const current = signal(initialWorkspace());
@@ -23,12 +27,25 @@ export function goto(id: string) {
   saveWorkspace(id);
 }
 
+/** Assistant plumbing shared by both shells: current workspace for its context, and its navigation requests. */
+function useAiBridge() {
+  useEffect(() => { aiWorkspace.value = current.value; }, [current.value]);
+  const n = nav.value;
+  useEffect(() => {
+    if (!n) return;
+    goto(n.ws);
+    if (n.cat) setSettingsCat(n.cat);
+    nav.value = null;
+  }, [n]);
+}
+
 const SHORTCUTS: [string, string][] = [
   ["1 … 7", "Switch workspace"],
   ["Ctrl/⌘ + B", "Toggle blackout"],
   ["Ctrl/⌘ + S", "Save show"],
   ["Ctrl/⌘ + Z", "Undo"],
   ["Ctrl/⌘ + Y  ·  Ctrl/⌘ + Shift + Z", "Redo"],
+  ["Ctrl/⌘ + K", "Ask the assistant"],
   ["/", "Command line"],
   ["?", "This help"],
   ["Esc", "Close dialogs"],
@@ -179,6 +196,7 @@ function StatusChip() {
 
 function MainApp() {
   const [help, setHelp] = useState(false);
+  useAiBridge();
   const bo = rt.value?.blackout ?? false;
 
   useEffect(() => { autoInitMidi(); initWindowSync(); }, []);
@@ -192,6 +210,7 @@ function MainApp() {
     const h = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); void send({ type: "blackout", on: !rt.value?.blackout }); return; }
+      if (mod && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); toggleQuick(); return; }
       if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); void send({ type: "show_save", name: null }).then(() => toast(t("Show saved"), "ok", 1500)).catch(() => {}); return; }
       if ((e.target as HTMLElement)?.matches?.("input,textarea,select")) return;
       if (mod && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); void send({ type: e.shiftKey ? "redo" : "undo" }).catch(() => {}); return; }
@@ -226,6 +245,8 @@ function MainApp() {
         <span class="sp" />
         <ProgChips />
         <CmdChip />
+        <HelpButton />
+        <AiButton />
         <span class="tc hide-narrow" title={t("Show timecode")} style={{ color: tc?.running ? "var(--amber)" : "var(--text)" }}>{tc?.text ?? "00:00:00:00"}</span>
         <UBars />
         <StatusChip />
@@ -255,6 +276,8 @@ function MainApp() {
           </tbody></table>
         </Modal>
       )}
+      <AiPanel />
+      <QuickAsk />
       <DialogHost />
       <Toasts />
     </div>
@@ -263,6 +286,7 @@ function MainApp() {
 
 function SecondaryApp() {
   const [pick, setPick] = useState(false);
+  useAiBridge();
   const bo = rt.value?.blackout ?? false;
   useEffect(() => { initWindowSync(); }, []);
   useEffect(() => {
@@ -277,6 +301,7 @@ function SecondaryApp() {
     const h = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); void send({ type: "blackout", on: !rt.value?.blackout }); return; }
+      if (mod && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); toggleQuick(); return; }
       if ((e.target as HTMLElement)?.matches?.("input,textarea,select")) return;
       if (mod && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); void send({ type: e.shiftKey ? "redo" : "undo" }).catch(() => {}); return; }
       if (mod && !e.altKey && e.key.toLowerCase() === "y") { e.preventDefault(); void send({ type: "redo" }).catch(() => {}); return; }
@@ -301,6 +326,8 @@ function SecondaryApp() {
         </button>
         <span class="win-chip">{t("Window {n}", { n: winId ?? "" })}</span>
         <NewWindowButton compact />
+        <HelpButton />
+        <AiButton />
         <span class="sp" />
         <GrandMaster />
         <button class={`btn-blackout ${bo ? "active" : ""}`} aria-pressed={bo} onClick={() => send({ type: "blackout", on: !bo })} title={t("Blackout (Ctrl+B)")}>BLACKOUT</button>
@@ -311,6 +338,8 @@ function SecondaryApp() {
       <TestBanner />
       <BlindBanner />
       <main class="grow" style={{ minHeight: 0, overflow: "hidden" }}><Cur /></main>
+      <AiPanel />
+      <QuickAsk />
       {pick && (
         <Modal title={t("Switch workspace")} onClose={() => setPick(false)} width={620}>
           <WorkspaceGrid value={ws.id} onPick={(id) => { goto(id); setPick(false); }} />
