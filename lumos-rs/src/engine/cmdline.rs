@@ -28,6 +28,11 @@
 //!             scene|escena N [on|off|solo|toggle|at V]   scene solo N     scenes release
 //!             chase N [on|off|tap|bpm V|next|prev]       macro N | macro stop [N]
 //!             timeline N [run [from T]|stop|seek T]
+//! SCRIPT      script|guion|escaleta [N] go|back|reset|follow [on|off]|goto <block> [mark]|fire <block> <mark>
+//! EXTERNAL    osc <host>:<port> </address> [args…]     (args typed: 12 → int, 0.5 → float, true/false, else text;
+//!                                                       s:/i:/f: prefix forces the type; "quoted text" keeps spaces)
+//!             midi note|cc|pc <channel 1-16> <number> [value] [port…]        (note default velocity 127)
+//!             http get|post|put|patch|delete <url> [body…]                  (5 s timeout, result in the log)
 //! SYSTEM      blackout|bo [on|off|toggle]   gm|master 80   clear|clr   park U/C at V   unpark [U/C]
 //!             undo|deshacer   redo|rehacer   blind [on|off]
 //! ```
@@ -135,6 +140,13 @@ const KW_RUN: &[&str] = &["run", "go", "play", "start", "iniciar"];
 const KW_STOP: &[&str] = &["stop", "parar"];
 const KW_SEEK: &[&str] = &["seek", "ir_a", "buscar"];
 const KW_FROM: &[&str] = &["from", "desde"];
+const KW_SCRIPT: &[&str] = &["script", "guion", "escaleta"];
+const KW_FOLLOW: &[&str] = &["follow", "sigue", "seguimiento"];
+const KW_RESET: &[&str] = &["reset", "reiniciar", "reinicio", "rewind"];
+const KW_FIRE: &[&str] = &["fire", "disparar", "lanzar"];
+const KW_OSC: &[&str] = &["osc"];
+const KW_MIDI: &[&str] = &["midi"];
+const KW_HTTP: &[&str] = &["http", "web"];
 
 const KW_INTENSITY: &[&str] = &["intensity", "intensidad"];
 const KW_POSITION: &[&str] = &["position", "posicion"];
@@ -203,6 +215,7 @@ const VERB_GROUPS: &[&[&str]] = &[
     KW_FIXTURE, KW_GROUP, KW_ALL, KW_NONE, KW_ODD, KW_EVEN, KW_NEXT, KW_PREV, KW_AT, KW_COLOUR, KW_RECORD, KW_UPDATE,
     KW_DELETE, KW_APPLY, KW_GO, KW_BACK, KW_PAUSE, KW_RELEASE, KW_GOTO, KW_CUELIST, KW_SCENE, KW_CHASE, KW_MACRO,
     KW_TIMELINE, KW_BLACKOUT, KW_GM, KW_CLEAR, KW_PARK, KW_UNPARK, KW_UNDO, KW_REDO, KW_BLIND, KW_LOCATE,
+    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP,
 ];
 
 fn all_keywords() -> Vec<&'static str> {
@@ -214,7 +227,7 @@ fn all_keywords() -> Vec<&'static str> {
         VERB_GROUPS[26], VERB_GROUPS[27], VERB_GROUPS[28], VERB_GROUPS[29], VERB_GROUPS[30], VERB_GROUPS[31],
         VERB_GROUPS[32], KW_THRU, KW_FULL, KW_OUT, KW_HALF, KW_HOME, KW_CUE, KW_PALETTE, KW_EFFECT, KW_NAME, KW_ON,
         KW_OFF, KW_TOGGLE, KW_SOLO, KW_REPLACE, KW_MERGE, KW_TRACK, KW_CUEONLY, KW_OUTPUT, KW_TAP, KW_BPM, KW_STOP,
-        KW_SEEK, KW_FROM, KW_INTENSITY, KW_POSITION, KW_BEAM,
+        KW_SEEK, KW_FROM, KW_INTENSITY, KW_POSITION, KW_BEAM, KW_SCRIPT, KW_FOLLOW, KW_RESET, KW_FIRE, KW_OSC, KW_MIDI, KW_HTTP,
     ];
     let mut v: Vec<&'static str> = groups.iter().flat_map(|g| g.iter().copied()).collect();
     v.extend(ATTR_ALIASES.iter().flat_map(|(_, a)| a.iter().copied()));
@@ -439,6 +452,16 @@ pub enum TlAct {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ScriptAct {
+    Go,
+    Back,
+    Reset,
+    Follow(bool),
+    Goto { block: u32, mark: Option<u32> },
+    Fire { block: u32, mark: u32 },
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     UseCuelist(u32),
     Select(Sel),
@@ -463,6 +486,9 @@ pub enum Stmt {
     MacroRun(u32),
     MacroStop(Option<u32>),
     Timeline { id: u32, act: TlAct },
+    Script { id: Option<u32>, act: ScriptAct },
+    /// `osc` / `midi` / `http`: runs outside the show model (see [`Session::ext`]).
+    Ext(ScriptAction),
     Blackout(Option<bool>),
     Gm(Val),
     Clear,
@@ -793,6 +819,10 @@ impl<'a> P<'a> {
         if is(w, KW_TIMELINE) {
             self.i += 1;
             return self.timeline();
+        }
+        if is(w, KW_SCRIPT) {
+            self.i += 1;
+            return self.script();
         }
         if is(w, KW_BLACKOUT) {
             self.i += 1;
@@ -1139,6 +1169,37 @@ impl<'a> P<'a> {
         Ok(Stmt::Chase { id, act })
     }
 
+    fn script(&mut self) -> R<Stmt> {
+        let id = if matches!(self.peek(), Some(Tok { t: T::Num(_), .. })) { Some(self.uint("a script number")?) } else { None };
+        let act = if self.eat_kw(KW_GO) || self.eat_kw(KW_RUN) {
+            ScriptAct::Go
+        } else if self.eat_kw(KW_BACK) {
+            ScriptAct::Back
+        } else if self.eat_kw(KW_RESET) {
+            ScriptAct::Reset
+        } else if self.eat_kw(KW_FOLLOW) {
+            if self.at_end() || self.eat_kw(KW_ON) {
+                ScriptAct::Follow(true)
+            } else if self.eat_kw(KW_OFF) {
+                ScriptAct::Follow(false)
+            } else {
+                return Err(self.here("expected on or off"));
+            }
+        } else if self.eat_kw(KW_GOTO) {
+            self.eat_kw(&["block", "bloque"]);
+            let block = self.uint("a block number")?;
+            let mark = if self.at_end() { None } else { Some(self.uint("a mark number")?) };
+            ScriptAct::Goto { block, mark }
+        } else if self.eat_kw(KW_FIRE) {
+            let block = self.uint("a block number")?;
+            let mark = self.uint("a mark number")?;
+            ScriptAct::Fire { block, mark }
+        } else {
+            return Err(self.here("expected go, back, reset, follow [on|off], goto <block> [mark] or fire <block> <mark>"));
+        };
+        Ok(Stmt::Script { id, act })
+    }
+
     fn timeline(&mut self) -> R<Stmt> {
         let id = self.uint("a timeline number")?;
         let act = if self.at_end() || self.eat_kw(KW_RUN) {
@@ -1170,11 +1231,168 @@ fn lev(a: &str, b: &str) -> usize {
     prev[b.len()]
 }
 
-/// Parse a text into statements (syntax only — no show state needed).
-pub fn parse(text: &str) -> Result<Vec<Parsed>, CmdError> {
-    if text.len() > 8192 {
-        return Err(CmdError::new(0, 0, "command line too long (max 8192 bytes)"));
+/// Statement spans of `text` (`;` / newline separated). Quotes and `#` comments only count at the start of a
+/// word, so a URL like `http://host/#x` or an OSC address stays in one span.
+fn spans(text: &str) -> Vec<(usize, usize)> {
+    let mut out = Vec::new();
+    let mut start = 0;
+    let mut word_start = true;
+    let mut it = text.char_indices().peekable();
+    while let Some((i, c)) = it.next() {
+        match c {
+            ';' | '\n' => {
+                out.push((start, i));
+                start = i + 1;
+                word_start = true;
+            }
+            '#' if word_start => {
+                while let Some(&(_, d)) = it.peek() {
+                    if d == '\n' {
+                        break;
+                    }
+                    it.next();
+                }
+            }
+            '"' | '\'' if word_start => {
+                for (_, d) in it.by_ref() {
+                    if d == c {
+                        break;
+                    }
+                }
+                word_start = false;
+            }
+            _ => word_start = c.is_whitespace(),
+        }
     }
+    out.push((start, text.len()));
+    out
+}
+
+struct XTok {
+    s: String,
+    pos: usize,
+    len: usize,
+}
+
+/// Whitespace-separated words of one `osc` / `midi` / `http` statement ("quoted text" is one word).
+fn ext_tokens(seg: &str) -> R<Vec<XTok>> {
+    let mut out = Vec::new();
+    let mut it = seg.char_indices().peekable();
+    while let Some(&(i, c)) = it.peek() {
+        if c.is_whitespace() {
+            it.next();
+        } else if c == '#' {
+            break;
+        } else if c == '"' || c == '\'' {
+            it.next();
+            let mut s = String::new();
+            let mut end = None;
+            for (j, d) in it.by_ref() {
+                if d == c {
+                    end = Some(j + 1);
+                    break;
+                }
+                s.push(d);
+            }
+            let Some(end) = end else { return Err(CmdError::new(i, seg.len() - i, "unterminated quote")) };
+            out.push(XTok { s, pos: i, len: end - i });
+        } else {
+            let mut end = i;
+            while let Some(&(j, d)) = it.peek() {
+                if d.is_whitespace() {
+                    break;
+                }
+                end = j + d.len_utf8();
+                it.next();
+            }
+            out.push(XTok { s: seg[i..end].to_string(), pos: i, len: end - i });
+        }
+    }
+    Ok(out)
+}
+
+fn ext_head(seg: &str) -> Option<&'static str> {
+    let w: String = seg.trim_start().split(char::is_whitespace).next()?.chars().map(fold).collect();
+    if is(&w, KW_OSC) {
+        Some("osc")
+    } else if is(&w, KW_MIDI) {
+        Some("midi")
+    } else if is(&w, KW_HTTP) {
+        Some("http")
+    } else {
+        None
+    }
+}
+
+fn parse_ext(seg: &str, head: &str) -> R<Parsed> {
+    use super::script::{valid_http, valid_osc_target};
+    let toks = ext_tokens(seg)?;
+    let at = |i: usize| toks.get(i);
+    let end_pos = seg.trim_end().len();
+    let need = |i: usize, what: &str| -> R<&XTok> { at(i).ok_or_else(|| CmdError::new(end_pos, 0, format!("expected {what}"))) };
+    let bad = |t: &XTok, m: String| CmdError::new(t.pos, t.len, m);
+    let int = |i: usize, what: &str, lo: u32, hi: u32| -> R<u32> {
+        let t = need(i, what)?;
+        match t.s.parse::<u32>() {
+            Ok(n) if (lo..=hi).contains(&n) => Ok(n),
+            _ => Err(bad(t, format!("{what} must be a whole number {lo}-{hi}"))),
+        }
+    };
+    let action = match head {
+        "osc" => {
+            let t = need(1, "<host>:<port>")?;
+            let Some((host, port)) = t.s.rsplit_once(':') else { return Err(bad(t, "expected <host>:<port>, e.g. 192.168.1.20:53000".into())) };
+            let port: u16 = port.parse().map_err(|_| bad(t, "OSC port must be 1-65535".into()))?;
+            let a = need(2, "an OSC address starting with '/'")?;
+            let args: Vec<String> = toks[3..].iter().map(|t| t.s.clone()).collect();
+            valid_osc_target(host, port, &a.s, &args).map_err(|m| bad(a, m))?;
+            ScriptAction::Osc { host: host.to_string(), port, address: a.s.clone(), args }
+        }
+        "midi" => {
+            let k = need(1, "note, cc or pc")?;
+            let kind = match k.s.chars().map(fold).collect::<String>().as_str() {
+                "note" | "nota" => MidiKind::Note,
+                "cc" | "control" => MidiKind::Cc,
+                "pc" | "program" | "programa" => MidiKind::Program,
+                _ => return Err(bad(k, "expected note, cc or pc".into())),
+            };
+            let channel = int(2, "the MIDI channel", 1, 16)? as u8;
+            let number = int(3, "the note / controller / program number", 0, 127)? as u8;
+            let mut next = 4;
+            let value = match at(next).map(|t| t.s.parse::<u32>()) {
+                Some(Ok(v)) if v <= 127 => {
+                    next += 1;
+                    v as u8
+                }
+                Some(Ok(_)) => return Err(bad(&toks[next], "the value must be 0-127".into())),
+                _ if kind == MidiKind::Cc => return Err(CmdError::new(end_pos, 0, "expected the controller value (0-127)")),
+                _ if kind == MidiKind::Note => 127,
+                _ => 0,
+            };
+            let port = if toks.len() > next { Some(toks[next..].iter().map(|t| t.s.as_str()).collect::<Vec<_>>().join(" ")) } else { None };
+            ScriptAction::Midi { port, kind, channel, number, value }
+        }
+        _ => {
+            let m = need(1, "get, post, put, patch or delete")?;
+            let method = match m.s.chars().map(fold).collect::<String>().as_str() {
+                "get" | "obtener" => "GET",
+                "post" | "enviar" => "POST",
+                "put" => "PUT",
+                "patch" => "PATCH",
+                "delete" | "borrar" => "DELETE",
+                _ => return Err(bad(m, "expected get, post, put, patch or delete".into())),
+            };
+            let u = need(2, "a url (http:// or https://)")?;
+            valid_http(method, &u.s).map_err(|e| bad(u, e))?;
+            let body = toks[3.min(toks.len())..].iter().map(|t| t.s.as_str()).collect::<Vec<_>>().join(" ");
+            ScriptAction::Http { method: method.into(), url: u.s.clone(), body }
+        }
+    };
+    let lead = seg.len() - seg.trim_start().len();
+    Ok(Parsed { stmt: Stmt::Ext(action), text: seg.trim().to_string(), pos: lead })
+}
+
+fn parse_std(text: &str) -> R<Vec<Parsed>> {
     let toks = lex(text)?;
     let mut p = P { text, toks, i: 0 };
     let mut out = Vec::new();
@@ -1194,9 +1412,43 @@ pub fn parse(text: &str) -> Result<Vec<Parsed>, CmdError> {
             return Err(p.unexpected());
         }
         out.push(Parsed { stmt, text: text[start..end].to_string(), pos: start });
-        if out.len() > 200 {
-            return Err(CmdError::new(start, 0, "too many statements (max 200)"));
+    }
+    Ok(out)
+}
+
+/// Parse a text into statements (syntax only — no show state needed).
+///
+/// `osc` / `midi` / `http` statements are hand-parsed (their words — `host:port`, `/addresses`, URLs — are not
+/// lexable); their spans are blanked out of a same-length copy of the text, so every other statement keeps its
+/// exact byte positions.
+pub fn parse(text: &str) -> Result<Vec<Parsed>, CmdError> {
+    if text.len() > 8192 {
+        return Err(CmdError::new(0, 0, "command line too long (max 8192 bytes)"));
+    }
+    let mut masked = text.as_bytes().to_vec();
+    let mut ext = Vec::new();
+    for (a, b) in spans(text) {
+        let seg = &text[a..b];
+        if let Some(head) = ext_head(seg) {
+            let mut p = parse_ext(seg, head).map_err(|mut e| {
+                if e.pos != usize::MAX {
+                    e.pos += a;
+                }
+                e
+            })?;
+            p.pos += a;
+            ext.push(p);
+            masked[a..b].fill(b' ');
         }
+    }
+    let masked = String::from_utf8(masked).unwrap_or_default();
+    let mut out = parse_std(&masked)?;
+    if !ext.is_empty() {
+        out.extend(ext);
+        out.sort_by_key(|p| p.pos);
+    }
+    if out.len() > 200 {
+        return Err(CmdError::new(out[200].pos, 0, "too many statements (max 200)"));
     }
     Ok(out)
 }
@@ -1216,6 +1468,8 @@ pub struct Ctx {
     pub programmer: Vec<u32>,
     pub scenes_active: Vec<u32>,
     pub blackout: bool,
+    /// Script ids, ascending.
+    pub scripts: Vec<u32>,
 }
 
 /// Interpreter session state (lives for one command-line text or one macro run).
@@ -1223,6 +1477,8 @@ pub struct Ctx {
 pub struct Session {
     pub selection: Vec<u32>,
     pub cuelist: Option<u32>,
+    /// External actions (`osc` / `midi` / `http`) resolved but not run yet; `run_cmdline` drains them.
+    pub ext: Vec<ScriptAction>,
 }
 
 #[derive(Debug, Clone)]
@@ -1564,6 +1820,40 @@ pub fn resolve(stmt: &Stmt, ctx: &Ctx, sess: &mut Session) -> R<Compiled> {
             };
             one(cmd, format!("timeline {id} {what}"))
         }
+        Stmt::Script { id, act } => {
+            let id = match id {
+                Some(i) => *i,
+                None => *ctx.scripts.first().ok_or_else(|| CmdError::stmt("there are no scripts"))?,
+            };
+            if !ctx.scripts.contains(&id) {
+                return Err(CmdError::stmt(format!("script {id} does not exist")));
+            }
+            let (cmd, what) = match act {
+                ScriptAct::Go => (Command::ScriptGo { id }, "go".to_string()),
+                ScriptAct::Back => (Command::ScriptBack { id }, "back".to_string()),
+                ScriptAct::Reset => (Command::ScriptReset { id }, "reset".to_string()),
+                ScriptAct::Follow(on) => (Command::ScriptFollow { id, on: *on }, format!("follow {}", if *on { "on" } else { "off" })),
+                ScriptAct::Goto { block, mark } => (
+                    Command::ScriptGoto { id, block: *block, mark: *mark },
+                    match mark {
+                        Some(m) => format!("goto block {block} mark {m}"),
+                        None => format!("goto block {block}"),
+                    },
+                ),
+                ScriptAct::Fire { block, mark } => (Command::ScriptFire { id, block: *block, mark: *mark }, format!("fire block {block} mark {mark}")),
+            };
+            one(cmd, format!("script {id} {what}"))
+        }
+        Stmt::Ext(a) => {
+            sess.ext.push(a.clone());
+            let summary = match a {
+                ScriptAction::Osc { host, port, address, .. } => format!("OSC {host}:{port} {address}"),
+                ScriptAction::Midi { kind, channel, number, value, .. } => format!("MIDI {kind:?} ch{channel} #{number} v{value}").to_lowercase(),
+                ScriptAction::Http { method, url, .. } => format!("HTTP {method} {url}"),
+                ScriptAction::Console { text } => text.clone(),
+            };
+            Ok(Compiled { cmds: vec![], summary })
+        }
         Stmt::Blackout(v) => {
             let on = v.unwrap_or(!ctx.blackout);
             one(Command::Blackout { on }, format!("blackout {}", if on { "on" } else { "off" }))
@@ -1602,6 +1892,9 @@ const FOLLOW: &[(&[&str], &[&str])] = &[
     (&["chase"], &["on", "off", "tap", "bpm", "next", "prev"]),
     (&["timeline", "tl"], &["run", "stop", "seek"]),
     (&["macro"], &["stop"]),
+    (&["script", "guion", "escaleta"], &["go", "back", "reset", "follow", "goto", "fire"]),
+    (&["midi"], &["note", "cc", "pc"]),
+    (&["http"], &["get", "post", "put", "patch", "delete"]),
     (&["blackout", "bo"], &["on", "off", "toggle"]),
     (&["blind"], &["on", "off"]),
     (&["colour", "color"], &["red", "green", "blue", "white", "yellow", "cyan", "magenta", "orange", "pink", "purple", "amber", "warm", "cool"]),
@@ -1613,7 +1906,7 @@ const FOLLOW: &[(&[&str], &[&str])] = &[
 const TOP_LEVEL: &[&str] = &[
     "fixture", "group", "all", "dimmer", "red", "green", "blue", "pan", "tilt", "at", "colour", "record", "update", "delete", "apply",
     "go", "back", "pause", "release", "goto", "cuelist", "scene", "chase", "macro", "timeline", "blackout", "gm", "clear", "park",
-    "unpark", "undo", "redo", "blind", "locate",
+    "unpark", "undo", "redo", "blind", "locate", "script", "osc", "midi", "http",
 ];
 
 /// Suggestions for the word being typed at the end of `prefix`.
@@ -1665,6 +1958,10 @@ pub fn help_json() -> serde_json::Value {
         ("chase", "chase N [on|off|tap|bpm V|next|prev]", "Chases", &["chase 1 on", "chase 2 bpm 128"]),
         ("macro", "macro N | macro stop [N]", "Macros", &["macro 3"]),
         ("timeline", "timeline N [run [from T]|stop|seek T]", "Timelines", &["timeline 1 run", "timeline 1 seek 30"]),
+        ("script", "script|guion [N] go|back|reset|follow [on|off]|goto <block> [mark]|fire <block> <mark>", "Running order (Guion): go fires the next cue mark, back re-arms the previous one, follow makes the reader track cues started anywhere", &["script 1 go", "guion 1 atras", "script 1 goto 12", "script follow on"]),
+        ("osc", "osc <host>:<port> </address> [args…]", "Send an OSC message to another app (QLab, Resolume…). Args are typed: 12 int, 0.5 float, true/false, else text; s:/i:/f: forces the type; use \"quotes\" for spaces", &["osc 192.168.1.20:53000 /cue/1/start", "osc 127.0.0.1:7000 /layer1/opacity 0.5"]),
+        ("midi", "midi note|cc|pc <channel 1-16> <number> [value] [port…]", "Send a MIDI message (no port = every enabled output). note default velocity 127; cc needs a value; pc ignores it", &["midi note 1 60 100", "midi cc 2 7 64", "midi pc 1 12"]),
+        ("http", "http get|post|put|patch|delete <url> [body…]", "HTTP request (VLC, OBS, webhooks); 5 s timeout, failures appear in the log", &["http get http://127.0.0.1:8080/requests/status.xml?command=pl_play", "http post http://host/hook {\"cue\":1}"]),
         ("system", "blackout [on|off|toggle] | gm V | clear | park U/C at V | unpark [U/C] | undo | redo | blind [on|off] | <sel> locate [on|off]", "Masters and utilities", &["gm 80", "blackout on", "park 1/5 at 100", "fixture 4 locate"]),
     ];
     let statements: Vec<Value> = STATEMENTS
@@ -1677,7 +1974,7 @@ pub fn help_json() -> serde_json::Value {
         ("half", KW_HALF), ("home", KW_HOME), ("colour", KW_COLOUR), ("record", KW_RECORD), ("update", KW_UPDATE),
         ("delete", KW_DELETE), ("apply", KW_APPLY), ("go", KW_GO), ("back", KW_BACK), ("pause", KW_PAUSE),
         ("release", KW_RELEASE), ("goto", KW_GOTO), ("cue", KW_CUE), ("cuelist", KW_CUELIST), ("scene", KW_SCENE),
-        ("chase", KW_CHASE), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
+        ("chase", KW_CHASE), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
         ("clear", KW_CLEAR), ("park", KW_PARK), ("unpark", KW_UNPARK), ("undo", KW_UNDO), ("redo", KW_REDO),
         ("blind", KW_BLIND), ("locate", KW_LOCATE),
     ];
@@ -1725,6 +2022,11 @@ impl Engine {
             programmer: self.programmer.keys().copied().collect(),
             scenes_active: self.show.scenes.iter().map(|s| s.id).filter(|id| self.scenes.is_active(*id)).collect(),
             blackout: self.blackout,
+            scripts: {
+                let mut v: Vec<u32> = self.show.scripts.iter().map(|x| x.id).collect();
+                v.sort_unstable();
+                v
+            },
         }
     }
 
@@ -1766,6 +2068,12 @@ impl Engine {
                     return Err(format!("{}: {msg}", p.text));
                 }
             }
+            for a in std::mem::take(&mut sess.ext) {
+                if let Err(msg) = self.script_action(&a) {
+                    self.auto.log.push(&p.text, false, msg.clone());
+                    return Err(format!("{}: {msg}", p.text));
+                }
+            }
             self.auto.log.push(&p.text, true, compiled.summary);
         }
         self.dirty = true;
@@ -1788,6 +2096,7 @@ mod tests {
             programmer: vec![1, 2],
             scenes_active: vec![5],
             blackout: false,
+            scripts: vec![1, 2],
         }
     }
 
@@ -2509,5 +2818,162 @@ mod tests {
         let t = e.now();
         e.update_playback(t + 0.3);
         assert_eq!(frame(&mut e)[0], 255, "programmer 100% must win over a releasing cuelist");
+    }
+
+    // ── script / osc / midi / http ──
+
+    fn ext_of(text: &str) -> ScriptAction {
+        match &parse(text).unwrap_or_else(|e| panic!("{}", e.render(text)))[0].stmt {
+            Stmt::Ext(a) => a.clone(),
+            o => panic!("expected Ext, got {o:?}"),
+        }
+    }
+
+    #[test]
+    fn script_verbs_and_aliases() {
+        let cmds = |t: &str| run(t).unwrap_or_else(|e| panic!("{e}"));
+        assert!(matches!(cmds("script 1 go")[0], Command::ScriptGo { id: 1 }));
+        assert!(matches!(cmds("guion 2 atras")[0], Command::ScriptBack { id: 2 }));
+        assert!(matches!(cmds("escaleta 1 ir")[0], Command::ScriptGo { id: 1 }));
+        assert!(matches!(cmds("script reset")[0], Command::ScriptReset { id: 1 }));
+        assert!(matches!(cmds("script 1 follow")[0], Command::ScriptFollow { id: 1, on: true }));
+        assert!(matches!(cmds("guion 1 sigue off")[0], Command::ScriptFollow { id: 1, on: false }));
+        assert!(matches!(cmds("script 1 goto 12")[0], Command::ScriptGoto { id: 1, block: 12, mark: None }));
+        assert!(matches!(cmds("script 1 saltar 12 3")[0], Command::ScriptGoto { id: 1, block: 12, mark: Some(3) }));
+        assert!(matches!(cmds("script 2 lanzar 4 1")[0], Command::ScriptFire { id: 2, block: 4, mark: 1 }));
+    }
+
+    #[test]
+    fn script_errors() {
+        assert!(err_of("script 9 go").contains("script 9 does not exist"));
+        assert!(err_of("script 1 volar").contains("expected go, back"));
+        assert!(err_of("script 1 follow maybe").contains("on or off"));
+    }
+
+    #[test]
+    fn osc_statement_is_parsed_with_typed_args() {
+        assert_eq!(
+            ext_of("osc 192.168.1.20:53000 /cue/1/start 12 0.5 \"hola mundo\" true"),
+            ScriptAction::Osc {
+                host: "192.168.1.20".into(),
+                port: 53000,
+                address: "/cue/1/start".into(),
+                args: vec!["12".into(), "0.5".into(), "hola mundo".into(), "true".into()],
+            }
+        );
+        assert!(err_of("osc 10.0.0.1 /x").contains("<host>:<port>"));
+        assert!(err_of("osc 10.0.0.1:99999 /x").contains("port"));
+        assert!(err_of("osc 10.0.0.1:9000 x").contains("must start with '/'"));
+        assert!(err_of("osc").contains("expected <host>:<port>"));
+    }
+
+    #[test]
+    fn midi_statement_variants() {
+        let m = |t: &str| match ext_of(t) {
+            ScriptAction::Midi { port, kind, channel, number, value } => (port, kind, channel, number, value),
+            o => panic!("{o:?}"),
+        };
+        assert_eq!(m("midi note 1 60 100"), (None, MidiKind::Note, 1, 60, 100));
+        assert_eq!(m("midi nota 2 61"), (None, MidiKind::Note, 2, 61, 127));
+        assert_eq!(m("midi cc 16 7 64 IAC Driver Bus 1"), (Some("IAC Driver Bus 1".into()), MidiKind::Cc, 16, 7, 64));
+        assert_eq!(m("midi pc 1 12"), (None, MidiKind::Program, 1, 12, 0));
+        assert_eq!(m("midi programa 3 5 \"Mi Puerto\""), (Some("Mi Puerto".into()), MidiKind::Program, 3, 5, 0));
+        assert!(err_of("midi note 17 60").contains("MIDI channel"));
+        assert!(err_of("midi cc 1 7").contains("controller value"));
+        assert!(err_of("midi note 1 128").contains("0-127"));
+        assert!(err_of("midi zap 1 1").contains("note, cc or pc"));
+    }
+
+    #[test]
+    fn http_statement_keeps_urls_with_hash_and_semicolon_free_bodies() {
+        assert_eq!(
+            ext_of("http get http://127.0.0.1:8080/status?x=1#frag"),
+            ScriptAction::Http { method: "GET".into(), url: "http://127.0.0.1:8080/status?x=1#frag".into(), body: String::new() }
+        );
+        assert_eq!(
+            ext_of("web enviar http://h/hook {\"cue\":1}"),
+            ScriptAction::Http { method: "POST".into(), url: "http://h/hook".into(), body: "{\"cue\":1}".into() }
+        );
+        assert!(err_of("http fetch http://h/").contains("get, post"));
+        assert!(err_of("http get ftp://h/").contains("http:// or https://"));
+        assert!(err_of("http get").contains("expected a url"));
+    }
+
+    #[test]
+    fn ext_statements_mix_with_the_rest_and_report_columns() {
+        let p = parse("go; osc 127.0.0.1:9000 /a 1 ; midi note 1 60\nblackout on # tail; ignored").unwrap();
+        assert_eq!(p.len(), 4);
+        assert!(matches!(p[1].stmt, Stmt::Ext(ScriptAction::Osc { .. })));
+        assert_eq!(p[1].text, "osc 127.0.0.1:9000 /a 1");
+        assert!(matches!(p[3].stmt, Stmt::Blackout(Some(true))));
+        // quoted text may contain separators
+        assert_eq!(ext_of("osc 127.0.0.1:9000 /t \"a;b\""), ScriptAction::Osc { host: "127.0.0.1".into(), port: 9000, address: "/t".into(), args: vec!["a;b".into()] });
+        let e = parse("go; midi note 99 1").unwrap_err();
+        assert!(e.render("go; midi note 99 1").contains("col 15"), "{}", e.render("go; midi note 99 1"));
+    }
+
+    #[test]
+    fn engine_runs_script_and_external_verbs() {
+        let mut e = engine();
+        let sock = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        sock.set_read_timeout(Some(std::time::Duration::from_secs(2))).unwrap();
+        let port = sock.local_addr().unwrap().port();
+        e.handle(Command::ScriptSave {
+            script: Script {
+                id: 0,
+                name: "Obra".into(),
+                pdf: None,
+                blocks: vec![ScriptBlock {
+                    id: 1,
+                    kind: ScriptKind::Speech,
+                    speaker: "ANA".into(),
+                    text: "Hola".into(),
+                    page: 0,
+                    marks: vec![CueMark {
+                        id: 1,
+                        label: "Luz".into(),
+                        kind: MarkKind::Light,
+                        at_word: 0,
+                        actions: vec![ScriptAction::Console { text: "blackout on".into() }],
+                        link: None,
+                        standby_blocks: 0,
+                        note: String::new(),
+                    }],
+                }],
+            },
+        })
+        .unwrap();
+        e.handle(Command::CommandLine { text: "script 1 go".into() }).unwrap();
+        assert!(e.blackout, "the mark's console action ran");
+        let rt = e.scripts_rt();
+        assert_eq!(rt[0].mark, Some(1));
+        e.handle(Command::CommandLine { text: format!("osc 127.0.0.1:{port} /lumos/hi 7 \"a b\"") }).unwrap();
+        let mut buf = [0u8; 512];
+        let n = sock.recv(&mut buf).unwrap();
+        let (_, pkt) = rosc::decoder::decode_udp(&buf[..n]).unwrap();
+        match pkt {
+            rosc::OscPacket::Message(m) => {
+                assert_eq!(m.addr, "/lumos/hi");
+                assert_eq!(m.args, vec![rosc::OscType::Int(7), rosc::OscType::String("a b".into())]);
+            }
+            o => panic!("{o:?}"),
+        }
+        // a failing external statement stops the line and is logged
+        let r = e.handle(Command::CommandLine { text: "http get http://127.0.0.1:1/; blackout off".into() });
+        assert!(r.is_err() || e.blackout, "http needs a runtime: {r:?}");
+        e.handle(Command::CommandLine { text: "midi note 1 60 100".into() }).unwrap();
+        assert!(e.auto.log.0.iter().any(|l| l.text.starts_with("midi note") && l.ok));
+    }
+
+    #[test]
+    fn help_and_completion_cover_script_verbs() {
+        let h = help_json();
+        for n in ["script", "osc", "midi", "http"] {
+            assert!(h["statements"].as_array().unwrap().iter().any(|s| s["name"] == n), "{n}");
+        }
+        assert!(h["keywords"]["script"].as_array().unwrap().iter().any(|x| x == "guion"));
+        assert!(complete("gu").is_empty() || !complete("sc").is_empty());
+        assert!(complete("script ").contains(&"follow".to_string()));
+        assert!(complete("midi ").contains(&"note".to_string()));
     }
 }
