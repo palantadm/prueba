@@ -269,3 +269,5 @@ body.blind main { outline: 3px solid var(--amber); outline-offset: -3px; }
 
 /* Monitor keeps its own status strip */
 .statusbar { display: flex; align-items: center; gap: var(--s-3); height: 44px; padding: 0 var(--s-4); background: var(--ink-1); border-top: 1px solid var(--line); font-size: var(--fs-xs); color: var(--dim); overflow: hidden; }
+
+@media (max-width: 1560px) { .topbar .hide-mid, .hide-lg { display: none !important; } }

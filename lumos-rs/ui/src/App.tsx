@@ -168,7 +168,7 @@ function UBars() {
   }, []);
   void dmxVersion.value;
   return (
-    <span class="ubars hide-mid" aria-hidden="true">
+    <span class="ubars hide-lg" aria-hidden="true">
       {bars.map((b) => (
         <span class="ubar" key={b.u} title={t("Universe {u}: peak {max}", { u: b.u, max: b.max })}>
           <span class="mono">U{b.u}</span><span class="bar"><i style={{ width: `${(b.max / 255) * 100}%` }} /></span>
