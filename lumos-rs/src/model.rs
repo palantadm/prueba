@@ -1048,6 +1048,9 @@ pub struct ScriptImport {
     pub blocks: Vec<ScriptBlock>,
     pub pages: u32,
     pub warnings: Vec<String>,
+    /// `/media/<file>.pdf` — the uploaded original, to store in `Script.pdf` when the draft is saved.
+    #[serde(default)]
+    pub pdf: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]

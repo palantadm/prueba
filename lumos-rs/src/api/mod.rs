@@ -1,6 +1,7 @@
 //! HTTP + WebSocket front-end for the engine.
 
 mod data;
+mod script;
 
 use crate::engine::{EngineIn, Handle, Out};
 use crate::model::*;
@@ -34,6 +35,7 @@ pub fn router(h: Handle) -> Router {
         .route("/api/cmdline/complete", get(cmdline_complete))
         .route("/api/library/import", post(library_import).layer(DefaultBodyLimit::max(256 * 1024 * 1024)))
         .merge(data::routes())
+        .merge(script::routes())
         .nest_service("/media", ServeDir::new(media))
         .nest_service("/library", ServeDir::new(library))
         .fallback(static_handler)

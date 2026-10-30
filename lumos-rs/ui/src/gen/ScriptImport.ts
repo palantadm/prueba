@@ -4,4 +4,8 @@ import type { ScriptBlock } from "./ScriptBlock";
 /**
  * Result of `POST /api/script/import` (multipart: .pdf .txt .md .fountain .docx? text) — a draft, not saved.
  */
-export type ScriptImport = { name: string, blocks: Array<ScriptBlock>, pages: number, warnings: Array<string>, };
+export type ScriptImport = { name: string, blocks: Array<ScriptBlock>, pages: number, warnings: Array<string>, 
+/**
+ * `/media/<file>.pdf` — the uploaded original, to store in `Script.pdf` when the draft is saved.
+ */
+pdf: string | null, };

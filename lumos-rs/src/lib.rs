@@ -15,6 +15,7 @@ pub mod pdf;
 pub mod persist;
 pub mod qxf;
 pub mod reports;
+pub mod script_import;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;
