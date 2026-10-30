@@ -1,68 +1,46 @@
-# Lumos design system
+# Lumos design system (touch redesign)
 
-Dark, dense, console-style UI. Built for low-light rooms, mouse **and** touch (tablets on the LAN).
-Source of truth: `ui/src/styles/tokens.css` (variables) and `ui/src/styles/base.css` (primitive classes).
-Components live in `ui/src/ui/` and are exported from `ui/src/ui/index.ts`.
+Dark console UI built for touch. Reference boards: the Lumos design canvas (Live, Cues, Console, Stage, Settings, System).
+Source of truth in code: `ui/src/styles/tokens.css` (variables) and `ui/src/styles/base.css` (primitives).
 
 ## Principles
-1. **Tokens, never raw values.** Colours, spacing, radii and type come from CSS variables.
-2. **Colour carries meaning.** Amber = live/programmer/warning, cyan = selection/focus, green = go/ok, red = stop/error.
-   Attribute families have fixed hues (`--attr-intensity|position|color|beam|control|effect`) used everywhere an attribute appears.
-3. **Touch-first sizing.** Primary controls are ≥ 40 px (`.btn.tall`, `--touch`); dense table controls may be 32 px.
-4. **State is visible.** Every editor shows saved/unsaved; every output shows live status; nothing fails silently (toasts).
-5. **Keyboard reachable.** All controls are real `button/input/select`; focus ring is `--accent`.
+1. **One colour, one meaning.** Amber = what you touched (programmer, primary action). Cyan = selection/focus. Green = GO/running/OK. Red = blackout/delete/error. Violet = chases/effects. Orange = beam/warning. Pink = colour. Lime = control.
+2. **Touch first.** Minimum interactive size 48 px (`--touch`); primary controls 56–68 px (`--touch-lg`, `--touch-xl`). Never 44 px or less except inside a 48 px hit area. No hover-only information. Drag controls have a ± alternative.
+3. **Numbers are monospace** (`.mono` / `.num`, JetBrains Mono, tabular figures). Everything else is Inter. Fonts ship with the app (`@fontsource`), no network.
+4. **Always reachable.** GO/BLACKOUT/Master live in the bottom dock on every screen, at thumb height.
 
-## Tokens
+## Tokens (`tokens.css`)
 | Group | Variables |
 |---|---|
-| Surface | `--bg-0` app · `--bg-1` panel · `--bg-2` raised/header · `--bg-3` input · `--bg-4` hover · `--line`, `--line-strong` |
-| Text | `--text`, `--text-dim`, `--text-faint`, `--text-on-accent` |
-| State | `--accent`(+`-dim`) · `--live`(+`-dim`) · `--go`(+`-dim`) · `--stop`(+`-dim`) · `--info` |
-| Attributes | `--attr-intensity` `--attr-position` `--attr-color` `--attr-beam` `--attr-control` `--attr-effect` |
-| Space | `--s-1…--s-6` = 4, 8, 12, 16, 24, 32 px |
-| Shape | `--r-sm 4` `--r-md 6` `--r-lg 10`, `--touch 40px` |
-| Type | `--font-ui`, `--font-mono` (numbers, addresses, timecode); `--fs-xs 11 … --fs-xl 20` |
-| Motion | `--dur 120ms`, `--ease` |
+| Surfaces | `--ink-0` #0a0c10 app · `--ink-1` #10131a panels/bars · `--ink-2` #171b24 tiles/cards · `--ink-3` #1f2430 controls · `--ink-4` #2a3140 active · `--line`, `--line-strong` |
+| Text | `--text` #e8ebf2 · `--dim` #a3abbc · `--mute` #8791a5 · `--on-accent`, `--on-amber`, `--on-green` |
+| Meaning | `--amber` `--cyan` `--green` `--red` `--violet` `--orange` `--pink` `--lime` `--blue` |
+| Tints | `--cyan-fill` `--amber-fill` `--green-fill` `--green-fill-2` `--red-fill` `--red-line` `--violet-fill` |
+| Shape | `--r-sm` 10 · `--r-md` 12 · `--r-lg` 14 · `--r-xl` 18 · `--r-pill` |
+| Size | `--touch` 48 · `--touch-lg` 56 · `--touch-xl` 68 · `--dock-h` 92 · `--topbar-h` 64 |
+| Type | `--font-ui` Inter · `--font-mono` JetBrains Mono · `--fs-xs` 12 … `--fs-2xl` 28 |
+| Spacing | `--s-1`…`--s-6` (4 px base) |
 
-## Primitive classes (base.css)
-`.row/.col/.grow/.sp/.wrap/.scroll` layout · `.panel/.panel-head/.panel-body` · `.btn` (+`primary go danger ghost on sel`, sizes `sm`, `tall`, `lg`, `icon`)
-· `.input` (+`.num`, `.mono`) · `.field` · `.check` · `table.tbl` · `.chip` (+`ok warn err`) · `.dot` · `.tabs/.tab` · `.seg` · `.kbd` · `.vrow` (virtual row) · `.menu` · `.statusbar`.
+Legacy names (`--bg-0…4`, `--text-dim`, `--accent`, `--live`, `--go`, `--stop`, …) remain as aliases so unconverted workspaces keep working. **Use the new names in new code.**
 
-## Components (`src/ui`)
-| Component | Props | Notes / a11y |
-|---|---|---|
-| `Modal` | `title onClose footer? width?` | `role=dialog aria-modal`, Esc and backdrop close. |
-| `Toasts` + `toast()` (store) | — | `aria-live=polite`; kinds info/ok/err. |
-| `DialogHost`, `confirmDialog(title,msg,{danger,ok})`, `promptDialog(title,label,value)` | promise-based | Render `<DialogHost/>` once (App). |
-| `Field` | `label hint? for?` | Label bound by `for`; hint in faint text. |
-| `TextField` | `value onChange label? mono? placeholder? onCommit? invalid?` | `class="bare"` drops the label wrapper (table cells). `onCommit` fires on blur/Enter. |
-| `NumberField` | `value onChange min max step float? label?` | Free typing, clamped on commit; ↑/↓ bump. |
-| `Select<T>` | `value options[{value,label,disabled}] onChange label?` | Native `<select>` (best on touch). Numeric values stay numbers. |
-| `Toggle` | `checked onChange label?` | Native checkbox. |
-| `Segmented<T>` | `value options onChange label?` | `role=radiogroup`; 2–4 mutually exclusive choices. |
-| `Tabs<T>` | `value options[{value,label,badge?}] onChange` | `role=tablist`. |
-| `VirtualList<T>` | `items rowHeight render class?` | Fixed row height windowing; used for 256-universe and large fixture lists. |
-| `EmptyState` | `title hint? icon? children` | Always offer the primary action as a child. |
-| `PageHead` | `title sub? children` | Title + actions bar of every page. |
-| `StatusDot` | `state: ok|err|warn|off title?` | Has `role=img` + label — never colour only. |
-| `Kbd` | children | Shortcut hints. |
+## Components (`base.css`)
+- **Buttons** `.btn` (48 px) · sizes `.sm` (44) `.lg` (56) `.xl` (68) `.icon` · variants `.primary` (amber) `.cyan` `.go` `.danger` `.ghost` `.on` (amber tint) `.sel` (cyan tint).
+- **Inputs** `.input` (48 px; `.num` for numbers), `select.input`, `textarea.input`, `.field` + `label`, `.check` (24 px box), `.switch` (+ `.switch-row`), `.stepper` (− value +), `.readout`.
+- **Segmented / tabs** `.seg` + `.seg-btn.active`, `.tabs` + `.tab.active` — pill group, cyan active.
+- **Tile** `.tile` (+ `.sel`, `.held`, `.off`; children `.tile-id`, `.tile-name`, `.tile-bar > i`) in a `.tile-grid`. Used for fixtures, palettes, scenes, macros.
+- **Faders** `.fader-h` / `.fader-v` with `.fill` and `.cap` (set `%` inline). Handles ≥ 18 px wide, track ≥ 52 px.
+- **Panels** `.panel`, `.panel-head` (44 px label strip), `.panel-body`; `.page` / `.page-head` / `.page-body`; `.side` + `.side-item` (264 px rail).
+- **Tables** `.tbl` rows ≥ 52 px; selected row `.sel` (cyan tint + bar).
+- **Feedback** `.chip` (`.ok` `.err` `.warn`), `.dot`, `.banner`, `.toast`, `.modal`, `.menu`.
+- **Shell** `.topbar` (64 px), `.dock` (92 px) with `.dock-btn` (78×68, `.active` = amber tint), `.dock-master` (grand master), `.btn-blackout` (176×68; `.active` blinks red), `.status-chip`.
 
-States: default · hover (`--bg-4`) · active (1 px press) · disabled (40 % opacity, no pointer) · focus-visible (2 px accent ring) · selected (`sel`, accent-dim) · error (red border / `.chip.err`).
+## Touch rules
+- `touch-action: manipulation` on all interactive elements; tap highlight disabled; `@media (pointer: coarse)` raises sliders and rows further.
+- Target spacing ≥ 8 px. Use `Pointer Events` (`setPointerCapture`) for drag controls so mouse, pen and touch behave the same.
+- Keyboard: every workspace keeps its number shortcut; sliders also respond to arrow keys.
 
-## Patterns
-* **Settings page** = `PageHead` (title + `SaveBar`) + body of `.panel`s. `useSettingsDraft()` gives `draft/patch/dirty/save/revert`; Save is disabled when clean.
-* **Master/detail dialogs** edit a clone and send one command on Save.
-* **Bulk operations** (assign outputs to universes 1–16, copy outputs) are explicit dialogs with a preview of first/last result.
-* **Tables with many rows** use `VirtualList` + `.vrow`; selection with click, Ctrl/⌘ toggle, Shift range.
-
-## Do / Don't
-| Do | Don't |
-|---|---|
-| Use `var(--accent)` etc. | Hard-code hex values |
-| Show live status next to every output/input | Hide connection errors in the console |
-| Confirm destructive actions with `confirmDialog({danger:true})` | Delete on a single click |
-| Use `.mono` for addresses, values, timecode | Mix proportional digits in tables |
-| Keep primary actions ≥ 40 px | Make touch targets < 32 px |
-
-## Keyboard
-`1…7` workspaces · `Ctrl/⌘+B` blackout · `Ctrl/⌘+S` save show · `?` help · `Esc` close dialog.
+## Migrating a workspace
+1. Replace raw colours/sizes by tokens; use `.tile`, `.seg`, `.stepper`, `.switch`, `.fader-*` instead of ad-hoc controls.
+2. Check every control ≥ 48 px (primary 56+) and that nothing depends on hover.
+3. Numbers → `.mono`; labels → uppercase `.label`; keep all strings in `t()`.
+4. Workspaces fill `main` (`height: 100%`, `min-height: 0`); the dock and command bar are provided by the shell.
