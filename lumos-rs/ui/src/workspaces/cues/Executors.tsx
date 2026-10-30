@@ -30,16 +30,13 @@ export function Executors() {
   const [assign, setAssign] = useState<{ slot: number; exec?: Executor } | null>(null);
   const running = new Set(rt.value?.effects_running ?? []);
   return (
-    <div class="panel lv-execs">
-      <div class="row" style={{ marginBottom: 6 }}>
-        <span class="label">{t("Executors")}</span>
-        <div class="tabs" role="tablist" aria-label={t("Executor page")}>
-          {Array.from({ length: maxPage + 1 }, (_, i) => (
-            <button key={i} role="tab" aria-selected={i === page} class={`tab ${i === page ? "active" : ""}`} onClick={() => setPage(i)}>{t("Page {n}", { n: i + 1 })}</button>
-          ))}
-        </div>
+    <div class="panel cu-execs">
+      <div class="cu-pager" role="group" aria-label={t("Executor page")}>
+        <button class="btn icon" aria-label={t("Executor page")} disabled={page >= maxPage} onClick={() => setPage(Math.min(maxPage, page + 1))}>▲</button>
+        <span class="readout" aria-live="polite" title={t("Page {n}", { n: page + 1 })}>{page + 1}</span>
+        <button class="btn icon" aria-label={t("Executor page")} disabled={page <= 0} onClick={() => setPage(Math.max(0, page - 1))}>▼</button>
       </div>
-      <div class="lv-exrow">
+      <div class="cu-exrow">
         {Array.from({ length: SLOTS }, (_, slot) => {
           const e = execs.find((x) => x.page === page && x.slot === slot);
           const r = e ? rt.value?.executors.find((x) => x.id === e.id) : undefined;
@@ -97,7 +94,7 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
     </>}>
       <div class="row wrap" role="tablist" aria-label={t("Executor type")}>
         {(["cuelist", "x_fade", "group", "effect", "scene", "chase", "speed", "master"] as const).map((k) => (
-          <button key={k} role="tab" class={`btn ${type === k ? "sel" : ""}`} style={{ minHeight: 44 }} onClick={() => setType(k)}>{t(TYPE_LABEL[k])}</button>
+          <button key={k} role="tab" aria-selected={type === k} class={`btn ${type === k ? "sel" : ""}`} onClick={() => setType(k)}>{t(TYPE_LABEL[k])}</button>
         ))}
       </div>
       {(type === "cuelist" || type === "x_fade") && <div class="field"><label>{t("Cuelist")}</label>{sel(cuelist, setCuelist, s.cuelists)}</div>}

@@ -13,19 +13,19 @@ const COLORS = ["#3cc4e8", "#35c46a", "#f5a524", "#e5484d", "#e266b8", "#b38cff"
 function MacroButton({ m, running, onEdit }: { m: Macro; running: boolean; onEdit: () => void }) {
   const lp = useLongPress(onEdit);
   return (
-    <div class={`au-macro ${running ? "run" : ""}`} style={{ "--mc": m.color || "var(--accent)" } as any}>
+    <div class={`cu-macro ${running ? "run" : ""}`} style={{ "--mc": m.color || "var(--cyan)" } as any}>
       <i class="bar" aria-hidden="true" />
-      <button class="au-main" {...lp} aria-pressed={running}
+      <button class="main" {...lp} aria-pressed={running}
         aria-label={running ? t("Stop macro {name}", { name: m.name }) : t("Run macro {name}", { name: m.name })}
         onClick={() => {
           if (lp.wasLong()) return;
           if (running) send({ type: "macro_stop", id: m.id });
           else send({ type: "macro_run", id: m.id });
         }}>
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+        <span class="nm">{m.name}</span>
         <small>#{m.id} · {tp(m.steps.length, "{n} step", "{n} steps")}</small>
       </button>
-      <button class="au-edit" onClick={onEdit} aria-label={t("Edit macro {name}", { name: m.name })} title={t("Edit")}>⋮</button>
+      <button class="edit" onClick={onEdit} aria-label={t("Edit macro {name}", { name: m.name })} title={t("Edit")}>⋮</button>
     </div>
   );
 }
@@ -36,14 +36,14 @@ export function Macros() {
   const [edit, setEdit] = useState<Macro | null>(null);
   const create = () => setEdit({ id: Math.max(0, ...macros.map((m) => m.id)) + 1, name: t("Macro {n}", { n: macros.length + 1 }), steps: [{ text: "", wait: 0 }], color: COLORS[macros.length % COLORS.length] });
   return (
-    <div class="panel au-macros">
-      <div class="panel-head">
-        <span>{t("Macros")}</span><span class="sp" />
+    <div class="cu-macros">
+      <div class="cu-sec">
+        <span class="label">{t("Macros")}</span><span class="sp" />
         {running.size > 0 && <button class="btn sm danger" onClick={() => send({ type: "macro_stop", id: null })}>{t("Stop all")}</button>}
-        <button class="btn sm primary" onClick={create} aria-label={t("New macro")}>{t("+ New")}</button>
+        <button class="btn sm" onClick={create} aria-label={t("New macro")}>{t("+ New")}</button>
       </div>
-      {macros.length === 0 && <div class="dim" style={{ padding: 12 }}>{t("No macros yet. A macro is a sequence of command-line statements with optional waits.")}</div>}
-      <div class="au-mgrid">
+      {macros.length === 0 && <div class="dim cu-hint">{t("No macros yet. A macro is a sequence of command-line statements with optional waits.")}</div>}
+      <div class="cu-mgrid">
         {macros.map((m) => <MacroButton key={m.id} m={m} running={running.has(m.id)} onEdit={() => setEdit(structuredClone(m))} />)}
       </div>
       {edit && <MacroEditor initial={edit} isNew={!macros.some((m) => m.id === edit.id)} onClose={() => setEdit(null)} />}

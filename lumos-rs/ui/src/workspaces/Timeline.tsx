@@ -45,7 +45,7 @@ export function Timeline() {
           {list.map((x) => {
             const r = rt.value?.timelines.find((y) => y.id === x.id);
             return (
-              <div key={x.id} role="option" aria-selected={x.id === cur?.id} class={`lv-cl ${x.id === cur?.id ? "sel" : ""}`} style={{ minHeight: 48 }} onClick={() => select(x.id)}>
+              <div key={x.id} role="option" aria-selected={x.id === cur?.id} class={`lv-cl ${x.id === cur?.id ? "sel" : ""}`} style={{ minHeight: 56 }} onClick={() => select(x.id)}>
                 <span class={`dot ${r?.running ? "ok" : ""}`} />
                 <span class="grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.name}</span>
                 <span class="faint mono">#{x.id} · {x.events.length}</span>

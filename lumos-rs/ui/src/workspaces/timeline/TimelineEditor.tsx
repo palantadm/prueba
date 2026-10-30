@@ -10,8 +10,8 @@ import { tErr } from "../../i18n/errors";
 import { t } from "../../i18n";
 import { uploadAudio, usePeaks } from "./audio";
 
-const RULER_H = 44;
-const LANE_H = 50;
+const RULER_H = 48;
+const LANE_H = 58;
 const WAVE_H = 64;
 type Snap = "tenth" | "frame" | "off";
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
