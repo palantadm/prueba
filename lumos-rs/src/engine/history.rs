@@ -89,6 +89,8 @@ pub fn history_key(cmd: &Command) -> Option<(String, bool)> {
         MacroRemove { .. } => ("macro_remove", 0, false),
         TimelineSave { timeline } => ("timeline_save", timeline.id as u64, true),
         TimelineRemove { .. } => ("timeline_remove", 0, false),
+        ScriptSave { script } => ("script_save", script.id as u64, true),
+        ScriptRemove { .. } => ("script_remove", 0, false),
         _ => return None,
     };
     Some((format!("{name}:{id}"), coalesce))

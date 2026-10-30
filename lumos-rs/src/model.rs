@@ -970,7 +970,7 @@ pub enum MarkKind {
 }
 
 /// Something a cue mark does when it fires. Executed by the engine (works with the UI closed).
-#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
 #[ts(export)]
 pub enum ScriptAction {
