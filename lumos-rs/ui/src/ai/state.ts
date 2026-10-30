@@ -7,7 +7,16 @@ import { tErr } from "../i18n/errors";
 import { winId } from "../lib/windows";
 import type { AiConfigIn, AiConfigOut, AiEvent, AiMode, AiModelInfo, AiProviderOut, AiRisk, AiToolState, ServerMsg } from "../types";
 
-export const SESSION = `ai-${winId ?? "main"}`;
+// One server-side conversation per window *and tab*: the id lives in sessionStorage next to the persisted transcript,
+// so a reload resumes the same conversation and a second tab never shares (or fights over) it.
+const tabId = (() => {
+  try {
+    let v = sessionStorage.getItem("ai.tab");
+    if (!v) { v = Math.random().toString(36).slice(2, 8); sessionStorage.setItem("ai.tab", v); }
+    return v;
+  } catch { return Math.random().toString(36).slice(2, 8); }
+})();
+export const SESSION = `ai-${winId ?? "main"}-${tabId}`;
 
 // ── server config ───────────────────────────────────────
 export const aiConfig = signal<AiConfigOut | null>(null);
@@ -99,6 +108,13 @@ effect(() => {
 
 const push = (i: Item) => { items.value = [...items.value, i]; };
 const patch = (pred: (i: Item) => boolean, fn: (i: Item) => Item) => { items.value = items.value.map((i) => (pred(i) ? fn(i) : i)); };
+// Some providers reuse call ids across turns ("call_0"), so cards are matched only within the current turn.
+const turnStart = () => { const a = items.value; for (let i = a.length - 1; i >= 0; i--) if (a[i].k === "user") return i; return -1; };
+const inTurn = (kind: Item["k"], call: string) => { const a = items.value; const s = turnStart(); return a.some((i, n) => n > s && i.k === kind && (i as { call?: string }).call === call); };
+const patchCall = (kind: Item["k"], call: string, fn: (i: Item) => Item) => {
+  const s = turnStart();
+  items.value = items.value.map((i, n) => (n > s && i.k === kind && (i as { call?: string }).call === call ? fn(i) : i));
+};
 const lastAi = () => { const a = items.value; const l = a[a.length - 1]; return l && l.k === "ai" ? l : undefined; };
 const closeStream = () => { flush(); const l = lastAi(); if (l?.streaming) patch((i) => i.id === l.id, (i) => ({ ...(i as Item & { k: "ai" }), streaming: false })); };
 
@@ -141,11 +157,11 @@ export function handleAiEvent(ev: AiEvent) {
       break;
     case "tool": {
       closeStream();
-      const has = items.value.some((i) => i.k === "tool" && i.call === ev.call);
-      if (has) patch((i) => i.k === "tool" && i.call === ev.call, (i) => ({ ...(i as Item & { k: "tool" }), summary: ev.summary || (i as Item & { k: "tool" }).summary, risk: ev.risk, state: ev.state, result: ev.result }));
+      const has = inTurn("tool", ev.call);
+      if (has) patchCall("tool", ev.call, (i) => ({ ...(i as Item & { k: "tool" }), summary: ev.summary || (i as Item & { k: "tool" }).summary, risk: ev.risk, state: ev.state, result: ev.result }));
       else push({ k: "tool", id: next(), call: ev.call, name: ev.name, summary: ev.summary, risk: ev.risk, state: ev.state, result: ev.result });
       // the confirmation, if any, is settled: the tool card now carries the outcome
-      items.value = items.value.filter((i) => !(i.k === "confirm" && i.call === ev.call));
+      { const st = turnStart(); items.value = items.value.filter((i, n) => !(n > st && i.k === "confirm" && i.call === ev.call)); }
       break;
     }
     case "confirm": {
@@ -231,12 +247,12 @@ export function aiCancel() {
 
 export function aiConfirm(call: string, approve: boolean, allTurn = false) {
   if (allTurn) autoApproveTurn = true;
-  patch((i) => i.k === "confirm" && i.call === call, (i) => ({ ...(i as Item & { k: "confirm" }), resolved: approve ? "yes" : "no" }));
+  patchCall("confirm", call, (i) => ({ ...(i as Item & { k: "confirm" }), resolved: approve ? "yes" : "no" }));
   void send({ type: "ai_confirm", session: SESSION, call, approve }, { quiet: true }).catch((e) => toast(tErr((e as Error).message), "err"));
 }
 
 export function aiAnswer(call: string, answer: string) {
-  patch((i) => i.k === "ask" && i.call === call, (i) => ({ ...(i as Item & { k: "ask" }), answered: answer }));
+  patchCall("ask", call, (i) => ({ ...(i as Item & { k: "ask" }), answered: answer }));
   void send({ type: "ai_answer", session: SESSION, call, answer }, { quiet: true }).catch((e) => toast(tErr((e as Error).message), "err"));
 }
 

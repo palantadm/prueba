@@ -435,8 +435,8 @@ function PanelInner() {
       <Transcript />
 
       <footer class="ai-foot">
-        {n > 0 && !busy.value && (
-          <button class="btn tall ai-undo" onClick={() => void aiUndo()}>↶ {t("Undo the AI's changes ({n})", { n })}</button>
+        {n > 0 && (
+          <button class="btn tall ai-undo" disabled={busy.value} onClick={() => void aiUndo()}>↶ {t("Undo the AI's changes ({n})", { n })}</button>
         )}
         <Composer />
         <div class="ai-meter faint">
