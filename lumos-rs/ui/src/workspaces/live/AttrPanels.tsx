@@ -216,10 +216,10 @@ function ColorCard({ fxs, attrs, held, onRelease }: { fxs: Fixture[]; attrs: str
       <div class="lv-colorlayout">
         {hasRgb && (
           <div class="lv-wheelcol">
-            <ColorWheel rgb={rgb} held={r.held || g.held || b.held} onChange={apply} onEnd={(c) => pushColor(rbHex(c))} size={292} />
+            <ColorWheel rgb={rgb} held={r.held || g.held || b.held} onChange={apply} onEnd={(c) => pushColor(rbHex(c))} size={248} />
             <div class="row" style={{ width: "100%" }}>
-              <button class="btn lg grow" onClick={() => { apply(WARM); pushColor(rgbToHex(...WARM)); }}>{t("Warm white")} <span class="mono dim">3200K</span></button>
-              <button class="btn lg grow" onClick={() => { apply(COOL); pushColor(rgbToHex(...COOL)); }}>{t("Cool white")} <span class="mono dim">5600K</span></button>
+              <button class="btn lg grow lv-kbtn" onClick={() => { apply(WARM); pushColor(rgbToHex(...WARM)); }}>{t("Warm white")} <span class="mono dim">3200K</span></button>
+              <button class="btn lg grow lv-kbtn" onClick={() => { apply(COOL); pushColor(rgbToHex(...COOL)); }}>{t("Cool white")} <span class="mono dim">5600K</span></button>
             </div>
             <div class="row" style={{ width: "100%" }}>
               <span class="lv-sw lv-sw-big" style={{ background: hex }} />
