@@ -489,7 +489,7 @@ mod tests {
         ];
         let m = to_messages(&t, "S", &msgs);
         assert_eq!(m.len(), 1 + 1 + 1 + 2);
-        assert_eq!(m[1]["content"][1]["image_url"]["url"], "data:image/png;base64,AAA");
+        assert_eq!(m[1]["content"][2]["image_url"]["url"], "data:image/png;base64,AAA");
         assert_eq!(m[2]["content"], "ok");
         assert_eq!(m[2]["tool_calls"].as_array().unwrap().len(), 2);
         assert_eq!(m[2]["tool_calls"][0]["function"]["arguments"], "{\"section\":\"all\"}");

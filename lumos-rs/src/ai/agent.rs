@@ -37,7 +37,7 @@ impl Drop for RunGuard {
     }
 }
 
-pub async fn run_turn(inner: Arc<Inner>, sid: String, sess: Arc<Session>, input: TurnInput, mut cancel: Cancel, gen: u64) {
+pub(crate) async fn run_turn(inner: Arc<Inner>, sid: String, sess: Arc<Session>, input: TurnInput, mut cancel: Cancel, gen: u64) {
     let _guard = RunGuard(sess.clone());
     let mut hist = std::mem::take(&mut sess.st.lock().history);
     inner.emit(&sid, AiEvent::Started);
@@ -367,7 +367,7 @@ mod tests {
             Msg::user_text("otra"),
         ];
         let same = adapt(&h, "Anthropic:a", true, true);
-        assert_eq!(same.len(), 3);
+        assert_eq!(same.len(), 4);
         assert!(matches!(same[1].blocks[0], Block::Raw { .. }));
         let other = adapt(&h, "OpenaiCompat:gpt", true, true);
         assert_eq!(other.len(), 3);

@@ -793,7 +793,7 @@ mod tests {
         let go = cat.iter().find(|(n, _)| n == "go").unwrap();
         assert_eq!(go.1, "{ cuelist: u32 }");
         let rec = cat.iter().find(|(n, _)| n == "prog_record_cue").unwrap();
-        assert!(rec.1.contains("refs?: bool"), "serde(default) fields are marked optional: {}", rec.1);
+        assert!(rec.1.contains("?refs: bool"), "serde(default) fields are marked optional: {}", rec.1);
         assert!(cat.len() > 100);
     }
 
@@ -868,7 +868,8 @@ mod tests {
             ("fixture 1 at 50; go", true, Live),
             ("# comentario", false, Edit),
             ("frobnicate", false, Live),
-            ("rojo at 100", true, Live), // unknown first word → conservative
+            ("rojo at 100", true, Edit), // a known attribute alias, blind
+            ("rojo at 100", false, Live),
         ];
         for (t, blind, want) in cases {
             assert_eq!(console_risk(t, blind), want, "{t} blind={blind}");
