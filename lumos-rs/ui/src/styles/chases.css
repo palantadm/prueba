@@ -60,3 +60,7 @@
 
 /* pools column is tight on tablets: chases + speed masters need the same room as scenes */
 .lv-col.pools > .lv-scroll.ch-scroll { max-height: min(62vh, 640px); }
+
+/* touch: dialog chrome (close ✕, footer buttons) ≥ 44 px in the dialogs of this feature */
+.modal:has(.ch-seg, .fx-modes, .ch-pick, .ch-master-edit) .modal-head .btn { width: 44px; min-height: 44px; }
+.modal:has(.ch-seg, .fx-modes, .ch-pick, .ch-master-edit) .modal-foot .btn { min-height: 44px; min-width: 88px; }

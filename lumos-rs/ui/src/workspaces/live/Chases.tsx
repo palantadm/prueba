@@ -277,7 +277,7 @@ function MasterEdit({ m, onClose }: { m: SpeedMaster; onClose: () => void }) {
       <button class="btn" onClick={onClose}>{t("Cancel")}</button>
       <button class="btn primary" disabled={!Number.isFinite(v)} onClick={() => { send({ type: "speed_save", master: { ...m, name: name.trim() || m.name, bpm: clampBpm(v) } }); onClose(); }}>{t("Save")}</button>
     </>}>
-      <div class="field"><label>{t("Name")}</label><input class="input" style={{ minHeight: 44 }} value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} /></div>
+      <div class="field ch-master-edit"><label>{t("Name")}</label><input class="input" style={{ minHeight: 44 }} value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} /></div>
       <div class="field"><label>BPM (20–240)</label><input class="input num" style={{ minHeight: 44 }} type="number" min="20" max="240" step="0.5" value={bpm} onInput={(e) => setBpm((e.target as HTMLInputElement).value)} /></div>
     </Modal>
   );
