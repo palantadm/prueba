@@ -40,6 +40,10 @@ export function parseSuggestions(j: unknown, existing: ScriptBlock[]): Suggestio
       const have = existing.find((b) => b.id === x.id);
       for (const m of x.marks as CueMark[]) if (!have || !have.marks.some((h) => h.id === m.id && h.label === m.label)) out.push({ block: x.id, mark: m });
     } else if (x && x.block_id != null && x.kind) out.push({ block: Number(x.block_id), mark: x as CueMark });
+    else if (x && x.block != null && x.kind) {
+      // flat form: {block, at_word, kind, label?, actions?, note?}
+      out.push({ block: Number(x.block), mark: { id: 0, label: x.label ?? "", kind: x.kind, at_word: x.at_word ?? 0, actions: x.actions ?? [], link: x.link ?? null, standby_blocks: x.standby_blocks ?? 2, note: x.note ?? "" } });
+    }
   }
   return out;
 }

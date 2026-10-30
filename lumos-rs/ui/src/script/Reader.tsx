@@ -94,7 +94,7 @@ function BlockView(props: { script: Script; block: ScriptBlock; bi: number; pos:
     for (const m of marks) if (tail ? m.at_word >= ws.length : m.at_word === w) nodes.push(<Pill key={`m${m.id}`} script={script} block={block} mark={m} state={stateOf(m)} />);
     for (const g of sg) if (tail ? g.mark.at_word >= ws.length : g.mark.at_word === w) {
       nodes.push(
-        <Pill key={`g${g.mark.id}`} script={script} block={block} mark={g.mark} state="idle" ghost
+        <Pill key={`g${g.mark.id}-${g.mark.at_word}-${g.mark.label}`} script={script} block={block} mark={g.mark} state="idle" ghost
           onAccept={() => { suggestions.value = suggestions.value.filter((x) => x !== g); editScript((s) => ({ ...s, blocks: s.blocks.map((b) => (b.id === block.id ? { ...b, marks: [...b.marks, { ...g.mark, id: Math.max(0, ...s.blocks.flatMap((x) => x.marks.map((m) => m.id))) + 1 }] } : b)) }), true); }}
           onReject={() => { suggestions.value = suggestions.value.filter((x) => x !== g); }} />,
       );

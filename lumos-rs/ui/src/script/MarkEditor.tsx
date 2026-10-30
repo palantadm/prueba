@@ -72,7 +72,7 @@ function MarkEditor(props: { blockId: number; markId: number | null; word: numbe
           <div class="sc-kinds">
             {MARK_KINDS.map((k) => (
               <button key={k} class={`btn lg ${m.kind === k ? "sel" : ""}`} style={{ "--pk": KIND_COLOR[k] } as Record<string, string>} onClick={() => patch({ kind: k as MarkKind })}>
-                <i class="sc-kdot" />{kindLabel(k)}
+                <i class="sc-kdot" style={{ background: KIND_COLOR[k] }} />{kindLabel(k)}
               </button>
             ))}
           </div>
