@@ -1,13 +1,11 @@
 name: Lumos desktop installers
 
 on:
-  push:
-    branches: ["**"]
-    tags: ["v*"]
-    paths:
-      - "lumos-rs/**"
-      - ".github/workflows/desktop.yml"
+  # Manual: GitHub → Actions → "Lumos desktop installers" → Run workflow.
   workflow_dispatch:
+  # Release: pushing a tag like v0.3.0 builds the installers and publishes them.
+  push:
+    tags: ["v*"]
 
 permissions:
   contents: write
