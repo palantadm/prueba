@@ -2,11 +2,13 @@ import { useMemo, useState } from "preact/hooks";
 import type { OutputCfg, OutputStatus, UniverseCfg } from "../../types";
 import { rt, send, show, toast } from "../../store";
 import { EmptyState, Modal, NumberField, PageHead, Segmented, Select, StatusDot, TextField, Toggle, VirtualList, confirmDialog } from "../../ui";
-import { KINDS, KindFields, OutputEditor, advance, defaultKind, defaultOutput, summarize, type KindName } from "./OutputEditor";
+import { NodesPanel } from "./Network";
+import { KINDS, KindFields, ProtoGrid, advance, defaultKind, defaultOutput, summarize, type KindName } from "./OutputEditor";
 import { TestPanel } from "./OutputTest";
 import { t, tp } from "../../i18n";
+import { tErr } from "../../i18n/errors";
 
-const ROW = 40;
+const ROW = 64;
 
 function worst(sts: OutputStatus[]): "ok" | "err" | "off" {
   if (sts.some((s) => s.state === "error")) return "err";
@@ -21,23 +23,60 @@ async function saveMany(list: UniverseCfg[]) {
   else toast(tp(list.length, "{n} universe updated", "{n} universes updated"), "ok", 1800);
 }
 
-function UniverseDialog(props: { u: UniverseCfg; status: OutputStatus[]; onClose: () => void }) {
+function UniverseEditor(props: { u: UniverseCfg; status: OutputStatus[]; open: boolean; onClose: () => void }) {
   const [u, setU] = useState<UniverseCfg>(structuredClone(props.u));
-  const setOut = (i: number, o: OutputCfg) => setU({ ...u, outputs: u.outputs.map((x, j) => (j === i ? o : x)) });
+  const [oi, setOi] = useState(0);
+  const dirty = JSON.stringify(u) !== JSON.stringify(props.u);
+  const n = u.outputs.length;
+  const i = Math.min(oi, Math.max(0, n - 1));
+  const o = u.outputs[i];
+  const st = props.status.find((x) => x.index === i);
+  const testing = !!rt.value?.testing;
+  const setOut = (x: OutputCfg) => setU({ ...u, outputs: u.outputs.map((y, j) => (j === i ? x : y)) });
+  const stateTxt = !o ? t("No output") : !o.enabled ? t("Paused") : st?.state === "ok" ? t("Sending") : st?.state === "error" ? t("Error") : t("Off");
+  const dot: "ok" | "err" | "off" = o && o.enabled ? (st?.state === "ok" ? "ok" : st?.state === "error" ? "err" : "off") : "off";
+  const save = () => send({ type: "universe_save", universe: u }).catch(() => {});
   return (
-    <Modal title={t("Universe {id}", { id: u.id })} width={640} onClose={props.onClose}
-      footer={<>
-        <button class="btn" onClick={props.onClose}>{t("Cancel")}</button>
-        <button class="btn primary" onClick={async () => { await send({ type: "universe_save", universe: u }).then(props.onClose).catch(() => {}); }}>{t("Save")}</button>
-      </>}>
-      <TextField label={t("Name")} value={u.name} onChange={(name) => setU({ ...u, name })} />
-      {u.outputs.length === 0 && <div class="dim">{t("No outputs — this universe is rendered but not sent anywhere.")}</div>}
-      {u.outputs.map((o, i) => (
-        <OutputEditor key={i} value={o} onChange={(x) => setOut(i, x)} status={props.status.find((s) => s.index === i)}
-          onRemove={() => setU({ ...u, outputs: u.outputs.filter((_, j) => j !== i) })} />
-      ))}
-      <button class="btn" onClick={() => setU({ ...u, outputs: [...u.outputs, defaultOutput("art_net")] })}>{t("+ Add output")}</button>
-    </Modal>
+    <aside class={`uni-ed ${props.open ? "open" : ""}`} aria-label={t("Edit universe")}>
+      <div class="hd">
+        <div>
+          <div class="cap">{t("Universe {id}", { id: u.id })} · {props.u.name}</div>
+          <div class="ttl">{n ? t("Output {i} of {n}", { i: i + 1, n }) : t("No output")}</div>
+        </div>
+        <button class="btn ghost icon close" aria-label={t("Close")} onClick={props.onClose}>✕</button>
+      </div>
+      <div class="bd">
+        <TextField label={t("Name")} value={u.name} onChange={(name) => setU({ ...u, name })} />
+        {n > 1 && (
+          <div class="outtabs" role="tablist" aria-label={t("Outputs")}>
+            {u.outputs.map((_, j) => <button key={j} role="tab" aria-selected={j === i} class={j === i ? "on" : ""} onClick={() => setOi(j)}>{j + 1}</button>)}
+          </div>
+        )}
+        {!o ? <div class="dim">{t("No outputs — this universe is rendered but not sent anywhere.")}</div> : <>
+          <div>
+            <span class="lbl-cap">{t("Protocol")}</span>
+            <ProtoGrid value={o.kind.type} onChange={(ty) => setOut({ ...o, kind: defaultKind(ty) })} />
+          </div>
+          <KindFields kind={o.kind} onChange={(kind) => setOut({ ...o, kind })} />
+          <div class="statrow">
+            <StatusDot state={dot} title={stateTxt} />
+            <div class="t"><b>{stateTxt}</b><small>{(st?.message && tErr(st.message)) || summarize(o)}{st?.state === "ok" ? ` · ${t("{frames} frames", { frames: st.frames })}` : ""}</small></div>
+            <Toggle checked={o.enabled} onChange={(enabled) => setOut({ ...o, enabled })} label={t("Enabled")} />
+            <button class="btn" onClick={() => send({ type: "output_test", mode: testing ? { type: "off" } : { type: "chase", universe: u.id } }).catch(() => {})}>{testing ? t("Stop") : t("Test")}</button>
+          </div>
+        </>}
+      </div>
+      <div class="ft">
+        <div class="two">
+          <button class="btn" disabled={!dirty} onClick={() => setU(structuredClone(props.u))}>{t("Revert changes")}</button>
+          <button class="btn primary" disabled={!dirty} onClick={save}>{t("Save universe")}</button>
+        </div>
+        <div class="two">
+          <button class="btn danger" disabled={!o} onClick={() => { setU({ ...u, outputs: u.outputs.filter((_, j) => j !== i) }); setOi(Math.max(0, i - 1)); }}>{t("Remove output")}</button>
+          <button class="btn" onClick={() => { setU({ ...u, outputs: [...u.outputs, defaultOutput("art_net")] }); setOi(n); }}>{t("+ Another output")}</button>
+        </div>
+      </div>
+    </aside>
   );
 }
 
@@ -130,6 +169,8 @@ export function UniversesPage() {
   const [sel, setSel] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState("");
   const [edit, setEdit] = useState<number | null>(null);
+  const [open, setOpen] = useState(false);
+  const [showTest, setShowTest] = useState(false);
   const [dlg, setDlg] = useState<"add" | "bulk" | "copy" | null>(null);
   const universes = s?.universes ?? [];
   const stByU = useMemo(() => {
@@ -150,45 +191,60 @@ export function UniversesPage() {
     } else n.has(id) ? n.delete(id) : n.add(id);
     setSel(n);
   };
-  const editU = edit !== null ? universes.find((u) => u.id === edit) : undefined;
+  const editId = edit !== null && rows.some((r) => r.id === edit) ? edit : rows[0]?.id ?? null;
+  const editU = editId !== null ? universes.find((u) => u.id === editId) : undefined;
+  const pickRow = (id: number) => { setEdit(id); setOpen(true); };
   return (
-    <div class="page">
-      <PageHead title={t("Universes & outputs")} sub={t("{n} universes · each can drive any number of outputs", { n: universes.length })}>
-        <input class="input" style={{ width: 180 }} placeholder={t("Filter…")} aria-label={t("Filter universes")} value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />
-        <button class="btn tall" onClick={() => setDlg("add")}>{t("+ Add")}</button>
-        <button class="btn tall" onClick={() => setDlg("bulk")} title={t("Assign a protocol to a range of universes")}>{t("Bulk assign…")}</button>
-        <button class="btn tall" disabled={selIds.length < 2} onClick={() => setDlg("copy")} title={t("Copy outputs of the lowest selected universe to the others")}>{t("Copy to selected")}</button>
-        <button class="btn tall danger" disabled={!selIds.length} onClick={async () => {
-          if (!(await confirmDialog(t("Remove universes"), t("Remove {n} universe(s)? Fixtures patched to them stay in the show.", { n: selIds.length }), { danger: true, ok: t("Remove") }))) return;
-          for (const id of selIds) await send({ type: "universe_remove", id }, { quiet: true }).catch(() => {});
-          setSel(new Set());
-        }}>{t("Remove")}{selIds.length ? ` (${selIds.length})` : ""}</button>
-      </PageHead>
-      <TestPanel />
-      <div class="vrow" style={{ background: "var(--bg-2)", height: 32, fontSize: "var(--fs-xs)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 700 }}>
-        <input type="checkbox" aria-label={t("Select all")} checked={sel.size > 0 && sel.size === rows.length} onChange={(e) => setSel((e.target as HTMLInputElement).checked ? new Set(rows.map((r) => r.id)) : new Set())} />
-        <span style={{ width: 48 }}>#</span><span style={{ width: 160 }}>{t("Name")}</span><span class="grow">{t("Outputs")}</span><span style={{ width: 70 }}>{t("Status")}</span><span style={{ width: 80, textAlign: "right" }}>{t("Frames")}</span><span style={{ width: 64 }} />
+    <div class="uni-wrap">
+      <div class="uni-left">
+        <section class="uni-card grow">
+          <PageHead title={t("Universes & outputs")} sub={t("{n} universes · each can drive any number of outputs", { n: universes.length })}>
+            <input class="input" style={{ width: 160 }} placeholder={t("Filter…")} aria-label={t("Filter universes")} value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />
+            <button class="btn" disabled={selIds.length < 2} onClick={() => setDlg("copy")} title={t("Copy outputs of the lowest selected universe to the others")}>{t("Copy to selected")}</button>
+            <button class="btn danger" disabled={!selIds.length} onClick={async () => {
+              if (!(await confirmDialog(t("Remove universes"), t("Remove {n} universe(s)? Fixtures patched to them stay in the show.", { n: selIds.length }), { danger: true, ok: t("Remove") }))) return;
+              for (const id of selIds) await send({ type: "universe_remove", id }, { quiet: true }).catch(() => {});
+              setSel(new Set());
+            }}>{t("Remove")}{selIds.length ? ` (${selIds.length})` : ""}</button>
+            <button class="btn" onClick={() => setDlg("bulk")} title={t("Assign a protocol to a range of universes")}>{t("Bulk assign…")}</button>
+            <button class={`btn ${showTest || rt.value?.testing ? "sel" : ""}`} aria-pressed={showTest} onClick={() => setShowTest(!showTest)}>{t("Output test")}</button>
+            <button class="btn cyan" onClick={() => setDlg("add")}>{t("+ Add")}</button>
+          </PageHead>
+          {(showTest || rt.value?.testing) && <TestPanel />}
+          <div class="uni-cols">
+            <label class="pick" style={{ display: "grid", placeItems: "center", width: 40, height: 40 }}>
+              <input type="checkbox" aria-label={t("Select all")} checked={sel.size > 0 && sel.size === rows.length} onChange={(e) => setSel((e.target as HTMLInputElement).checked ? new Set(rows.map((r) => r.id)) : new Set())} />
+            </label>
+            <span>{t("No.")}</span><span>{t("Name")}</span><span>{t("Outputs")}</span><span>{t("Status")}</span><span>{t("Frames")}</span>
+          </div>
+          {rows.length === 0 ? <EmptyState title={t("No universes")} hint={t("Add universes, then assign Art-Net, sACN, OSC or USB outputs.")} icon="⎍"><button class="btn primary tall" onClick={() => setDlg("add")}>{t("+ Add universes")}</button></EmptyState> :
+            <VirtualList class="grow" label={t("Universes")} items={rows} rowHeight={ROW} render={(u) => {
+              const st = stByU.get(u.id) ?? [];
+              const frames = st.reduce((n, x) => n + x.frames, 0);
+              const w = worst(st);
+              return (
+                <div key={u.id} role="listitem" tabIndex={0} class={`uni-row ${u.id === editId ? "sel" : ""}`} style={{ height: ROW }}
+                  onClick={() => pickRow(u.id)} onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && e.target === e.currentTarget && (e.preventDefault(), pickRow(u.id))}>
+                  <label class="pick" onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" aria-label={t("Select universe {id}", { id: u.id })} checked={sel.has(u.id)} onClick={(e) => toggle(u.id, (e as MouseEvent).shiftKey)} />
+                  </label>
+                  <span class="n">{u.id}</span>
+                  <span class="nm">{u.name}</span>
+                  <span class="outs">
+                    {u.outputs.length === 0 ? <span class="ochip none">{t("No output")}</span> : u.outputs.map((o, i) => <span key={i} class={`ochip ${o.kind.type} ${o.enabled ? "" : "off"}`}>{summarize(o)}</span>)}
+                  </span>
+                  <span class="st" title={st.map((x) => x.message).filter(Boolean).join("\n")}>
+                    <StatusDot state={w} title={{ ok: t("OK"), err: t("Error"), off: t("Off") }[w]} />{{ ok: t("Sending"), err: t("Error"), off: u.outputs.length ? t("Off") : t("No output") }[w]}
+                  </span>
+                  <span class="fr">{frames || "—"}</span>
+                </div>
+              );
+            }} />}
+        </section>
+        <NodesPanel />
       </div>
-      {rows.length === 0 ? <EmptyState title={t("No universes")} hint={t("Add universes, then assign Art-Net, sACN, OSC or USB outputs.")} icon="⎍"><button class="btn primary tall" onClick={() => setDlg("add")}>{t("+ Add universes")}</button></EmptyState> :
-        <VirtualList class="grow" label={t("Universes")} items={rows} rowHeight={ROW} render={(u) => {
-          const st = stByU.get(u.id) ?? [];
-          const frames = st.reduce((n, x) => n + x.frames, 0);
-          const w = worst(st);
-          return (
-            <div key={u.id} role="listitem" class={`vrow ${sel.has(u.id) ? "sel" : ""}`} style={{ height: ROW }} onDblClick={() => setEdit(u.id)}>
-              <input type="checkbox" aria-label={t("Select universe {id}", { id: u.id })} checked={sel.has(u.id)} onClick={(e) => toggle(u.id, (e as MouseEvent).shiftKey)} />
-              <span class="mono" style={{ width: 48 }}>{u.id}</span>
-              <span style={{ width: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{u.name}</span>
-              <span class="grow dim" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {u.outputs.length === 0 ? <span class="faint">{t("— none —")}</span> : <>{u.outputs.map((o) => (o.enabled ? "" : "⏸ ") + summarize(o)).join("  ·  ")}</>}
-              </span>
-              <span style={{ width: 70 }} title={st.map((x) => x.message).filter(Boolean).join("\n")}><StatusDot state={w} title={{ ok: t("OK"), err: t("Error"), off: t("Off") }[w]} /> {u.outputs.length > 1 && <span class="faint">×{u.outputs.length}</span>}</span>
-              <span class="mono dim" style={{ width: 80, textAlign: "right" }}>{frames || ""}</span>
-              <button class="btn sm" style={{ width: 64 }} onClick={() => setEdit(u.id)}>{t("Edit")}</button>
-            </div>
-          );
-        }} />}
-      {editU && <UniverseDialog u={editU} status={stByU.get(editU.id) ?? []} onClose={() => setEdit(null)} />}
+      {editU ? <UniverseEditor key={editU.id} u={editU} status={stByU.get(editU.id) ?? []} open={open} onClose={() => setOpen(false)} />
+        : <aside class="uni-ed"><div class="bd"><EmptyState title={t("Select a universe")} hint={t("Pick a universe in the list to edit its outputs.")} /></div></aside>}
       {dlg === "add" && <AddDialog existing={new Set(universes.map((u) => u.id))} onClose={() => setDlg(null)} />}
       {dlg === "bulk" && <BulkDialog ids={selIds} all={sorted.map((u) => u.id)} onClose={() => setDlg(null)} />}
       {dlg === "copy" && selIds.length > 1 && <CopyDialog source={universes.find((u) => u.id === selIds[0])!} targets={selIds.slice(1)} onClose={() => setDlg(null)} />}

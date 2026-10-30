@@ -56,29 +56,29 @@ export function NodesPanel() {
   const list = useMemo(() => [...nodes.value].sort((a, b) => a.ip.localeCompare(b.ip, undefined, { numeric: true })), [nodes.value]);
   const unused = list.filter((x) => !used.has(x.ip)).length;
   return (
-    <div class="panel">
-      <div class="panel-head row" style={{ gap: 8, height: "auto", minHeight: 52, paddingTop: 4, paddingBottom: 4 }}>
-        <span class="grow">{t("Art-Net nodes")}</span>
+    <section class="uni-card node-card">
+      <div class="hd">
+        <b>{t("Art-Net nodes")}</b>
+        {list.length > 0 && <span class="cnt">{t("{n} detected", { n: list.length })}</span>}
         {list.length > 0 && <span class={`chip ${unused ? "warn" : "ok"}`}>{unused ? tp(unused, "{n} unused", "{n} unused") : t("all in use")}</span>}
-        <button class="btn tall" style={{ minHeight: 44 }} onClick={() => { fire({ type: "nodes_scan" }); toast(t("Scanning the network…"), "info", 1200); }}>{t("Scan")}</button>
+        <span class="sp" />
+        <button class="btn" onClick={() => { fire({ type: "nodes_scan" }); toast(t("Scanning the network…"), "info", 1200); }}>{t("Scan")}</button>
       </div>
-      <div class="panel-body col" style={{ gap: 6 }}>
-        {list.length === 0 && <div class="dim">{t("No Art-Net nodes found yet. Nodes answer an ArtPoll within a few seconds; make sure they are on the same network and subnet.")}</div>}
+      <div class="list">
+        {list.length === 0 && <div class="node-empty">{t("No Art-Net nodes found yet. Nodes answer an ArtPoll within a few seconds; make sure they are on the same network and subnet.")}</div>}
         {list.map((n) => {
           const inUse = used.has(n.ip);
           return (
-            <button key={n.ip} class="btn" onClick={() => setPick(n)} title={t("Assign a universe output to this node")}
-              style={{ minHeight: 52, justifyContent: "flex-start", textAlign: "left", gap: 12, flexWrap: "wrap", borderColor: inUse ? undefined : "var(--live)", background: inUse ? undefined : "var(--live-dim)" }}>
-              <span class="mono" style={{ width: 120 }}>{n.ip}</span>
-              <span class="grow" style={{ minWidth: 140, overflow: "hidden", textOverflow: "ellipsis" }}><b>{n.name || "—"}</b>{n.long_name && n.long_name !== n.name && <span class="dim"> {n.long_name}</span>}</span>
-              <span class="mono dim">{n.universes.length ? n.universes.map(pa).join("  ") : "—"}</span>
-              <span class="faint" style={{ width: 70, textAlign: "right" }}>{n.last_seen_ms < 1000 ? "<1 s" : `${Math.round(n.last_seen_ms / 1000)} s`}</span>
-              <span class={`chip ${inUse ? "ok" : "warn"}`}>{inUse ? t("in use") : t("unused")}</span>
-            </button>
+            <div key={n.ip} class="node-row">
+              <span class="nm">{n.name || "—"}{n.long_name && n.long_name !== n.name && <small>{n.long_name}</small>}</span>
+              <span class="ip">{n.ip}</span>
+              <span class="un">{n.universes.length ? n.universes.map(pa).join("  ") : "—"} · {n.last_seen_ms < 1000 ? "<1 s" : `${Math.round(n.last_seen_ms / 1000)} s`}</span>
+              <button class={`btn ${inUse ? "" : "free"}`} onClick={() => setPick(n)} title={t("Assign a universe output to this node")}>{inUse ? t("In use") : t("Assign to a universe")}</button>
+            </div>
           );
         })}
       </div>
       {pick && <AssignDialog node={pick} onClose={() => setPick(null)} />}
-    </div>
+    </section>
   );
 }

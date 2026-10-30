@@ -1,5 +1,7 @@
+import "../styles/settings.css";
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
+import { t } from "../i18n";
 
 let uid = 0;
 const nextId = () => `f${++uid}`;
@@ -36,6 +38,8 @@ export function TextField(props: {
 export function NumberField(props: {
   value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number; label?: string;
   disabled?: boolean; class?: string; hint?: string; width?: number; float?: boolean;
+  /** Card with visible 44 px − / + buttons (touch). */
+  stepper?: boolean;
 }) {
   const [id] = useState(nextId);
   const [txt, setTxt] = useState(String(props.value));
@@ -54,6 +58,21 @@ export function NumberField(props: {
     if (props.max !== undefined) n = Math.min(props.max, n);
     props.onChange(n);
   };
+  if (props.stepper) {
+    const lo = props.min !== undefined && props.value <= props.min, hi = props.max !== undefined && props.value >= props.max;
+    return (
+      <div class={`numstep ${props.class ?? ""}`}>
+        <label class="cap" for={id}>{props.label}</label>
+        <div class="row1">
+          <button type="button" aria-label={t("Less")} disabled={props.disabled || lo} onClick={() => bump(-1)}>−</button>
+          <input id={id} inputMode="decimal" value={txt} disabled={props.disabled} aria-label={props.label}
+            onInput={(e) => setTxt((e.target as HTMLInputElement).value)} onBlur={commit}
+            onKeyDown={(e) => { if (e.key === "Enter") commit(); else if (e.key === "ArrowUp") { e.preventDefault(); bump(1); } else if (e.key === "ArrowDown") { e.preventDefault(); bump(-1); } }} />
+        </div>
+        <button type="button" aria-label={t("More")} disabled={props.disabled || hi} onClick={() => bump(1)}>+</button>
+      </div>
+    );
+  }
   const input = (
     <input id={id} class={`input num ${props.class ?? ""}`} inputMode="decimal" value={txt} disabled={props.disabled}
       aria-label={props.label} style={props.width ? { width: props.width } : undefined}
@@ -93,7 +112,7 @@ export function Toggle(props: { checked: boolean; onChange: (v: boolean) => void
 }
 
 /** Segmented button group (single choice). */
-export function Segmented<T extends string | number>(props: { value: T; options: Opt<T>[]; onChange: (v: T) => void; label?: string; size?: "sm" | "md" }) {
+export function Segmented<T extends string | number>(props: { value: T; options: Opt<T>[]; onChange: (v: T) => void; label?: string; size?: "sm" | "md" | "lg" }) {
   return (
     <div class="seg" role="radiogroup" aria-label={props.label}>
       {props.options.map((o) => (

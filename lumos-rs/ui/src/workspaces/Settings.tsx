@@ -6,19 +6,20 @@ import { ArtNetInPage, OscPage } from "./settings/Inputs";
 import { GeneralPage, NetworkPage, TimecodePage } from "./settings/Misc";
 import { MscPage } from "./settings/Msc";
 import { AiPage } from "./settings/Ai";
-import { t } from "../i18n";
+import { Icon } from "../ui/Icon";
+import { lang, setLang, t } from "../i18n";
 
 const cats = [
-  { id: "universes", icon: "⎍", label: "Universes & outputs", c: UniversesPage },
-  { id: "midi", icon: "🎹", label: "MIDI", c: MidiPage },
-  { id: "controls", icon: "🎛", label: "Controls", c: BindingsPage },
-  { id: "osc", icon: "≋", label: "OSC", c: OscPage },
-  { id: "artnet", icon: "⇄", label: "Art-Net input", c: ArtNetInPage },
-  { id: "timecode", icon: "⏱", label: "Timecode", c: TimecodePage },
-  { id: "msc", icon: "🎬", label: "Show Control (MSC)", c: MscPage },
-  { id: "network", icon: "🌐", label: "Network", c: NetworkPage },
-  { id: "ai", icon: "✨", label: "Assistant", c: AiPage },
-  { id: "general", icon: "⚙", label: "General", c: GeneralPage },
+  { id: "universes", icon: "M3 12h4l3-8 4 16 3-8h4", label: "Universes & outputs", c: UniversesPage },
+  { id: "midi", icon: "M4 7h16v10H4zM8 7v6M12 7v6M16 7v6", label: "MIDI", c: MidiPage },
+  { id: "controls", icon: "M6 3v18M12 3v18M18 3v18M4 8h4M10 15h4M16 6h4", label: "Controls", c: BindingsPage },
+  { id: "osc", icon: "M4 12c2-6 4-6 6 0s4 6 6 0 3-4 4-2", label: "OSC", c: OscPage },
+  { id: "artnet", icon: "M4 12h12M12 6l6 6-6 6", label: "Art-Net input", c: ArtNetInPage },
+  { id: "timecode", icon: "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z", label: "Timecode", c: TimecodePage },
+  { id: "msc", icon: "M5 4h14v16H5zM9 9h6M9 13h6", label: "Show Control (MSC)", c: MscPage },
+  { id: "network", icon: "M3 12a9 9 0 0018 0 9 9 0 00-18 0zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18", label: "Network", c: NetworkPage },
+  { id: "ai", icon: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z", label: "Assistant", c: AiPage },
+  { id: "general", icon: "M12 15a3 3 0 100-6 3 3 0 000 6zM4 12h2M18 12h2M12 4v2M12 18v2M6.3 6.3l1.4 1.4M16.3 16.3l1.4 1.4M17.7 6.3l-1.4 1.4M7.7 16.3l-1.4 1.4", label: "General", c: GeneralPage },
 ];
 const cat = signal(localStorage.getItem("settings.cat") ?? "universes");
 
@@ -31,16 +32,24 @@ export function Settings() {
   const cur = cats.find((c) => c.id === cat.value) ?? cats[0];
   const C = cur.c;
   return (
-    <div class="row" style={{ height: "100%", alignItems: "stretch", gap: 0 }}>
-      <nav class="side" aria-label={t("Settings categories")}>
+    <div class="set-wrap">
+      <nav class="set-rail" aria-label={t("Settings categories")}>
         {cats.map((c) => (
           <button key={c.id} class={`side-item ${c.id === cur.id ? "active" : ""}`} aria-current={c.id === cur.id} title={t(c.label)}
-            onClick={() => { cat.value = c.id; localStorage.setItem("settings.cat", c.id); }}>
-            <span aria-hidden="true">{c.icon}</span><span class="lbl">{t(c.label)}</span>
+            onClick={() => setSettingsCat(c.id)}>
+            <span class="ico"><Icon d={c.icon} size={22} /></span><span class="lbl">{t(c.label)}</span>
           </button>
         ))}
+        <div class="grow-sp" />
+        <div class="set-lang" role="radiogroup" aria-label={t("Language")}>
+          <div class="cap">{t("Language")}</div>
+          <div class="opts">
+            <button role="radio" aria-checked={lang.value === "es"} class={lang.value === "es" ? "on" : ""} onClick={() => setLang("es")}><span class="full">Español</span><span class="short">ES</span></button>
+            <button role="radio" aria-checked={lang.value === "en"} class={lang.value === "en" ? "on" : ""} onClick={() => setLang("en")}><span class="full">English</span><span class="short">EN</span></button>
+          </div>
+        </div>
       </nav>
-      <div class="grow" style={{ minWidth: 0 }}><C /></div>
+      <div class="set-main"><div class="set-card"><C /></div></div>
     </div>
   );
 }

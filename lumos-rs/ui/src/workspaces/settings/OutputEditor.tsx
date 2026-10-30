@@ -55,20 +55,28 @@ export function KindFields(props: { kind: OutputKind; onChange: (k: OutputKind) 
   switch (k.type) {
     case "art_net":
       return (
-        <div class="grid2">
-          <TextField label={t("Host (empty = broadcast)")} value={k.host} placeholder={t("2.255.255.255 or 192.168.1.50")} onChange={(host) => set({ host })} mono />
+        <div class="col" style={{ gap: 14 }}>
+          <div>
+            <label class="lbl-cap" for="artnet-host">{t("Host / IP (empty = broadcast)")}</label>
+            <input id="artnet-host" class="bigfield" inputMode="decimal" value={k.host} placeholder={t("2.255.255.255 or 192.168.1.50")} aria-label={t("Host (empty = broadcast)")}
+              onInput={(e) => set({ host: (e.target as HTMLInputElement).value })} />
+          </div>
+          <div class="numstep3">
+            <NumberField stepper label={t("Net")} value={k.net} min={0} max={127} onChange={(net) => set({ net })} />
+            <NumberField stepper label={t("Sub-net")} value={k.subnet} min={0} max={15} onChange={(subnet) => set({ subnet })} />
+            <NumberField stepper label={t("Art-Net universe")} value={k.universe} min={0} max={15} onChange={(universe) => set({ universe })} />
+          </div>
           <NumberField label={t("UDP port")} value={k.port} min={1} max={65535} onChange={(port) => set({ port })} />
-          <NumberField label={t("Net (0–127)")} value={k.net} min={0} max={127} onChange={(net) => set({ net })} />
-          <NumberField label={t("Sub-net (0–15)")} value={k.subnet} min={0} max={15} onChange={(subnet) => set({ subnet })} />
-          <NumberField label={t("Universe (0–15)")} value={k.universe} min={0} max={15} onChange={(universe) => set({ universe })} />
         </div>
       );
     case "sacn":
       return (
-        <div class="grid2">
-          <NumberField label={t("sACN universe (1–63999)")} value={k.universe} min={1} max={63999} onChange={(universe) => set({ universe })} />
-          <NumberField label={t("Priority (0–200)")} value={k.priority} min={0} max={200} onChange={(priority) => set({ priority })} />
+        <div class="col" style={{ gap: 14 }}>
           <TextField label={t("Unicast IP (empty = multicast)")} value={k.unicast ?? ""} mono placeholder={t("239.255.x.x multicast")} onChange={(v) => set({ unicast: v.trim() ? v : null })} />
+          <div class="numstep3" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+            <NumberField stepper label={t("sACN universe (1–63999)")} value={k.universe} min={1} max={63999} onChange={(universe) => set({ universe })} />
+            <NumberField stepper label={t("Priority (0–200)")} value={k.priority} min={0} max={200} step={10} onChange={(priority) => set({ priority })} />
+          </div>
         </div>
       );
     case "osc":
@@ -103,6 +111,17 @@ export function KindFields(props: { kind: OutputKind; onChange: (k: OutputKind) 
   }
 }
 
+/** 2-column protocol picker (56 px buttons). */
+export function ProtoGrid(props: { value: KindName; onChange: (k: KindName) => void }) {
+  return (
+    <div class="proto-grid" role="radiogroup" aria-label={t("Protocol")}>
+      {KINDS.map((x) => (
+        <button key={x.value} role="radio" aria-checked={props.value === x.value} class={props.value === x.value ? "on" : ""} onClick={() => props.value !== x.value && props.onChange(x.value)}>{t(x.label)}</button>
+      ))}
+    </div>
+  );
+}
+
 export function OutputEditor(props: { value: OutputCfg; onChange: (o: OutputCfg) => void; onRemove?: () => void; status?: { state: string; message: string; frames: number } }) {
   const o = props.value;
   return (
@@ -111,10 +130,10 @@ export function OutputEditor(props: { value: OutputCfg; onChange: (o: OutputCfg)
         <Toggle checked={o.enabled} onChange={(enabled) => props.onChange({ ...o, enabled })} label={t("Enabled")} />
         <span class="sp" />
         {props.status && <span class={`chip ${props.status.state === "ok" ? "ok" : props.status.state === "error" ? "err" : ""}`} title={tErr(props.status.message)}>{props.status.state === "ok" ? t("{frames} frames", { frames: props.status.frames }) : tErr(props.status.message) || ({ ok: t("OK"), error: t("Error"), off: t("Off") } as Record<string, string>)[props.status.state] || props.status.state}</span>}
-        {props.onRemove && <button class="btn sm danger" onClick={props.onRemove} aria-label={t("Remove output")}>{t("Remove")}</button>}
+        {props.onRemove && <button class="btn danger" onClick={props.onRemove} aria-label={t("Remove output")}>{t("Remove")}</button>}
       </div>
       <div class="panel-body col" style={{ gap: 12 }}>
-        <Select<KindName> label={t("Protocol")} value={o.kind.type} options={KINDS.map((x) => ({ ...x, label: t(x.label) }))} onChange={(ty) => ty !== o.kind.type && props.onChange({ ...o, kind: defaultKind(ty) })} />
+        <ProtoGrid value={o.kind.type} onChange={(ty) => props.onChange({ ...o, kind: defaultKind(ty) })} />
         <KindFields kind={o.kind} onChange={(kind) => props.onChange({ ...o, kind })} />
       </div>
     </div>

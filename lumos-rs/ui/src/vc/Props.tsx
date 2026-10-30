@@ -171,7 +171,7 @@ function InputsEditor({ w }: { w: VcWidget }) {
         </div>
       ))}
       <div class="row">
-        <button class={`btn ${learn.on ? "on" : "primary"} grow`} onClick={learn.start}>{learn.on ? t("Listening… move a control (click to cancel)") : t("● Learn")}</button>
+        <button class={`btn vc-learn ${learn.on ? "on" : ""} grow`} onClick={learn.start}>{learn.on ? t("Listening… move a control (click to cancel)") : t("● Learn")}</button>
         <button class="btn" onClick={() => patchWidget(w.id, (x) => { x.inputs.push(defaultInput({ type: "midi", port: null, kind: x.kind === "button" ? "note" : "cc", channel: null, number: 0 })); }, false)}>{t("＋ Manual")}</button>
       </div>
     </>
