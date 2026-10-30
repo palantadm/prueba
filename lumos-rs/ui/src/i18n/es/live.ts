@@ -445,6 +445,7 @@ export const live: Record<string, string> = {
   "Hue and saturation wheel": "Rueda de matiz y saturación",
   "Options": "Opciones",
   "Go to cue {n}": "Ir al cue {n}",
+  "Command: {text}": "Comando: {text}",
 };
 
 /** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */

@@ -101,6 +101,9 @@ function ActionEditor({ w }: { w: VcWidget }) {
         <Row label={t("Palette")}><Picker value={a.palette} options={L.palettes} onChange={(v) => set({ ...a, palette: v })} /></Row>
         <Row label={t("Group")}><Picker value={a.group ?? 0} options={[{ value: 0, label: t("Current selection") }, ...L.groups]} onChange={(v) => set({ ...a, group: v || null })} /></Row>
       </>}
+      {a.type === "command" && <Row label={t("Command line")}>
+        <TextField class="bare mono" value={a.text} placeholder="go cuelist 1; scene 3 on" onChange={(v) => set({ ...a, text: v })} />
+      </Row>}
       {a.type === "page" && <Row label={t("Page")}><Picker value={a.page} options={L.pages} onChange={(v) => set({ ...a, page: v })} /></Row>}
       {a.type === "xy" && <>
         <Row label={t("Group")}><Picker value={a.group} options={L.groups} onChange={(v) => set({ ...a, group: v })} /></Row>

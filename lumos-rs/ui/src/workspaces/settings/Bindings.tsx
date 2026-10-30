@@ -30,6 +30,7 @@ export function actionText(a: Action): string {
     case "effect_toggle": return t("Effect {effect} toggle", { effect: a.effect });
     case "palette_apply": return a.group ? t("Palette {palette} → group {group}", { palette: a.palette, group: a.group }) : t("Palette {palette}", { palette: a.palette });
     case "prog_clear": return t("Clear programmer");
+    case "command": return t("Command: {text}", { text: a.text.length > 40 ? a.text.slice(0, 40) + "…" : a.text });
   }
 }
 
@@ -49,6 +50,7 @@ const ACTIONS: { value: AT; label: string; cont: boolean }[] = [
   { value: "effect_toggle", label: "Effect toggle", cont: false },
   { value: "palette_apply", label: "Apply palette", cont: false },
   { value: "prog_clear", label: "Clear programmer", cont: false },
+  { value: "command", label: "Command line", cont: false },
 ];
 
 function defaultAction(ty: AT): Action {
@@ -63,6 +65,7 @@ function defaultAction(ty: AT): Action {
     case "group_attr": return { type: ty, group: sh?.groups[0]?.id ?? 1, attr: "dimmer" };
     case "effect_toggle": return { type: ty, effect: sh?.effects[0]?.id ?? 1 };
     case "palette_apply": return { type: ty, palette: sh?.palettes[0]?.id ?? 1, group: null };
+    case "command": return { type: ty, text: "go" };
   }
 }
 
@@ -93,6 +96,8 @@ function ActionFields(props: { a: Action; onChange: (a: Action) => void }) {
     case "palette_apply":
       return <div class="grid2"><Select label={t("Palette")} value={a.palette} options={pickOpts(sh?.palettes, (p) => p.name)} onChange={(palette) => props.onChange({ ...a, palette })} />
         <Select label={t("Only group")} value={a.group ?? 0} options={[{ value: 0, label: t("Current selection / all") }, ...pickOpts(sh?.groups, (g) => g.name)]} onChange={(g) => props.onChange({ ...a, group: g || null })} /></div>;
+    case "command":
+      return <TextField label={t("Command line")} mono value={a.text} placeholder="go cuelist 1; scene 3 on" onChange={(text) => props.onChange({ ...a, text })} />;
     default: return null;
   }
 }

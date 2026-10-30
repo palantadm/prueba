@@ -98,6 +98,7 @@ export function describeAction(a: VcAction, show: Show | null): string {
     case "prog_clear": return t("Clear programmer");
     case "page": return t("Page {name}", { name: show?.vconsole.find((p) => p.id === a.page)?.name ?? `#${a.page}` });
     case "xy": return `${nm(show?.groups, a.group)} ${a.x_attr}/${a.y_attr}`;
+    case "command": return t("Command: {text}", { text: a.text.length > 40 ? a.text.slice(0, 40) + "…" : a.text });
   }
 }
 
@@ -119,10 +120,11 @@ export const ACTION_TYPES: { type: VcAction["type"]; label: string }[] = [
   { type: "prog_clear", label: "Clear programmer" },
   { type: "page", label: "Go to page" },
   { type: "xy", label: "XY (group)" },
+  { type: "command", label: "Command" },
 ];
 export function actionTypesFor(k: VcKind): VcAction["type"][] {
   switch (k) {
-    case "button": return ["none", "exec", "cuelist", "scene", "blackout", "grand_master", "effect_toggle", "palette_apply", "prog_clear", "page", "dmx"];
+    case "button": return ["none", "exec", "cuelist", "scene", "blackout", "grand_master", "effect_toggle", "palette_apply", "prog_clear", "page", "dmx", "command"];
     case "slider": case "knob": return ["none", "exec", "cuelist", "scene", "scene_morph", "grand_master", "group_attr", "fixture_attr", "dmx", "effect_rate"];
     case "xy_pad": return ["xy", "none"];
     case "cue_list": return ["cuelist", "none"];
@@ -145,6 +147,7 @@ export function defaultAction(type: VcAction["type"], show: Show | null, kind: V
     case "scene_morph": return { type, a: show?.scenes?.[0]?.id ?? 0, b: show?.scenes?.[1]?.id ?? show?.scenes?.[0]?.id ?? 0 };
     case "page": return { type, page: show?.vconsole[0]?.id ?? 0 };
     case "xy": return { type, group: show?.groups[0]?.id ?? 0, x_attr: "pan", y_attr: "tilt" };
+    case "command": return { type, text: "go" };
     default: return { type } as VcAction;
   }
 }
@@ -176,6 +179,7 @@ export function autoLabel(a: VcAction, show: Show | null): string | null {
     case "page": return show?.vconsole.find((p) => p.id === a.page)?.name ?? null;
     case "xy": return nm(show?.groups, a.group) ?? null;
     case "dmx": return `DMX ${a.universe}/${a.channel}`;
+    case "command": return a.text.trim().split(/[;\n]/)[0].slice(0, 24) || null;
     default: return null;
   }
 }
