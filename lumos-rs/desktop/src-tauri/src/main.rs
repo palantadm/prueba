@@ -316,6 +316,17 @@ fn move_next_monitor(w: &WebviewWindow) {
     });
 }
 
+/// A link to somewhere other than this app's own server (doc pages, key consoles…): hand it to the system browser.
+fn open_external(url: &tauri::Url) -> bool {
+    let web = matches!(url.scheme(), "http" | "https" | "mailto");
+    let own = matches!(url.host_str(), Some("127.0.0.1" | "localhost" | "[::1]" | "::1"));
+    if web && !own {
+        let _ = opener::open(url.as_str());
+        return true;
+    }
+    false
+}
+
 /// Adds the handlers every Lumos window needs: `window.open` → native window, and
 /// `/__lumos/<cmd>` navigations (close / fullscreen / move) coming from the page.
 fn attach<'a, M: Manager<tauri::Wry>>(b: WebviewWindowBuilder<'a, tauri::Wry, M>, app: &AppHandle, label: &str) -> WebviewWindowBuilder<'a, tauri::Wry, M> {
@@ -323,6 +334,9 @@ fn attach<'a, M: Manager<tauri::Wry>>(b: WebviewWindowBuilder<'a, tauri::Wry, M>
     let a2 = app.clone();
     let l1 = label.to_string();
     b.on_navigation(move |url| {
+        if open_external(url) {
+            return false;
+        }
         let path = url.path();
         if let Some(cmd) = path.strip_prefix("/__lumos/") {
             let (app, label, cmd) = (a1.clone(), l1.clone(), cmd.to_string());
@@ -342,6 +356,9 @@ fn attach<'a, M: Manager<tauri::Wry>>(b: WebviewWindowBuilder<'a, tauri::Wry, M>
         true
     })
     .on_new_window(move |url, _features| {
+        if open_external(&url) {
+            return NewWindowResponse::Deny;
+        }
         let q: HashMap<String, String> = url.query_pairs().into_owned().collect();
         let app = a2.clone();
         let id = q.get("win").and_then(|v| v.parse::<u32>().ok()).unwrap_or_else(|| free_id(&app));
