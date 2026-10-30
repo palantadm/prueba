@@ -1,4 +1,13 @@
 export type { Action } from "./gen/Action";
+export type { AiConfigIn } from "./gen/AiConfigIn";
+export type { AiConfigOut } from "./gen/AiConfigOut";
+export type { AiContext } from "./gen/AiContext";
+export type { AiEvent } from "./gen/AiEvent";
+export type { AiImage } from "./gen/AiImage";
+export type { AiMode } from "./gen/AiMode";
+export type { AiModelInfo } from "./gen/AiModelInfo";
+export type { AiRisk } from "./gen/AiRisk";
+export type { AiToolState } from "./gen/AiToolState";
 export type { ArtNetInCfg } from "./gen/ArtNetInCfg";
 export type { ArtNetInMap } from "./gen/ArtNetInMap";
 export type { ArtNode } from "./gen/ArtNode";
