@@ -1,5 +1,5 @@
 import type { Executor, ExecRt } from "../types";
-import { fire } from "../store";
+import { fire, rt as liveRt } from "../store";
 import { Fader } from "./Fader";
 import { useState } from "preact/hooks";
 import { t } from "../i18n";
@@ -27,8 +27,11 @@ export function ExecutorStrip(p: {
   const level = p.rt?.level ?? 0;
   const isMaster = e.kind.type === "master";
   const isScene = e.kind.type === "scene";
-  const canGo = e.kind.type === "cuelist" || e.kind.type === "x_fade" || e.kind.type === "effect" || isScene;
-  const toggled = isScene ? !!p.rt?.active : !!p.effectOn;
+  const isChase = e.kind.type === "chase";
+  const isSpeed = e.kind.type === "speed";
+  const canGo = e.kind.type === "cuelist" || e.kind.type === "x_fade" || e.kind.type === "effect" || isScene || isChase || isSpeed;
+  const toggled = isScene || isChase ? !!p.rt?.active : !!p.effectOn;
+  const bpm = isSpeed ? liveRt.value?.speed?.find((m) => m.id === (e.kind as { master: number }).master)?.bpm : undefined;
   return (
     <div class={`lv-ex ${p.rt?.active || p.effectOn ? "active" : ""}`}>
       <div class="row" style={{ gap: 4 }}>
@@ -39,9 +42,9 @@ export function ExecutorStrip(p: {
       <Fader value={level} height={120} width={40} color="var(--accent)"
         ariaLabel={t("Executor {n} level", { n: p.slot + 1 })}
         onChange={(v) => fire({ type: "exec_level", id: e.id, level: v })} />
-      <div class="mono lv-ex-lvl">{Math.round(level * 100)}%</div>
-      {canGo && <button class={`btn go sm lv-ex-btn`} onClick={p.onGo} aria-label={t("Go executor {n}", { n: p.slot + 1 })}>{e.kind.type === "effect" || isScene ? (toggled ? "OFF" : "ON") : "GO"}</button>}
-      {!isMaster && (
+      <div class="mono lv-ex-lvl">{bpm !== undefined ? `${Math.round(bpm)} BPM` : `${Math.round(level * 100)}%`}</div>
+      {canGo && <button class={`btn go sm lv-ex-btn`} onClick={p.onGo} aria-label={t("Go executor {n}", { n: p.slot + 1 })}>{isSpeed ? "TAP" : e.kind.type === "effect" || isScene || isChase ? (toggled ? "OFF" : "ON") : "GO"}</button>}
+      {!isMaster && !isSpeed && !isChase && (
         <button class={`btn sm lv-ex-btn ${down || p.rt?.flash ? "on" : ""}`}
           onPointerDown={(ev) => { (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId); setDown(true); fire({ type: "exec_flash", id: e.id, down: true }); }}
           onPointerUp={() => { setDown(false); fire({ type: "exec_flash", id: e.id, down: false }); }}

@@ -1,0 +1,62 @@
+/* Chases, speed masters and the effects editor (touch-first: every control ≥ 44 px, no hover-only affordances) */
+.ch-bar { display: flex; flex-wrap: wrap; gap: 6px; padding: var(--s-2); border-bottom: 1px solid var(--line); align-items: center; }
+.ch-bar .btn { min-height: 44px; min-width: 44px; padding: 0 var(--s-3); }
+.ch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: var(--s-2); align-content: start; }
+.ch-tile { position: relative; min-height: 76px; display: flex; border: 1px solid var(--line-strong); border-radius: var(--r-md); background: var(--bg-2); overflow: hidden; }
+.ch-tile.on { border-color: var(--ch, var(--accent)); box-shadow: 0 0 0 1px var(--ch, var(--accent)) inset; }
+.ch-led { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--ch, var(--accent)); opacity: .35; }
+.ch-tile.on .ch-led { opacity: 1; }
+.ch-main { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; text-align: left; background: transparent; border: 0; padding: 8px 10px 14px; cursor: pointer; color: var(--text); }
+.ch-name { font-weight: 700; font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-sub { font-size: var(--fs-xs); color: var(--text-dim); }
+.ch-menu { width: 44px; min-height: 44px; align-self: flex-start; background: transparent; border: 0; color: var(--text-dim); font-size: 20px; cursor: pointer; }
+.ch-dots { position: absolute; left: 10px; right: 10px; bottom: 4px; display: flex; gap: 2px; height: 5px; }
+.ch-dots i { flex: 1; background: var(--bg-0); border-radius: 2px; }
+.ch-dots i.cur { background: var(--ch, var(--accent)); }
+
+.ch-live { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-md); }
+.ch-live .btn { min-height: 44px; min-width: 44px; }
+.ch-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.ch-seg .btn { min-height: 44px; flex: 1 1 90px; }
+.ch-tempo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ch-tempo .ch-step { flex: 1 1 200px; }
+.ch-tempo select { flex: 1 1 160px; }
+.ch-tap { min-width: 88px; min-height: 56px !important; font-weight: 800; letter-spacing: .08em; touch-action: manipulation; }
+.ch-step { display: flex; align-items: center; gap: 6px; }
+.ch-step .btn { width: 48px; min-height: 48px; font-size: 20px; }
+.ch-step .val { flex: 1; text-align: center; font-family: var(--font-mono); font-size: var(--fs-lg); min-width: 56px; }
+
+.ch-steps { display: flex; flex-direction: column; gap: 6px; max-height: 38vh; overflow: auto; }
+.ch-steprow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg-2); }
+.ch-steprow.cur { border-color: var(--go); box-shadow: 0 0 0 1px var(--go) inset; }
+.ch-idx { width: 28px; height: 28px; border-radius: 50%; background: var(--bg-3); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.ch-sum { min-width: 120px; font-size: var(--fs-sm); }
+.ch-ctl { display: flex; flex-direction: column; gap: 2px; min-width: 150px; }
+.ch-ctl .ch-k { font-size: var(--fs-xs); color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; }
+.ch-range { width: 100%; min-height: 44px; accent-color: var(--accent); }
+.ch-acts { display: flex; gap: 4px; }
+.ch-acts .btn { width: 44px; min-height: 44px; padding: 0; }
+.ch-add { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ch-add .btn { min-height: 48px; }
+.ch-pick { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow: auto; min-width: 260px; }
+
+.ch-speed { border-top: 1px solid var(--line); padding: var(--s-2); display: flex; flex-direction: column; gap: 8px; }
+.ch-speed-h { display: flex; align-items: center; gap: 8px; }
+.ch-speed-h h4 { margin: 0; font-size: var(--fs-xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-dim); }
+.ch-speed-h .btn { min-height: 44px; }
+.ch-master { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--bg-2); }
+.ch-mname { flex: 1 1 90px; min-height: 44px; text-align: left; background: transparent; border: 0; color: var(--text); font-weight: 700; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-bpm { min-height: 44px; min-width: 92px; background: var(--bg-3); border: 1px solid var(--line-strong); border-radius: var(--r-sm); color: var(--text); font-size: 26px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: baseline; justify-content: center; gap: 4px; padding: 0 10px; }
+.ch-bpm small { font-size: 10px; color: var(--text-dim); letter-spacing: .08em; }
+.ch-mbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+.ch-mbtns .btn { min-width: 44px; min-height: 44px; }
+
+/* effects editor additions */
+.fx-modes { display: flex; flex-wrap: wrap; gap: 6px; }
+.fx-modes .btn { min-height: 44px; flex: 1 1 80px; }
+.fx-preview { display: flex; align-items: center; gap: 12px; }
+.fx-fig { background: var(--bg-0); border: 1px solid var(--line); border-radius: var(--r-md); }
+.fx-fig-lbl { font-size: var(--fs-xs); color: var(--text-dim); }
+
+/* pools column is tight on tablets: chases + speed masters need the same room as scenes */
+.lv-col.pools > .lv-scroll.ch-scroll { max-height: min(62vh, 640px); }

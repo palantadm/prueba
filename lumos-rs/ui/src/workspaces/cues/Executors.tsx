@@ -6,7 +6,7 @@ import { ExecutorStrip } from "../../widgets";
 import { t } from "../../i18n";
 
 const SLOTS = 10;
-const TYPE_LABEL = { cuelist: "Cuelist", group: "Group", effect: "Effect", scene: "Scene", x_fade: "Manual crossfade", master: "Grand master" } as const;
+const TYPE_LABEL = { cuelist: "Cuelist", group: "Group", effect: "Effect", scene: "Scene", x_fade: "Manual crossfade", chase: "Chase", speed: "Speed master", master: "Grand master" } as const;
 
 function kindLabel(k: ExecKind): string {
   const s = show.value;
@@ -15,6 +15,8 @@ function kindLabel(k: ExecKind): string {
     case "group": return s?.groups.find((g) => g.id === k.group)?.name ?? `Grp ${k.group}`;
     case "effect": return s?.effects.find((e) => e.id === k.effect)?.name ?? `FX ${k.effect}`;
     case "scene": return s?.scenes?.find((x) => x.id === k.scene)?.name ?? `${t("Scene")} ${k.scene}`;
+    case "chase": return s?.chases?.find((c) => c.id === k.chase)?.name ?? `Chase ${k.chase}`;
+    case "speed": return s?.speed_masters?.find((m) => m.id === k.master)?.name ?? `BPM ${k.master}`;
     case "x_fade": return `↔ ${s?.cuelists.find((c) => c.id === k.cuelist)?.name ?? `CL ${k.cuelist}`}`;
     case "master": return t("Grand Master");
     default: return "";
@@ -67,10 +69,14 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
   const [effect, setEffect] = useState(k?.type === "effect" ? k.effect : s.effects[0]?.id ?? 0);
   const scenes = s.scenes ?? [];
   const [scene, setScene] = useState(k?.type === "scene" ? k.scene : scenes[0]?.id ?? 0);
+  const chases = s.chases ?? [];
+  const masters = s.speed_masters ?? [];
+  const [chase, setChase] = useState(k?.type === "chase" ? k.chase : chases[0]?.id ?? 0);
+  const [master, setMaster] = useState(k?.type === "speed" ? k.master : masters[0]?.id ?? 0);
   const [label, setLabel] = useState(exec?.label ?? "");
   const kind = (): ExecKind =>
-    type === "cuelist" ? { type, cuelist } : type === "group" ? { type, group } : type === "effect" ? { type, effect } : type === "scene" ? { type, scene } : type === "x_fade" ? { type, cuelist } : { type: "master", master: "grand" };
-  const valid = type === "master" || ((type === "cuelist" || type === "x_fade") && cuelist) || (type === "group" && group) || (type === "effect" && effect) || (type === "scene" && scene);
+    type === "cuelist" ? { type, cuelist } : type === "group" ? { type, group } : type === "effect" ? { type, effect } : type === "scene" ? { type, scene } : type === "x_fade" ? { type, cuelist } : type === "chase" ? { type, chase } : type === "speed" ? { type, master } : { type: "master", master: "grand" };
+  const valid = type === "master" || ((type === "cuelist" || type === "x_fade") && cuelist) || (type === "group" && group) || (type === "effect" && effect) || (type === "scene" && scene) || (type === "chase" && chase) || (type === "speed" && master);
   const save = () => {
     const id = exec?.id ?? Math.max(0, ...s.executors.map((e) => e.id)) + 1;
     send({ type: "exec_save", executor: { id, page, slot, label, kind: kind() } });
@@ -90,7 +96,7 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
       <button class="btn primary" disabled={!valid} onClick={save}>{t("Assign")}</button>
     </>}>
       <div class="row wrap" role="tablist" aria-label={t("Executor type")}>
-        {(["cuelist", "x_fade", "group", "effect", "scene", "master"] as const).map((k) => (
+        {(["cuelist", "x_fade", "group", "effect", "scene", "chase", "speed", "master"] as const).map((k) => (
           <button key={k} role="tab" class={`btn ${type === k ? "sel" : ""}`} style={{ minHeight: 44 }} onClick={() => setType(k)}>{t(TYPE_LABEL[k])}</button>
         ))}
       </div>
@@ -98,6 +104,8 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
       {type === "group" && <div class="field"><label>{t("Group (dimmer master)")}</label>{sel(group, setGroup, s.groups)}</div>}
       {type === "effect" && <div class="field"><label>{t("Effect")}</label>{sel(effect, setEffect, s.effects)}</div>}
       {type === "scene" && <div class="field"><label>{t("Scene")}</label>{sel(scene, setScene, scenes)}</div>}
+      {type === "chase" && <div class="field"><label>{t("Chase")}</label>{sel(chase, setChase, chases)}</div>}
+      {type === "speed" && <div class="field"><label>{t("Speed master")}</label>{sel(master, setMaster, masters)}</div>}
       <div class="field"><label>{t("Label")}</label><input class="input" value={label} placeholder={t("(auto)")} onInput={(e) => setLabel((e.target as HTMLInputElement).value)} /></div>
     </Modal>
   );
