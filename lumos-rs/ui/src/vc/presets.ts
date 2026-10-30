@@ -58,6 +58,12 @@ export function autoBuildFromExecutors(show: Show, startId: number, pageId: numb
     } else if (e.kind.type === "scene") {
       const f = newWidget("slider", id++, col, 0); f.label = label; f.h = 6; f.w = 2; f.action = { type: "exec", exec: e.id, op: "level" }; f.color = "#e266b8"; add(f);
       const b = newWidget("button", id++, col, 6); b.label = label; b.w = 2; b.h = 2; b.mode = "toggle"; b.action = { type: "exec", exec: e.id, op: "toggle" }; b.color = "#e266b8"; add(b);
+    } else if (e.kind.type === "chase") {
+      const f = newWidget("slider", id++, col, 0); f.label = label; f.h = 6; f.w = 2; f.action = { type: "exec", exec: e.id, op: "level" }; f.color = "#3cc4e8"; add(f);
+      const b = newWidget("button", id++, col, 6); b.label = label; b.w = 2; b.h = 2; b.mode = "toggle"; b.action = { type: "exec", exec: e.id, op: "toggle" }; b.color = "#3cc4e8"; add(b);
+    } else if (e.kind.type === "speed") {
+      const f = newWidget("slider", id++, col, 0); f.label = label; f.h = 6; f.w = 2; f.action = { type: "exec", exec: e.id, op: "level" }; f.color = "#f2d98d"; add(f);
+      const b = newWidget("button", id++, col, 6); b.label = t("TAP"); b.w = 2; b.h = 2; b.mode = "trigger"; b.action = { type: "exec", exec: e.id, op: "go" }; b.color = "#f2d98d"; add(b);
     } else if (e.kind.type === "master") {
       const f = newWidget("slider", id++, col, 0); f.label = label; f.h = 6; f.w = 2; f.action = { type: "grand_master" }; f.color = "#e5484d"; add(f);
     }
