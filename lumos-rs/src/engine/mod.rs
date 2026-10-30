@@ -905,7 +905,7 @@ impl Engine {
             TimelineStop { id } => self.timeline_stop(id)?,
             TimelineSeek { id, t } => self.timeline_seek(id, t)?,
             // be-ai
-            AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } => {}
+            AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } | AiListModels { .. } | AiTestProvider { .. } => {}
             // be-data
             c @ (BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. }) => {
                 self.data_command(c)?

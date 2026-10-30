@@ -1568,6 +1568,10 @@ pub enum Command {
     AiUndo { session: String },
     /// Machine-level assistant configuration (API key is stored outside the show and never sent back).
     AiConfigure { cfg: AiConfigIn },
+    /// Fetch the provider's `/models` list and merge it into its model list (re-sends `AiConfig`).
+    AiListModels { provider: String },
+    /// Tiny non-streaming request to check key/URL/model; answered with `ServerMsg::AiTest`.
+    AiTestProvider { provider: String },
     /// Enable/disable a native (server-side) MIDI port. Machine-level setting, persisted outside the show.
     MidiEnable { output: bool, name: String, enabled: bool },
     // ── streaming ──
@@ -1687,37 +1691,111 @@ pub enum AiEvent {
     Error { msg: String },
 }
 
+/// Wire format a provider speaks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AiProviderKind {
+    /// Anthropic Messages API (Claude): adaptive thinking, effort, caching, refusal fallbacks.
+    Anthropic,
+    /// OpenAI Chat Completions wire format: OpenAI, Gemini (OpenAI-compatible endpoint), OpenRouter,
+    /// Groq, Mistral, DeepSeek, Together, xAI, Perplexity, Azure-style bases and local servers
+    /// (Ollama, LM Studio, llama.cpp, vLLM).
+    OpenaiCompat,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AiModelInfo {
     pub id: String,
     pub label: String,
     pub note: String,
+    /// Accepts image inputs.
+    #[serde(default)]
+    pub vision: bool,
+    /// Supports tool/function calling. `false` → chat/help only.
+    #[serde(default = "d_true")]
+    pub tools: bool,
+    /// Reasoning model (sends `reasoning_effort` / `max_completion_tokens` on the OpenAI wire format).
+    #[serde(default)]
+    pub reasoning: bool,
 }
 
-/// Sent to clients (never contains the key).
+/// A configured provider, as sent to clients (never contains the key).
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiProviderOut {
+    pub id: String,
+    pub name: String,
+    pub kind: AiProviderKind,
+    pub base_url: String,
+    /// A key is stored (or found in the environment).
+    pub has_key: bool,
+    /// False for localhost / LAN-less local servers.
+    pub needs_key: bool,
+    pub models: Vec<AiModelInfo>,
+    /// Created from a built-in preset.
+    pub builtin: bool,
+}
+
+/// Catalog entry offered by the UI to add a provider with one tap.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiPreset {
+    pub id: String,
+    pub name: String,
+    pub kind: AiProviderKind,
+    pub base_url: String,
+    pub needs_key: bool,
+    /// Where the user gets an API key (or installs the local server).
+    pub doc_url: String,
+    /// Suggested models; always refreshable with `AiListModels`.
+    pub models: Vec<AiModelInfo>,
+}
+
+/// Sent to clients (never contains keys). Default (no providers) = assistant not configured.
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AiConfigOut {
-    pub has_key: bool,
     pub enabled: bool,
+    pub active_provider: String,
     pub model: String,
     /// `low` | `medium` | `high`
     pub effort: String,
     pub mode: AiMode,
-    pub models: Vec<AiModelInfo>,
+    pub providers: Vec<AiProviderOut>,
+    pub presets: Vec<AiPreset>,
+}
+
+/// Add or update a provider. `id` of an existing provider updates it; otherwise it is created.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiProviderIn {
+    pub id: String,
+    pub name: String,
+    pub kind: AiProviderKind,
+    pub base_url: String,
+    /// `Some("")` clears the stored key; `None` keeps it.
+    #[serde(default)]
+    pub api_key: Option<String>,
+    /// Replace the model list (e.g. after the user edits capability flags).
+    #[serde(default)]
+    pub models: Option<Vec<AiModelInfo>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct AiConfigIn {
-    /// `Some("")` clears the key.
     #[serde(default)]
-    pub api_key: Option<String>,
+    pub provider: Option<AiProviderIn>,
     #[serde(default)]
-    pub enabled: Option<bool>,
+    pub remove_provider: Option<String>,
+    #[serde(default)]
+    pub active_provider: Option<String>,
     #[serde(default)]
     pub model: Option<String>,
+    #[serde(default)]
+    pub enabled: Option<bool>,
     #[serde(default)]
     pub effort: Option<String>,
     #[serde(default)]
@@ -1760,6 +1838,8 @@ pub enum ServerMsg {
     AiEvent { session: String, ev: AiEvent },
     /// Assistant configuration (sent on connect and after changes).
     AiConfig { cfg: AiConfigOut },
+    /// Result of `AiTestProvider`.
+    AiTest { provider: String, ok: bool, message: String, ms: u32 },
     /// Show backups (auto + manual). Sent on connect and after changes.
     Backups { items: Vec<BackupInfo> },
     /// Art-Net nodes discovered via ArtPoll.
