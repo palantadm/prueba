@@ -18,7 +18,12 @@ import type { Timeline } from "./Timeline";
 import type { UniverseCfg } from "./UniverseCfg";
 import type { VcPage } from "./VcPage";
 
-export type Show = { name: string, universes: Array<UniverseCfg>, fixtures: Array<Fixture>, groups: Array<Group>, palettes: Array<Palette>, scenes: Array<Scene>, chases: Array<Chase>, speed_masters: Array<SpeedMaster>, macros: Array<Macro>, scripts: Array<Script>, timelines: Array<Timeline>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
+export type Show = { name: string, universes: Array<UniverseCfg>, fixtures: Array<Fixture>, groups: Array<Group>, palettes: Array<Palette>, scenes: Array<Scene>, chases: Array<Chase>, speed_masters: Array<SpeedMaster>, macros: Array<Macro>, 
+/**
+ * Per-profile "locate" look: attribute values that make a fixture of that profile visibly light
+ * (dimmer up, colour/white, shutter open, lamp-on control channel…). Overrides the automatic guess.
+ */
+locate: { [key in string]?: { [key in string]?: number } }, scripts: Array<Script>, timelines: Array<Timeline>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
 /**
  * Profiles imported into / customised in this show (merged over the built-in library).
  */

@@ -1083,6 +1083,10 @@ pub struct Show {
     pub speed_masters: Vec<SpeedMaster>,
     #[serde(default)]
     pub macros: Vec<Macro>,
+    /// Per-profile "locate" look: attribute values that make a fixture of that profile visibly light
+    /// (dimmer up, colour/white, shutter open, lamp-on control channel…). Overrides the automatic guess.
+    #[serde(default)]
+    pub locate: BTreeMap<String, Attrs>,
     #[serde(default)]
     pub scripts: Vec<Script>,
     #[serde(default)]
@@ -1115,6 +1119,7 @@ impl Default for Show {
             chases: vec![],
             speed_masters: vec![],
             macros: vec![],
+            locate: BTreeMap::new(),
             scripts: vec![],
             timelines: vec![],
             cuelists: vec![],
@@ -1646,8 +1651,12 @@ pub enum Command {
     /// Re-send the Art-Net node list after an ArtPoll.
     NodesScan,
     OutputTest { mode: TestMode },
-    /// Locate a fixture: dimmer/colour to full, pan/tilt home, shutter open.
+    /// Locate a fixture: dimmer/colour to full, pan/tilt home, shutter open, lamp on (see `Show.locate`).
     Identify { fixture: u32, on: bool },
+    /// Save (`Some`) or remove (`None`) the locate look of a fixture profile.
+    LocateSave { profile: String, attrs: Option<Attrs> },
+    /// Save the programmer values currently held for `fixture` as the locate look of its profile.
+    LocateCapture { fixture: u32 },
     // ── cuelists ──
     CuelistSave { cuelist: Cuelist },
     CuelistRemove { id: u32 },

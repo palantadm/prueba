@@ -51,6 +51,65 @@ impl DataRt {
     }
 }
 
+/// Automatic "make it visibly light" look for one patched fixture (no saved override).
+pub(super) fn locate_guess(pf: &PatchFixture) -> Attrs {
+    let mut a = Attrs::new();
+    if pf.has_dimmer {
+        a.insert("dimmer".into(), 1.0);
+    }
+    let mut any_colour = false;
+    for c in COLOR_ATTRS.iter().filter(|c| **c != "uv") {
+        if pf.has_attr(c) {
+            a.insert((*c).into(), 1.0);
+            any_colour = true;
+        }
+    }
+    if !pf.has_dimmer && !any_colour {
+        a.insert("dimmer".into(), 1.0);
+    }
+    for ch in &pf.chans {
+        let attr = ch.attr.as_str();
+        match attr {
+            "dimmer" => {}
+            "pan" | "tilt" => {
+                a.insert(attr.into(), if ch.default.is_finite() { ch.default.clamp(0.0, 1.0) } else { 0.5 });
+            }
+            "shutter" => {
+                let v = open_value(ch).unwrap_or(if ch.default > 0.0 { ch.default } else { 1.0 });
+                a.insert("shutter".into(), v);
+            }
+            "colorwheel" | "gobo" | "gobo2" | "prism" | "iris" | "frost" => {
+                a.insert(attr.into(), open_value(ch).unwrap_or(ch.default));
+            }
+            "cto" | "uv" => {
+                a.insert(attr.into(), 0.0);
+            }
+            _ => {
+                // lamp-on / power-on style control channels, and anything else with a named "on" capability
+                if let Some(v) = lamp_on_value(ch) {
+                    a.insert(attr.into(), v);
+                }
+            }
+        }
+    }
+    a
+}
+
+/// Centre of a capability that switches the lamp / output on (never reset, off or maintenance).
+fn lamp_on_value(c: &ChannelDef) -> Option<f32> {
+    c.capabilities
+        .iter()
+        .find(|k| {
+            let l = k.label.to_lowercase();
+            let on = ["lamp on", "lamp-on", "lampon", "lamp strike", "lamp ignite", "ignite", "strike", "power on", "lámpara on", "lampara on", "encend", "lamp  on", "turn on", "output on"]
+                .iter()
+                .any(|w| l.contains(w));
+            let bad = ["off", "reset", "apag", "maint", "calib", "blackout"].iter().any(|w| l.contains(w));
+            on && !bad
+        })
+        .map(|k| (k.min as f32 + k.max as f32) / 2.0 / 255.0)
+}
+
 /// Normalised "open / no effect" position of a channel with named capabilities.
 fn open_value(c: &ChannelDef) -> Option<f32> {
     if c.capabilities.is_empty() {
@@ -130,6 +189,31 @@ impl Engine {
                     self.data.identifying.remove(&fixture);
                 }
                 self.dirty = true;
+            }
+            LocateSave { profile, attrs } => {
+                match attrs {
+                    Some(a) => {
+                        if a.is_empty() {
+                            return Err("No locate values given".into());
+                        }
+                        let a: Attrs = a.into_iter().map(|(k, v)| (k, v.clamp(0.0, 1.0))).collect();
+                        self.show.locate.insert(profile, a);
+                    }
+                    None => {
+                        self.show.locate.remove(&profile);
+                    }
+                }
+                self.touch();
+            }
+            LocateCapture { fixture } => {
+                let f = self.show.fixtures.iter().find(|f| f.id == fixture).ok_or(format!("Fixture {fixture} does not exist"))?;
+                let profile = f.profile.clone();
+                let held = self.programmer.get(&fixture).cloned().unwrap_or_default();
+                if held.is_empty() {
+                    return Err(format!("The programmer holds no values for fixture {fixture}: light it up first, then save"));
+                }
+                self.show.locate.insert(profile, held);
+                self.touch();
             }
             _ => {}
         }
@@ -211,51 +295,17 @@ impl Engine {
 
     // ───────────── render layers ─────────────
 
-    /// Locate layer: above masters (works in blackout). Replaces the fixture's attributes entirely.
-    pub(super) fn identify_layer(&self, merged: &mut PerFixture, now: f64) {
-        if self.data.identifying.is_empty() {
-            return;
-        }
-        let on = (now * 2.0).fract() < 0.5; // 2 Hz strobe
-        let level = if on { 1.0 } else { 0.0 };
+    /// Locate layer: above masters (works in blackout). Replaces the fixture's attributes entirely with a
+    /// steady, clearly lit look: dimmer up, colour/white on, shutter/iris/gobo/prism open, pan/tilt home,
+    /// lamp-on control channels engaged — then the profile's saved `Show.locate` look wins over the guess.
+    pub(super) fn identify_layer(&self, merged: &mut PerFixture, _now: f64) {
         for id in &self.data.identifying {
             let Some(pf) = self.patch.get(*id) else { continue };
-            let mut a = Attrs::new();
-            if pf.has_dimmer {
-                a.insert("dimmer".into(), level);
-                for c in COLOR_ATTRS.iter().filter(|c| **c != "uv") {
-                    if pf.has_attr(c) {
-                        a.insert((*c).into(), 1.0);
-                    }
-                }
-            } else {
-                let mut any = false;
-                for c in COLOR_ATTRS.iter().filter(|c| **c != "uv") {
-                    if pf.has_attr(c) {
-                        a.insert((*c).into(), level);
-                        any = true;
-                    }
-                }
-                if !any {
-                    a.insert("dimmer".into(), level);
-                }
-            }
-            for ch in &pf.chans {
-                match ch.attr.as_str() {
-                    "pan" | "tilt" => {
-                        a.insert(ch.attr.clone(), if ch.default.is_finite() { ch.default.clamp(0.0, 1.0) } else { 0.5 });
-                    }
-                    "shutter" => {
-                        a.insert("shutter".into(), open_value(ch).unwrap_or(1.0));
-                    }
-                    "colorwheel" | "gobo" | "gobo2" | "prism" | "iris" | "frost" => {
-                        if let Some(v) = open_value(ch) {
-                            a.insert(ch.attr.clone(), v);
-                        } else {
-                            a.insert(ch.attr.clone(), ch.default);
-                        }
-                    }
-                    _ => {}
+            let profile = self.show.fixtures.iter().find(|f| f.id == *id).map(|f| f.profile.as_str()).unwrap_or("");
+            let mut a = locate_guess(pf);
+            if let Some(custom) = self.show.locate.get(profile) {
+                for (k, v) in custom {
+                    a.insert(k.clone(), *v);
                 }
             }
             merged.insert(*id, a);
@@ -402,7 +452,7 @@ mod tests {
     }
 
     #[test]
-    fn identify_layers_above_masters_and_strobes() {
+    fn identify_layers_above_masters_and_stays_steady() {
         let mut e = engine();
         add(&mut e, "generic/rgb-par", "3ch", 1);
         add(&mut e, "generic/mh-spot", "16ch", 1);
@@ -413,7 +463,7 @@ mod tests {
         e.handle(Command::Identify { fixture: 2, on: true }).unwrap();
         assert!(e.handle(Command::Identify { fixture: 99, on: true }).is_err());
         assert_eq!(e.build_rt().identifying, vec![1, 2]);
-        e.render(0.0); // strobe phase "on"
+        e.render(0.0);
         let f = **e.frames.get(&1).unwrap();
         assert_eq!(&f[0..3], &[255, 255, 255], "RGB par full even in blackout");
         let m = e.patch.get(2).unwrap();
@@ -421,15 +471,61 @@ mod tests {
         let pan = mover_pan.offset as usize + m.address as usize - 1;
         assert_eq!(f[dim], 255, "mover dimmer full");
         assert_eq!(f[pan], channel_bytes(&mover_pan, mover_pan.default).0, "pan homed (programmer value replaced)");
-        e.render(0.3); // phase "off"
+        e.render(0.3); // steady: same look half a second later
         let f = **e.frames.get(&1).unwrap();
-        assert_eq!(&f[0..3], &[0, 0, 0]);
-        assert_eq!(f[dim], 0);
+        assert_eq!(&f[0..3], &[255, 255, 255]);
+        assert_eq!(f[dim], 255);
         e.handle(Command::Identify { fixture: 1, on: false }).unwrap();
         e.handle(Command::Identify { fixture: 2, on: false }).unwrap();
         e.render(0.0);
         assert_eq!(e.frames[&1][0], 0, "blackout applies again once identify is off");
         assert!(e.build_rt().identifying.is_empty());
+    }
+
+    #[test]
+    fn locate_guess_engages_lamp_and_saved_look_wins() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        let pf = e.patch.get(1).unwrap().clone();
+        let g = locate_guess(&pf);
+        assert_eq!(g.get("dimmer"), Some(&1.0));
+        // custom look for the profile: pretend the control channel needs 0.5 to strike the lamp
+        let mut custom = Attrs::new();
+        custom.insert("control".into(), 0.5);
+        custom.insert("zoom".into(), 0.25);
+        e.handle(Command::LocateSave { profile: "generic/mh-spot".into(), attrs: Some(custom) }).unwrap();
+        e.handle(Command::Identify { fixture: 1, on: true }).unwrap();
+        e.render(0.0);
+        let m = e.patch.get(1).unwrap();
+        let at = |attr: &str| m.chans.iter().find(|c| c.attr == attr).map(|c| c.offset as usize + m.address as usize - 1).unwrap();
+        let f = **e.frames.get(&1).unwrap();
+        assert_eq!(f[at("control")], 128, "saved control value");
+        assert_eq!(f[at("zoom")], 64);
+        assert_eq!(f[at("dimmer")], 255, "guess still supplies dimmer");
+        e.handle(Command::LocateSave { profile: "generic/mh-spot".into(), attrs: None }).unwrap();
+        assert!(e.show.locate.is_empty());
+    }
+
+    #[test]
+    fn locate_capture_saves_programmer_values_for_the_profile() {
+        let mut e = engine();
+        add(&mut e, "generic/rgb-par", "3ch", 1);
+        assert!(e.handle(Command::LocateCapture { fixture: 1 }).is_err(), "nothing held yet");
+        assert!(e.handle(Command::LocateCapture { fixture: 9 }).is_err());
+        set(&mut e, 1, "red", 1.0);
+        set(&mut e, 1, "green", 0.5);
+        e.handle(Command::LocateCapture { fixture: 1 }).unwrap();
+        let l = &e.show.locate["generic/rgb-par"];
+        assert_eq!((l["red"], l["green"]), (1.0, 0.5));
+    }
+
+    #[test]
+    fn lamp_on_capability_is_recognised_and_reset_is_not() {
+        let cap = |min: u8, max: u8, l: &str| Capability { min, max, label: l.into(), color: None, image: None, wheel: None, slot: None };
+        let mut c = ChannelDef { attr: "control".into(), offset: 0, fine: None, default: 0.0, invert: false, capabilities: vec![cap(0, 9, "No function"), cap(10, 19, "Reset"), cap(20, 29, "Lamp off"), cap(30, 39, "Lamp on")] };
+        assert!((lamp_on_value(&c).unwrap() - 34.5 / 255.0).abs() < 1e-6);
+        c.capabilities = vec![cap(0, 9, "Reset"), cap(10, 255, "Lamp off")];
+        assert!(lamp_on_value(&c).is_none());
     }
 
     #[test]

@@ -930,7 +930,7 @@ impl Engine {
             // be-ai
             c @ (AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } | AiListModels { .. } | AiTestProvider { .. }) => return self.ai.dispatch(c),
             // be-data
-            c @ (BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. }) => {
+            c @ (BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. } | LocateSave { .. } | LocateCapture { .. }) => {
                 self.data_command(c)?
             }
             SceneRecord { id, name, from_output, fixtures, merge, refs: _ } => self.scene_record(id, name, from_output, fixtures, merge)?,

@@ -126,9 +126,10 @@
 .ai-preset:hover { background: var(--ink-3); }
 .ai-preset b { font-size: var(--fs-md); }
 .ai-model { display: flex; align-items: center; gap: var(--s-3); padding: 8px 4px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.ai-model-name { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+.ai-model-name { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
 .ai-model .check { min-height: 44px; }
 .ai-note { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--ink-2); padding: 10px 14px; color: var(--dim); font-size: var(--fs-sm); line-height: 1.5; }
 .ai-preset-cell { display: flex; flex-direction: column; gap: 4px; }
 .ai-preset-cell .ai-preset { flex: 1; width: 100%; }
 .ai-preset-link { color: var(--cyan); font-size: var(--fs-xs); padding: 6px 4px; min-height: 32px; display: inline-flex; align-items: center; }
+.ai-model .check { gap: 8px; }

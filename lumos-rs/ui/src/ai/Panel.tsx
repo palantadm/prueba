@@ -197,13 +197,15 @@ function Transcript() {
   };
   const toEnd = () => { const e = el.current; if (e) { stick.current = true; e.scrollTo({ top: e.scrollHeight, behavior: "smooth" }); setAway(false); } };
 
+  const lastItem = arr[arr.length - 1];
+  const waiting = !!lastItem && ((lastItem.k === "confirm" && !lastItem.resolved) || (lastItem.k === "ask" && lastItem.answered === undefined));
   const streaming = arr.length > 0 && arr[arr.length - 1].k === "ai" && (arr[arr.length - 1] as Extract<Item, { k: "ai" }>).streaming;
   return (
     <div class="ai-scroll-wrap">
       <div class="ai-scroll" ref={el} onScroll={onScroll} role="log" aria-live="polite" aria-label={t("Conversation")}>
         {!aiReady.value ? <Onboarding /> : arr.length === 0 ? <Welcome /> : arr.map((it) => <Entry key={it.id} it={it} />)}
-        {run && !streaming && <div class="ai-status"><span class="ai-spin" aria-hidden="true" />{status || t("Thinking…")}</div>}
-        {run && streaming && status && <div class="ai-status">{status}</div>}
+        {run && !streaming && !waiting && <div class="ai-status"><span class="ai-spin" aria-hidden="true" />{status || t("Thinking…")}</div>}
+        {run && streaming && !waiting && status && <div class="ai-status">{status}</div>}
       </div>
       {away && <button class="btn sm ai-jump" onClick={toEnd}>↓ {t("Jump to end")}</button>}
     </div>

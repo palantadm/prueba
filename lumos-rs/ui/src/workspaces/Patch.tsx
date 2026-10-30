@@ -6,6 +6,7 @@ import { collisions, footprint, modeOf, profileById } from "../lib/fixtures";
 import { AddDialog } from "./patch/AddDialog";
 import { ImportDialog } from "./patch/ImportDialog";
 import { MorphDialog } from "./patch/MorphDialog";
+import { LocateDialog } from "./patch/LocateDialog";
 import { UniverseMap } from "./patch/UniverseMap";
 import { t, tp } from "../i18n";
 
@@ -24,6 +25,7 @@ export function Patch() {
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [morphing, setMorphing] = useState(false);
+  const [locating, setLocating] = useState(false);
   const [q, setQ] = useState("");
   const anchor = useRef<number | null>(null);
   const sorted = useMemo(() => [...fixtures].sort((a, b) => a.id - b.id), [fixtures]);
@@ -60,7 +62,9 @@ export function Patch() {
         <Segmented value={view} onChange={setView} label={t("View")} options={[{ value: "table", label: t("Table") }, { value: "map", label: t("Universe map") }]} />
         <button class="btn tall" onClick={() => setImporting(true)} title={t("Import GDTF, QLC+ (.qxf) or Open Fixture Library (.json) fixture files")}>{t("Import fixtures…")}</button>
         <button class={`btn tall ${selIdentOn ? "on" : ""}`} disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={identifySel}
-          title={t("Locate the selected fixtures: full light, home position, flashing")}>{selIdentOn ? t("Stop identifying") : t("Identify selection")}</button>
+          title={t("Locate the selected fixtures: full light, open shutter, home position, lamp on")}>{selIdentOn ? t("Stop identifying") : t("Identify selection")}</button>
+        <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setLocating(true)}
+          title={t("Set what “Identify” does for this fixture model (dimmer, colour, shutter, lamp on…)")}>{t("Locate look…")}</button>
         <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setMorphing(true)}
           title={t("Replace the selected fixtures with another model keeping cues, scenes and groups")}>{t("Swap (Morph)")}</button>
         <button class="btn tall danger" disabled={!selection.value.length} onClick={del}>{t("Delete")}{selection.value.length ? ` (${selection.value.length})` : ""}</button>
@@ -99,6 +103,7 @@ export function Patch() {
       {adding && <AddDialog onClose={() => setAdding(false)} />}
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
       {morphing && <MorphDialog ids={selection.value} onClose={() => setMorphing(false)} />}
+      {locating && (() => { const fx = fixtures.find((x) => selection.value.includes(x.id)); return fx ? <LocateDialog fixture={fx} onClose={() => setLocating(false)} /> : null; })()}
     </div>
   );
 }
