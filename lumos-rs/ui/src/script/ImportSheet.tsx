@@ -3,7 +3,7 @@ import { send, show } from "../store";
 import { Modal, TextField } from "../ui";
 import { t } from "../i18n";
 import type { Script, ScriptImport } from "../types";
-import { ApiError, importDraft, uploadMedia } from "./api";
+import { ApiError, importDraft } from "./api";
 import { setActive } from "./store";
 import { SCRIPT_TEST_ID, nextId } from "./util";
 
@@ -30,7 +30,8 @@ export function ImportSheet(props: { onClose: () => void }) {
       setName(d.name || src.file?.name.replace(/\.[^.]+$/, "") || t("New script"));
     } catch (e) {
       const status = e instanceof ApiError ? e.status : 0;
-      if (status === 422) setErr(t("This PDF has no selectable text (it looks like a scan). Export it with text from the original document, or paste the text instead."));
+      const code = e instanceof ApiError ? e.code : "";
+      if (code === "scanned_pdf") setErr(t("This PDF has no selectable text (it looks like a scan). Export it with text from the original document, or paste the text instead."));
       else if (status === 413) setErr(t("The file is too large."));
       else if (status === 0) setErr(t("Could not reach the server."));
       else setErr((e as Error).message || t("Could not read the file."));
@@ -42,8 +43,7 @@ export function ImportSheet(props: { onClose: () => void }) {
     if (!draft) return;
     setBusy("saving");
     try {
-      let pdf: string | null = null;
-      if (file && /\.pdf$/i.test(file.name)) { try { pdf = await uploadMedia(file); } catch { /* script still usable without the viewer */ } }
+      const pdf = draft.pdf ?? null;
       const id = nextId((show.value?.scripts ?? []).filter((s) => s.id < SCRIPT_TEST_ID));
       const script: Script = { id, name: name.trim() || draft.name || t("New script"), blocks: draft.blocks, pdf };
       await send({ type: "script_save", script });

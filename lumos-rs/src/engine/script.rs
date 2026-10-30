@@ -470,6 +470,7 @@ impl Engine {
                     att.follow()
                 }
             });
+            let _ = rustls::crypto::ring::default_provider().install_default();
             let client = match reqwest::Client::builder().timeout(Duration::from_secs(5)).redirect(policy).build() {
                 Ok(c) => c,
                 Err(e) => return log("error", format!("HTTP client: {e}")),

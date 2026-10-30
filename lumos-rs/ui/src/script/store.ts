@@ -52,6 +52,17 @@ export function saveScript(s: Script, immediate = false) {
   if (immediate) void flush(my);
   else timer = window.setTimeout(() => void flush(my), 220);
 }
+/** Save and wait for the engine's verdict; throws its validation message (the draft is rolled back). */
+export async function saveScriptStrict(s: Script): Promise<void> {
+  const n = normalizeScript(s);
+  clearTimeout(timer);
+  ++ver;
+  draft.value = n;
+  try { await send({ type: "script_save", script: n }, { quiet: true }); }
+  catch (e) { draft.value = null; throw e; }
+  const my = ver;
+  setTimeout(() => { if (ver === my) draft.value = null; }, 700);
+}
 export function editScript(f: (s: Script) => Script, immediate = false) {
   const cur = currentScript();
   if (cur) saveScript(f(structuredClone(cur)), immediate);

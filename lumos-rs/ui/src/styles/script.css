@@ -111,3 +111,4 @@
   .sc-spk { text-align: left; }
 }
 button.sc-follow { background: none; border: 0; color: var(--text); padding: 0 var(--s-2); font: inherit; font-size: var(--fs-md); font-weight: 600; }
+button.sc-action-title { display: flex; align-items: center; gap: var(--s-2); flex: 1; min-width: 0; min-height: var(--touch); background: none; border: 0; color: inherit; font: inherit; text-align: left; padding: 0; cursor: pointer; }

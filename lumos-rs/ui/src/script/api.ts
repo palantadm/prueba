@@ -1,21 +1,21 @@
 import type { CueMark, ScriptBlock, ScriptImport } from "../types";
 
 export class ApiError extends Error {
-  constructor(public status: number, msg: string) { super(msg); }
+  constructor(public status: number, msg: string, public code = "") { super(msg); }
 }
 
-async function errText(r: Response): Promise<string> {
+async function fail(r: Response): Promise<ApiError> {
   const raw = await r.text().catch(() => "");
-  try { const j = JSON.parse(raw); return String(j.error ?? j.message ?? raw); } catch { return raw || `HTTP ${r.status}`; }
+  try { const j = JSON.parse(raw); return new ApiError(r.status, String(j.error ?? j.message ?? raw), String(j.code ?? "")); } catch { return new ApiError(r.status, raw || `HTTP ${r.status}`); }
 }
 
 /** Parse a script draft from a file (.pdf .txt .md .fountain) or pasted text. */
 export async function importDraft(src: { file?: File; text?: string }): Promise<ScriptImport> {
   const fd = new FormData();
   if (src.file) fd.append("file", src.file, src.file.name);
-  else fd.append("text", src.text ?? "");
+  else fd.append("file", new File([src.text ?? ""], "pegado.txt", { type: "text/plain" }));
   const r = await fetch("/api/script/import", { method: "POST", body: fd });
-  if (!r.ok) throw new ApiError(r.status, await errText(r));
+  if (!r.ok) throw await fail(r);
   return (await r.json()) as ScriptImport;
 }
 
@@ -23,7 +23,7 @@ export async function uploadMedia(file: File): Promise<string> {
   const fd = new FormData();
   fd.append("file", file, file.name);
   const r = await fetch("/api/media", { method: "POST", body: fd });
-  if (!r.ok) throw new ApiError(r.status, await errText(r));
+  if (!r.ok) throw await fail(r);
   const j = await r.json();
   return String(j.url ?? j.path ?? "");
 }
@@ -50,6 +50,6 @@ export function parseSuggestions(j: unknown, existing: ScriptBlock[]): Suggestio
 
 export async function suggestMarks(blocks: ScriptBlock[]): Promise<Suggestion[]> {
   const r = await fetch("/api/script/suggest", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ blocks }) });
-  if (!r.ok) throw new ApiError(r.status, await errText(r));
+  if (!r.ok) throw await fail(r);
   return parseSuggestions(await r.json(), blocks);
 }

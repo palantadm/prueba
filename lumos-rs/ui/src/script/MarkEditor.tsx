@@ -4,7 +4,7 @@ import { Modal, Select, TextField } from "../ui";
 import { confirmDialog } from "../ui";
 import { t } from "../i18n";
 import type { CueMark, MarkKind, ScriptAction } from "../types";
-import { currentScript, editScript } from "./store";
+import { currentScript, editScript, saveScriptStrict } from "./store";
 import { ActionEditor, PresetPicker, Stepper } from "./Actions";
 import { KIND_COLOR, MARK_KINDS, kindLabel, newMark, words } from "./util";
 import { blockEditor, markEditor } from "./Reader";
@@ -28,16 +28,15 @@ function MarkEditor(props: { blockId: number; markId: number | null; word: numbe
   const close = () => (markEditor.value = null);
   const patch = (p: Partial<CueMark>) => setM((x) => ({ ...x, ...p }));
 
-  const save = () => {
-    editScript((s) => ({
-      ...s,
-      blocks: s.blocks.map((b) => {
-        if (b.id !== block.id) return b;
-        const rest = b.marks.filter((x) => x.id !== m.id);
-        return { ...b, marks: [...rest, m] };
-      }),
-    }), true);
-    close();
+  const [err, setErr] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const save = async () => {
+    const cur = currentScript();
+    if (!cur) return;
+    setSaving(true); setErr(null);
+    const next = { ...structuredClone(cur), blocks: cur.blocks.map((b) => (b.id !== block.id ? b : { ...b, marks: [...b.marks.filter((x) => x.id !== m.id), m] })) };
+    try { await saveScriptStrict(next); close(); }
+    catch (e) { setErr((e as Error).message); setSaving(false); document.querySelector(".modal-body")?.scrollTo({ top: 0, behavior: "smooth" }); }
   };
   const remove = async () => {
     if (!(await confirmDialog(t("Delete cue"), t("Delete cue “{name}”?", { name: m.label || kindLabel(m.kind) }), { danger: true, ok: t("Delete") }))) return;
@@ -62,10 +61,11 @@ function MarkEditor(props: { blockId: number; markId: number | null; word: numbe
           )}
           <span class="sp" />
           <button class="btn lg" onClick={close}>{t("Cancel")}</button>
-          <button class="btn lg primary" onClick={save}>{t("Save")}</button>
+          <button class="btn lg primary" disabled={saving} onClick={() => void save()}>{t("Save")}</button>
         </>
       }>
       <div class="col" style={{ gap: 18 }}>
+        {err && <div class="sc-err" role="alert">{err}</div>}
         <TextField label={t("Name")} value={m.label} placeholder={t("e.g. Sunrise on the patio")} onChange={(label) => patch({ label })} />
 
         <div class="field"><label>{t("Type")}</label>
