@@ -159,11 +159,11 @@ function Timing({ list, cue, save }: { list: Cuelist; cue: Cue; save: (p: Partia
   };
   return (
     <div class="cu-timing">
-      <div class="cu-defs mono" aria-label={t("Cue default")}>
-        <div><span class="label">{t("Fade in")}</span><b>{fmtNum(cue.fade_in)}</b></div>
-        <div><span class="label">{t("Fade out")}</span><b>{fmtNum(cue.fade_out)}</b></div>
-        <div><span class="label">{t("Delay")}</span><b>{fmtNum(cue.delay)}</b></div>
-        <div><span class="label">{t("Follow")}</span><b>{cue.follow == null ? "—" : fmtNum(cue.follow)}</b></div>
+      <div class="cu-defs" role="group" aria-label={t("Cue default")}>
+        <div><span class="label">{t("Fade in")}</span><Num value={cue.fade_in} placeholder="0" label={t("Fade in")} onCommit={(v) => v !== undefined && save({ fade_in: v })} /></div>
+        <div><span class="label">{t("Fade out")}</span><Num value={cue.fade_out} placeholder="0" label={t("Fade out")} onCommit={(v) => v !== undefined && save({ fade_out: v })} /></div>
+        <div><span class="label">{t("Delay")}</span><Num value={cue.delay} placeholder="0" label={t("Delay")} onCommit={(v) => v !== undefined && save({ delay: v })} /></div>
+        <div><span class="label">{t("Follow")}</span><Num value={cue.follow ?? undefined} placeholder="—" label={t("Follow")} onCommit={(v) => save({ follow: v ?? null })} /></div>
       </div>
       <div class="dim cu-hint">{t("Blank = use the cue's own delay / fade. Per-group values override them for that group of attributes.")}</div>
       <div class="cu-grid" role="group" aria-label={t("Timing per attribute group")}>

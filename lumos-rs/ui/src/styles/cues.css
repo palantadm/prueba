@@ -1,7 +1,7 @@
 /* Cues + Timeline workspaces (touch skin). Tokens only; every control ≥ 48 px; no hover-only affordances.
    Colour meaning: green = GO/running, cyan = selection/next, amber = live/manual, violet = chases/effects, red = danger. */
 
-.cu-root { display: grid; grid-template-columns: 236px minmax(0, 1fr) 360px; grid-template-rows: minmax(0, 1fr) auto; gap: var(--s-2); height: 100%; min-height: 0; padding: var(--s-2); }
+.cu-root { display: grid; grid-template-columns: 224px minmax(0, 1fr) 344px; grid-template-rows: minmax(0, 1fr) auto; gap: var(--s-2); height: 100%; min-height: 0; padding: var(--s-2); }
 .cu-root > .cu-execs { grid-column: 1 / -1; }
 
 /* ── left: cuelists + macros ───────────────────────────────── */
@@ -39,11 +39,12 @@
 .cu-play { position: relative; flex: none; display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3); overflow: hidden; }
 .cu-pbtns { display: flex; gap: var(--s-2); flex: none; align-items: center; }
 .cu-go.btn { width: 176px; height: 88px; border-radius: var(--r-xl); font-size: 32px; font-weight: 800; letter-spacing: .12em; }
-.cu-pb.btn { width: 104px; height: 88px; padding: 0; border-radius: var(--r-xl); font-size: var(--fs-md); font-weight: 700; letter-spacing: .04em; }
+.cu-pb.btn { width: 100px; height: 88px; padding: 0; border-radius: var(--r-xl); font-size: var(--fs-md); font-weight: 700; letter-spacing: .04em; }
 .cu-sep { align-self: stretch; width: 1px; background: var(--line); flex: none; }
 .cu-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--s-2); }
-.cu-now { display: flex; align-items: flex-end; gap: var(--s-4); min-width: 0; }
-.cu-now > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cu-now { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 6px var(--s-4); min-width: 0; }
+.cu-now > div { display: flex; flex-direction: column; gap: 2px; flex: none; }
+.cu-now .sp { flex: 1 1 0; min-width: 0; }
 .cu-num { font-family: var(--font-mono); font-size: 32px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; color: var(--cyan); }
 .cu-num.cur { color: var(--green); }
 .cu-remain { font-size: var(--fs-lg); }
@@ -111,8 +112,9 @@
 
 .cu-timing { display: flex; flex-direction: column; gap: var(--s-3); }
 .cu-defs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-.cu-defs > div { display: flex; flex-direction: column; gap: 2px; padding: 8px; background: var(--ink-2); border: 1px solid var(--line); border-radius: var(--r-md); }
-.cu-defs b { font-size: var(--fs-lg); }
+.cu-defs > div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cu-defs .label { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cu-defs .input.cu-val { padding: 0 6px; }
 .cu-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; align-items: center; }
 .cu-grid .g { font-weight: 600; font-size: var(--fs-sm); }
 .input.cu-val { min-height: 48px; width: 100%; font-family: var(--font-mono); font-size: var(--fs-md); font-weight: 600; background: var(--ink-3); }
@@ -146,7 +148,7 @@
 .cu-ex .kdot { width: 10px; height: 10px; border-radius: 50%; background: var(--kc, var(--amber)); flex: none; }
 .cu-ex .lvl { font-size: var(--fs-sm); color: var(--kc, var(--amber)); font-weight: 700; }
 .cu-ex-head .nm { font-size: var(--fs-xs); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cu-ex-fader { flex: 1; min-height: 96px; display: flex; justify-content: center; padding: 8px 0; }
+.cu-ex-fader { flex: 1; min-height: 80px; display: flex; justify-content: center; padding: 8px 0; }
 .cu-ex-btns { display: flex; gap: 6px; }
 .cu-ex-btns .btn { flex: 1; min-width: 0; min-height: 48px; padding: 0 4px; font-size: var(--fs-xs); font-weight: 800; letter-spacing: .04em; }
 .cu-ex-btns .btn.go.lit { box-shadow: 0 0 0 2px var(--kc, var(--green)); }

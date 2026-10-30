@@ -25,7 +25,11 @@ export const isDesktopApp: boolean = (() => {
 
 export function initialWorkspace(): string {
   const fromUrl = q.get("ws");
-  if (fromUrl) return fromUrl;
+  if (fromUrl) {
+    // a secondary window remembers what it was opened with, so it is restored after a restart
+    if (isSecondary) saveWorkspace(fromUrl);
+    return fromUrl;
+  }
   try { return localStorage.getItem(wsKey) ?? "live"; } catch { return "live"; }
 }
 
