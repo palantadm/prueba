@@ -127,7 +127,7 @@ function BlockView(props: { script: Script; block: ScriptBlock; bi: number; pos:
   return (
     <div id={`sb-${block.id}`} class={cls} data-bi={bi} onClick={() => { if (!edit) blockSheet.value = block.id; }}>
       {block.kind === "speech" && <div class="sc-spk">{block.speaker}</div>}
-      {block.kind === "direction" && <div class="sc-spk dim">{t("Direction")}</div>}
+      {block.kind === "direction" && <div class="sc-spk dim">{t("Stage direction")}</div>}
       {block.kind === "note" && <div class="sc-spk note">{t("NOTE")}</div>}
       {block.kind === "heading" && <div class="sc-spk" />}
       <div class="sc-txt">{nodes}</div>

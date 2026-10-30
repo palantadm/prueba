@@ -10,6 +10,7 @@ import { Plan2D } from "./Plan2D";
 import { Settings } from "./Settings";
 import { VConsole } from "./VConsole";
 import { Timeline } from "./Timeline";
+import { Script } from "./Script";
 
 export type Workspace = { id: string; key: string; label: string; component: ComponentType };
 
@@ -25,4 +26,5 @@ export const workspaces: Workspace[] = [
   { id: "settings", key: "7", get label() { return t("Settings"); }, component: Settings },
   { id: "vc", key: "9", get label() { return t("Console"); }, component: VConsole },
   { id: "timeline", key: "0", get label() { return t("Timeline"); }, component: Timeline },
+  { id: "script", key: "g", get label() { return t("Script"); }, component: Script },
 ];
