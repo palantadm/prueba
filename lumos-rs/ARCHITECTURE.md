@@ -69,3 +69,32 @@ Shared and frozen: `src/model.rs`, `ui/src/store.ts`, `ui/src/gen/**`, `ui/src/s
   `looped`; `tc_start` follows show timecode (holds while TC is stopped; jumps >2 s are seeks).
 * **MSC** (`msc.rs`): SysEx `F0 7F <dev> 02 <fmt> <cmd> … F7` via `MidiIn` (browser needs Web MIDI `sysex: true`) or native MIDI. GO/STOP/RESUME/TIMED_GO/LOAD/ALL_OFF/RESET
   honouring `Settings.msc` (device id, list→cuelist map); LOAD arms the cue for the next MSC GO.
+
+## Script / running order ("Guion")
+Model (`model.rs`): `Script{blocks, pdf}` → `ScriptBlock{kind, speaker, text, page, marks}` → `CueMark{at_word, kind, actions, link, standby_blocks}`;
+persisted in `Show.scripts` (undoable). Mark order = (block order, `at_word`, list order).
+* **Runtime** (`engine/script.rs`): per-script reader pointer (runtime only, not saved) published as `Runtime.scripts`.
+  `ScriptGo` fires the next mark; `ScriptBack` re-arms the previous mark *without* firing; `ScriptGoto{block, mark}` only moves
+  the pointer (the next Go fires that mark; no mark = first mark at/after the block); `ScriptFire` fires one mark now; `ScriptReset`
+  rewinds. `ScriptFollow{on}`: any cue started anywhere (button, MIDI, MSC, macro…) whose `CueLink` matches a mark moves the reader
+  there without firing (cues started by the script itself are ignored). Firing a mark runs its `link` (GO that cue) then each
+  action in order; a failing action is logged (`cmd_log` + `recent`) and never stops the others. Nesting limit 8.
+* **Actions** (engine-side, so they work with every browser closed): `Console` = command-line text; `Osc` via the OSC output socket
+  (args typed by content: int, float, `true/false`, else string; `s:/i:/f:` prefix forces the type); `Midi` native port (feature `midi`)
+  else `ServerMsg::MidiOut` for the browser; `Http` on the tokio runtime (5 s timeout, same-host redirects only), result reported
+  asynchronously as `ServerMsg::Log` (error toast in the UI).
+* **Command line**: `script|guion|escaleta [N] go|back|reset|follow [on|off]|goto <block> [mark]|fire <block> <mark>`;
+  `osc <host>:<port> </address> [args…]`; `midi note|cc|pc <ch 1-16> <n> [v] [port…]`; `http get|post|put|patch|delete <url> [body…]`
+  (EN + ES aliases, "quoted text" keeps spaces). `osc/midi/http` are hand-parsed (host:port, addresses and URLs are not lexable):
+  their spans are blanked out of a same-length copy of the text, so other statements keep exact byte positions. Resolved external
+  actions travel in `Session.ext` and `run_cmdline` executes them after the statement's `Command`s.
+* **Import** (`script_import.rs`, `POST /api/script/import`, multipart `file`): `.pdf` (pure-Rust `pdf-extract`, repeating header/footer
+  and bare page numbers dropped, per-block `page`), `.txt`, `.md`, `.fountain`. Heuristics for Spanish theatre: headings (`ACTO I`,
+  `ESCENA 2`, `# …`, `.INT`), speakers (`JUAN.- …`, `DOÑA INÉS: …`, `JUAN (bajo). …`, own-line cues, `Juan:` once the name is known),
+  parenthetical stage directions (also multi-line and inline `(Pausa.)` inside a speech), `NOTA:`/`[[…]]` notes, list items (escaletas).
+  Returns a draft `ScriptImport{name, blocks, pages, warnings, pdf}` — nothing is saved; the PDF original is kept in `<data>/media`
+  and its URL is in `pdf`. Errors: 415 unknown type, 422 `{code:"scanned_pdf"}` (no text layer, needs OCR) or `"unreadable"`.
+* **Suggestions** (`POST /api/script/suggest`, `{script_id}` or `{blocks}` → `{suggestions:[{block, at_word, kind, label, matched}]}`):
+  ES/EN keywords (luz, apagón, suena, teléfono, vídeo, proyecta, telón, cambio de escena…) in stage directions / notes / headings
+  and inside `( )` of speeches. One per block and kind, skipping kinds the block already has a mark for. Never applied automatically.
+* E2E: `node scripts/e2e-script.mjs [binary]`.
