@@ -1554,6 +1554,20 @@ pub enum Command {
     VcXy { widget: u32, x: f32, y: f32 },
     /// Remove an imported/custom profile from the show library.
     LibraryRemove { id: String },
+    // ── AI assistant (be-ai) ──
+    /// Send a user message to the assistant. Streams `ServerMsg::AiEvent` for `session`.
+    AiSend { session: String, text: String, images: Vec<AiImage>, context: AiContext },
+    AiCancel { session: String },
+    /// Approve/deny a tool call the assistant is waiting on (`AiEvent::Confirm`).
+    AiConfirm { session: String, call: String, approve: bool },
+    /// Answer an `AiEvent::Ask` question.
+    AiAnswer { session: String, call: String, answer: String },
+    /// Forget the conversation.
+    AiReset { session: String },
+    /// Undo everything the assistant changed in this session (uses the show undo history).
+    AiUndo { session: String },
+    /// Machine-level assistant configuration (API key is stored outside the show and never sent back).
+    AiConfigure { cfg: AiConfigIn },
     /// Enable/disable a native (server-side) MIDI port. Machine-level setting, persisted outside the show.
     MidiEnable { output: bool, name: String, enabled: bool },
     // ── streaming ──
@@ -1596,6 +1610,120 @@ pub struct ArtNode {
     pub last_seen_ms: u32,
 }
 
+// ───────────────────────────── AI assistant ─────────────────────────────
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiImage {
+    /// `image/jpeg` | `image/png` | `image/webp` | `image/gif`
+    pub media_type: String,
+    /// Base64 without the `data:` prefix.
+    pub data: String,
+}
+
+/// What the user is looking at when they talk to the assistant.
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiContext {
+    /// Active workspace id (`live`, `cues`, `patch`, `stage`, …).
+    pub workspace: String,
+    /// Fixture ids selected in the UI.
+    pub selection: Vec<u32>,
+    /// `es` | `en`
+    pub lang: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AiRisk {
+    /// Reads state only.
+    Read,
+    /// Changes show data / programmer; no immediate effect on a running look (or undoable).
+    Edit,
+    /// Changes what the audience sees right now (GO, blackout, live output) or is destructive.
+    Live,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AiMode {
+    /// Confirm every tool call that changes anything.
+    Ask,
+    /// Confirm only `Live` risk (default).
+    Smart,
+    /// Never confirm.
+    Auto,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AiToolState {
+    Running,
+    Done,
+    Error,
+    Denied,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum AiEvent {
+    Started,
+    /// Streamed assistant text (Markdown).
+    Text { delta: String },
+    /// Short status line, e.g. "Consultando el patch…".
+    Status { text: String },
+    /// A tool call started/finished. `summary` is a one-line human description.
+    Tool { call: String, name: String, summary: String, risk: AiRisk, state: AiToolState, result: String },
+    /// Waiting for the user to approve this call.
+    Confirm { call: String, name: String, summary: String, risk: AiRisk, args: String },
+    /// Assistant asks the user a question (optionally with quick-reply options).
+    Ask { call: String, question: String, options: Vec<String> },
+    /// Turn finished. `changes` = undo steps created by the assistant in this session.
+    Done { input_tokens: u32, output_tokens: u32, changes: u32 },
+    Error { msg: String },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiModelInfo {
+    pub id: String,
+    pub label: String,
+    pub note: String,
+}
+
+/// Sent to clients (never contains the key).
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiConfigOut {
+    pub has_key: bool,
+    pub enabled: bool,
+    pub model: String,
+    /// `low` | `medium` | `high`
+    pub effort: String,
+    pub mode: AiMode,
+    pub models: Vec<AiModelInfo>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AiConfigIn {
+    /// `Some("")` clears the key.
+    #[serde(default)]
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+    #[serde(default)]
+    pub model: Option<String>,
+    #[serde(default)]
+    pub effort: Option<String>,
+    #[serde(default)]
+    pub mode: Option<AiMode>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct MidiPortInfo {
@@ -1628,6 +1756,10 @@ pub enum ServerMsg {
     Learned { source: Source },
     /// Saved shows list. Sent on connect and after save/delete.
     Shows { shows: Vec<ShowInfo> },
+    /// Assistant stream/events for a chat session.
+    AiEvent { session: String, ev: AiEvent },
+    /// Assistant configuration (sent on connect and after changes).
+    AiConfig { cfg: AiConfigOut },
     /// Show backups (auto + manual). Sent on connect and after changes.
     Backups { items: Vec<BackupInfo> },
     /// Art-Net nodes discovered via ArtPoll.

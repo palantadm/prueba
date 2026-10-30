@@ -1,54 +1,95 @@
-/* Lumos design tokens. Components must use these variables — never raw hex. */
+/* Lumos design tokens (touch console). Components must use these variables — never raw hex.
+   New names (--ink*, --amber, --cyan…) are canonical; the old names below are aliases kept
+   so existing stylesheets keep working while workspaces are restyled one by one. */
 :root {
-  /* surfaces (dark console) */
-  --bg-0: #0b0c0e;      /* app background */
-  --bg-1: #111316;      /* panels */
-  --bg-2: #181b1f;      /* raised / cards / table header */
-  --bg-3: #20242a;      /* inputs, buttons */
-  --bg-4: #2a2f37;      /* hover */
-  --line: #272b32;
-  --line-strong: #343a43;
+  color-scheme: dark;
+
+  /* surfaces */
+  --ink-0: #0a0c10;      /* app background */
+  --ink-1: #10131a;      /* panels, bars */
+  --ink-2: #171b24;      /* raised: tiles, cards, table header */
+  --ink-3: #1f2430;      /* controls: buttons, inputs */
+  --ink-4: #2a3140;      /* hover / active control */
+  --line: #262c3a;
+  --line-strong: #343c4e;
 
   /* text */
-  --text: #d9dde3;
-  --text-dim: #8a93a0;
-  --text-faint: #5a626d;
-  --text-on-accent: #04141a;
+  --text: #e8ebf2;
+  --dim: #a3abbc;        /* secondary text (≥ 7:1 on ink-1) */
+  --mute: #8791a5;       /* tertiary text, still ≥ 4.8:1 on ink-1 */
+  --on-accent: #06222c;
+  --on-amber: #1a1204;
+  --on-green: #04170c;
 
-  /* brand + state */
-  --accent: #3cc4e8;     /* selection, focus, links */
-  --accent-dim: #1b5666;
-  --live: #f5a524;       /* programmer / live values / warnings */
-  --live-dim: #5e3f0c;
-  --go: #35c46a;
-  --go-dim: #174a2b;
-  --stop: #e5484d;
-  --stop-dim: #521a1c;
-  --info: #5b8def;
+  /* meaning — one colour, one job */
+  --amber: #ffb02e;      /* programmer / live values / primary action */
+  --cyan: #4cc9f0;       /* selection, focus */
+  --green: #3ddc84;      /* GO, running, output OK */
+  --red: #ff5d5d;        /* blackout, delete, errors */
+  --violet: #b794ff;     /* chases, effects */
+  --orange: #ff9a3d;     /* beam, warnings */
+  --pink: #f06bb4;       /* colour */
+  --lime: #8bd450;       /* control */
+  --blue: #5b8def;       /* info */
+
+  /* dark tints for filled states */
+  --cyan-fill: #123a4a;
+  --amber-fill: #3a2a08;
+  --green-fill: #0f2a1c;
+  --green-fill-2: #14502e;
+  --red-fill: #3b1417;
+  --red-line: #6b2a2e;
+  --violet-fill: #241d3a;
+
+  /* ── legacy aliases (do not use in new code) ── */
+  --bg-0: var(--ink-0);
+  --bg-1: var(--ink-1);
+  --bg-2: var(--ink-2);
+  --bg-3: var(--ink-3);
+  --bg-4: var(--ink-4);
+  --text-dim: var(--dim);
+  --text-faint: var(--mute);
+  --text-on-accent: var(--on-accent);
+  --accent: var(--cyan);
+  --accent-dim: var(--cyan-fill);
+  --live: var(--amber);
+  --live-dim: var(--amber-fill);
+  --go: var(--green);
+  --go-dim: var(--green-fill-2);
+  --stop: var(--red);
+  --stop-dim: var(--red-fill);
+  --info: var(--blue);
 
   /* attribute families (match fixture channel groups) */
   --attr-intensity: #f2d98d;
   --attr-position: #46d4e8;
-  --attr-color: #e266b8;
-  --attr-beam: #ff9a3d;
-  --attr-control: #7bd66b;
-  --attr-effect: #b38cff;
+  --attr-color: var(--pink);
+  --attr-beam: var(--orange);
+  --attr-control: var(--lime);
+  --attr-effect: var(--violet);
 
-  /* spacing (4px base) */
+  /* spacing (4 px base) */
   --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px;
 
   /* shape */
-  --r-sm: 4px; --r-md: 6px; --r-lg: 10px;
-  --touch: 40px;         /* minimum interactive height */
+  --r-sm: 10px; --r-md: 12px; --r-lg: 14px; --r-xl: 18px; --r-pill: 999px;
+
+  /* touch sizes */
+  --touch: 48px;         /* minimum interactive height */
+  --touch-lg: 56px;      /* primary controls */
+  --touch-xl: 68px;      /* GO, blackout */
+  --dock-h: 92px;
+  --topbar-h: 64px;
 
   /* type */
-  --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: ui-monospace, "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
-  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 15px; --fs-xl: 20px;
+  --font-ui: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-xs: 12px; --fs-sm: 13px; --fs-md: 15px; --fs-lg: 17px; --fs-xl: 20px; --fs-2xl: 28px;
 
   /* elevation + motion */
   --shadow-1: 0 1px 2px rgba(0,0,0,.5);
   --shadow-2: 0 8px 28px rgba(0,0,0,.6);
+  --shadow-cap: 0 2px 8px rgba(0,0,0,.6);
   --ease: cubic-bezier(.2,.8,.2,1);
   --dur: 120ms;
 }

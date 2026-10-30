@@ -676,4 +676,5 @@ export const shell: Record<string, string> = {
   "Skipped": "Omitidos",
   "Warnings": "Avisos",
   "Could not read the audio file": "No se pudo leer el archivo de audio",
+  "GRAND MASTER": "MASTER GENERAL",
 };
