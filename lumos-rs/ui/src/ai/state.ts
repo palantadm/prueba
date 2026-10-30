@@ -144,8 +144,8 @@ export function handleAiEvent(ev: AiEvent) {
       const has = items.value.some((i) => i.k === "tool" && i.call === ev.call);
       if (has) patch((i) => i.k === "tool" && i.call === ev.call, (i) => ({ ...(i as Item & { k: "tool" }), summary: ev.summary || (i as Item & { k: "tool" }).summary, risk: ev.risk, state: ev.state, result: ev.result }));
       else push({ k: "tool", id: next(), call: ev.call, name: ev.name, summary: ev.summary, risk: ev.risk, state: ev.state, result: ev.result });
-      // the confirmation, if any, is settled once the call runs/ends
-      patch((i) => i.k === "confirm" && i.call === ev.call && !i.resolved, (i) => ({ ...(i as Item & { k: "confirm" }), resolved: ev.state === "denied" ? "no" : "yes" }));
+      // the confirmation, if any, is settled: the tool card now carries the outcome
+      items.value = items.value.filter((i) => !(i.k === "confirm" && i.call === ev.call));
       break;
     }
     case "confirm": {

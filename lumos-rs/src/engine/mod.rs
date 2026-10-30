@@ -15,6 +15,7 @@ mod playback;
 mod prog_tests;
 mod refs;
 mod scenes;
+mod script;
 mod speed;
 mod timeline;
 mod vconsole;
@@ -222,6 +223,8 @@ struct Engine {
     data: DataRt,
     /// In-app AI assistant (lives outside the engine task; see `ai/mod.rs`).
     ai: crate::ai::AiHub,
+    /// Script reader pointers and follow flags (see script.rs).
+    script: script::ScriptState,
 }
 
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
@@ -254,6 +257,7 @@ impl Engine {
         let mut e = Engine {
             data: DataRt::new(&store),
             ai: crate::ai::AiHub::new(store.clone(), out.clone()),
+            script: Default::default(),
             store,
             t0: now,
             out,
@@ -511,6 +515,7 @@ impl Engine {
     fn set_show(&mut self, show: Show) {
         self.data_before_replace();
         self.prog = Default::default();
+        self.script.reset();
         self.show = show;
         self.programmer.clear();
         self.runs.clear();
@@ -926,7 +931,14 @@ impl Engine {
             TimelineStop { id } => self.timeline_stop(id)?,
             TimelineSeek { id, t } => self.timeline_seek(id, t)?,
             // be-script
-            ScriptSave { .. } | ScriptRemove { .. } | ScriptGo { .. } | ScriptBack { .. } | ScriptGoto { .. } | ScriptFire { .. } | ScriptFollow { .. } | ScriptReset { .. } => {}
+            ScriptSave { script } => self.script_save(script)?,
+            ScriptRemove { id } => self.script_remove(id),
+            ScriptGo { id } => self.script_go(id)?,
+            ScriptBack { id } => self.script_back(id)?,
+            ScriptGoto { id, block, mark } => self.script_goto(id, block, mark)?,
+            ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
+            ScriptFollow { id, on } => self.script_follow_set(id, on)?,
+            ScriptReset { id } => self.script_reset(id)?,
             // be-ai
             c @ (AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } | AiListModels { .. } | AiTestProvider { .. }) => return self.ai.dispatch(c),
             // be-data
@@ -1363,6 +1375,7 @@ impl Engine {
         run.manual = None;
         run.compute_span();
         self.dirty = true;
+        self.script_follow_cue(id, cue.number);
     }
 
     fn update_playback(&mut self, now: f64) {
@@ -2019,7 +2032,7 @@ impl Engine {
             timecode: TimecodeRt { running: self.tc.running, frames, text: fmt_tc(frames, fps) },
             learn: self.learn,
             fps: self.fps,
-            scripts: vec![],
+            scripts: self.scripts_rt(),
             blind: self.prog.blind,
             undo: self.prog.hist.counts().0,
             redo: self.prog.hist.counts().1,

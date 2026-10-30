@@ -81,6 +81,7 @@ export type { ScriptBlock } from "./gen/ScriptBlock";
 export type { ScriptImport } from "./gen/ScriptImport";
 export type { ScriptKind } from "./gen/ScriptKind";
 export type { ScriptRt } from "./gen/ScriptRt";
+export type { ScriptSuggestion } from "./gen/ScriptSuggestion";
 export type { SerialDriver } from "./gen/SerialDriver";
 export type { ServerMsg } from "./gen/ServerMsg";
 export type { Settings } from "./gen/Settings";

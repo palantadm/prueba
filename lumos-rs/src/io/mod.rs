@@ -283,6 +283,11 @@ impl IoHub {
     /// Send one float OSC message to an arbitrary target (non-blocking; address resolved once and cached).
     /// Returns whether the datagram was handed to the socket.
     pub fn osc_send(&self, host: &str, port: u16, addr: &str, value: f32) -> bool {
+        self.osc_send_args(host, port, addr, vec![rosc::OscType::Float(value)])
+    }
+
+    /// Send one OSC message with any arguments to an arbitrary target (non-blocking).
+    pub fn osc_send_args(&self, host: &str, port: u16, addr: &str, args: Vec<rosc::OscType>) -> bool {
         let Some(sock) = &self.osc_tx else { return false };
         let target = {
             let mut cache = self.osc_resolved.lock();
@@ -291,10 +296,7 @@ impl IoHub {
             })
         };
         let Some(target) = target else { return false };
-        let pkt = rosc::OscPacket::Message(rosc::OscMessage {
-            addr: addr.to_string(),
-            args: vec![rosc::OscType::Float(value)],
-        });
+        let pkt = rosc::OscPacket::Message(rosc::OscMessage { addr: addr.to_string(), args });
         match rosc::encoder::encode(&pkt) {
             Ok(buf) => sock.send_to(&buf, target).is_ok(),
             Err(_) => false,
