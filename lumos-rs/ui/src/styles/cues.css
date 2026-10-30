@@ -59,7 +59,7 @@
 .cu-hf.fader-h { height: 36px; min-width: 80px; border-radius: var(--r-md); }
 .cu-hf.fader-h > .fill { border-radius: calc(var(--r-md) - 1px); }
 .cu-hf.fader-h > .cap { width: 16px; margin-left: -8px; top: -6px; bottom: -6px; }
-.cu-vf.fader-v { width: 46px; height: 100%; min-height: 96px; border-radius: var(--r-md); }
+.cu-vf.fader-v { width: 46px; height: 100%; min-height: 72px; border-radius: var(--r-md); }
 .cu-vf.fader-v > .fill { border-radius: calc(var(--r-md) - 1px); opacity: .85; }
 .cu-vf.fader-v > .cap { height: 16px; margin-bottom: -8px; left: -6px; right: -6px; }
 .cu-hf:focus-visible, .cu-vf:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
@@ -152,12 +152,13 @@
 .cu-ex-btns { display: flex; gap: 6px; }
 .cu-ex-btns .btn { flex: 1; min-width: 0; min-height: 48px; padding: 0 4px; font-size: var(--fs-xs); font-weight: 800; letter-spacing: .04em; }
 .cu-ex-btns .btn.go.lit { box-shadow: 0 0 0 2px var(--kc, var(--green)); }
-.cu-ex.empty { align-items: center; justify-content: center; gap: var(--s-2); min-height: 200px; background: transparent; border-style: dashed; border-color: var(--line-strong); color: var(--dim); cursor: pointer; }
+.cu-ex.empty { align-items: center; justify-content: center; gap: var(--s-2); min-height: 0; background: transparent; border-style: dashed; border-color: var(--line-strong); color: var(--dim); cursor: pointer; }
 .cu-ex.empty .plus { font-size: var(--fs-xs); font-weight: 600; }
 
 /* ── responsive: tablet portrait = one scrolling column ─────── */
 @media (max-width: 1100px) {
-  .cu-root { grid-template-columns: 1fr; grid-template-rows: none; overflow-y: auto; height: 100%; align-content: start; }
+  .cu-root { display: flex; flex-direction: column; overflow-y: auto; height: 100%; }
+  .cu-root > * { flex: none; }
   .cu-left { overflow: visible; flex: none; }
   .cu-lists { flex-direction: row; flex-wrap: wrap; }
   .cu-list { flex: 1 1 160px; }
@@ -167,7 +168,7 @@
   .cu-right { overflow: visible; }
   .cu-detail { flex: none; }
   .cu-db { overflow: visible; }
-  .cu-execs { min-height: 320px; }
+  .cu-execs { min-height: 300px; }
   .cu-play { flex-wrap: wrap; }
   .cu-sep { display: none; }
   .cu-info { flex: 1 1 100%; }
