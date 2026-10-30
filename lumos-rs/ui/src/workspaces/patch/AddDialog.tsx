@@ -42,9 +42,9 @@ export function AddDialog(props: { onClose: () => void }) {
           <input class="input" placeholder={t("Search manufacturer, model, type…")} aria-label={t("Search library")} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} autofocus />
           <div class="panel grow" style={{ display: "flex", flexDirection: "column", height: 340 }}>
             {items.length === 0 ? <EmptyState title={t("No match")} /> :
-              <VirtualList class="grow" rowHeight={34} items={items} label={t("Fixture library")} render={(it) => "h" in it ?
-                <div key={"h" + it.h} style={{ height: 34, display: "flex", alignItems: "center", padding: "0 12px", background: "var(--bg-2)", fontSize: "var(--fs-xs)", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text-dim)" }}>{it.h}</div> :
-                <div key={it.p.id} role="listitem" class={`vrow ${sel?.id === it.p.id ? "sel" : ""}`} style={{ height: 34, cursor: "pointer" }} tabIndex={0}
+              <VirtualList class="grow" rowHeight={52} items={items} label={t("Fixture library")} render={(it) => "h" in it ?
+                <div key={"h" + it.h} style={{ height: 52, display: "flex", alignItems: "center", padding: "0 12px", background: "var(--bg-2)", fontSize: "var(--fs-xs)", fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "var(--text-dim)" }}>{it.h}</div> :
+                <div key={it.p.id} role="listitem" class={`vrow ${sel?.id === it.p.id ? "sel" : ""}`} style={{ height: 52, cursor: "pointer" }} tabIndex={0}
                   onClick={() => { setSel(it.p); setModeName(""); }} onKeyDown={(e) => e.key === "Enter" && setSel(it.p)}>
                   <span class="grow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.p.model}</span>
                   {it.p.model3d && <span class="chip ok" title={t("Real 3D model and optics (GDTF)")}>3D</span>}
@@ -57,7 +57,7 @@ export function AddDialog(props: { onClose: () => void }) {
             <div><b style={{ fontSize: "var(--fs-lg)" }}>{sel.manufacturer} {sel.model}</b> <span class="dim">· {sel.category}{sel.power_w ? ` · ${sel.power_w} W` : ""}</span>
               <span class="chip" style={{ marginLeft: 8 }}>{sel.source ?? t("builtin")}</span>{sel.model3d && <span class="chip ok" style={{ marginLeft: 4 }}>{t("3D model · {n} wheel slots", { n: sel.model3d.wheels.reduce((n, w) => n + w.slots.length, 0) })}</span>}
               {sel.source && sel.source !== "builtin" && show.value?.profiles.some((p) => p.id === sel.id) && !show.value?.fixtures.some((f) => f.profile === sel.id) &&
-                <button class="btn sm ghost" style={{ marginLeft: 8 }} onClick={() => send({ type: "library_remove", id: sel.id }).then(() => setSel(null)).catch(() => {})}>{t("Remove from show")}</button>}</div>
+                <button class="btn ghost" style={{ marginLeft: 8 }} onClick={() => send({ type: "library_remove", id: sel.id }).then(() => setSel(null)).catch(() => {})}>{t("Remove from show")}</button>}</div>
             <Select label={t("Mode")} value={mode.name} options={sel.modes.map((m) => ({ value: m.name, label: t("{name} ({n} ch)", { name: m.name, n: footprint(m) }) }))} onChange={setModeName} />
             <div class="panel scroll" style={{ maxHeight: 150 }}>
               <table class="tbl"><thead><tr><th style={{ width: 50 }}>{t("Ch")}</th><th>{t("Attribute")}</th><th>{t("Notes")}</th></tr></thead><tbody>

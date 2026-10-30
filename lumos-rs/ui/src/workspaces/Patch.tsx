@@ -9,8 +9,9 @@ import { MorphDialog } from "./patch/MorphDialog";
 import { LocateDialog } from "./patch/LocateDialog";
 import { UniverseMap } from "./patch/UniverseMap";
 import { t, tp } from "../i18n";
+import "../styles/settings.css";
 
-const ROW = 48;
+const ROW = 56;
 const upd = (f: Fixture, p: Partial<Fixture>) => send({ type: "fixture_update", fixture: { ...f, ...p } }, { quiet: false }).catch(() => {});
 
 function NameCell(props: { x: Fixture }) {
@@ -56,10 +57,10 @@ export function Patch() {
   const cell = (n: number) => ({ width: n, flex: "none" as const });
 
   return (
-    <div class="page">
+    <div class="patch-wrap"><div class="set-card patch-card"><div class="page">
       <PageHead title={t("Patch")} sub={`${tp(fixtures.length, "{n} fixture", "{n} fixtures")} · ${bad.size ? t("{n} with address conflicts", { n: bad.size }) : t("no conflicts")}`}>
-        <input class="input" style={{ width: 160 }} placeholder={t("Filter…")} aria-label={t("Filter fixtures")} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
-        <Segmented value={view} onChange={setView} label={t("View")} options={[{ value: "table", label: t("Table") }, { value: "map", label: t("Universe map") }]} />
+        <input class="input" style={{ width: 168 }} placeholder={t("Filter…")} aria-label={t("Filter fixtures")} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+        <Segmented size="lg" value={view} onChange={setView} label={t("View")} options={[{ value: "table", label: t("Table") }, { value: "map", label: t("Universe map") }]} />
         <button class="btn tall" onClick={() => setImporting(true)} title={t("Import GDTF, QLC+ (.qxf) or Open Fixture Library (.json) fixture files")}>{t("Import fixtures…")}</button>
         <button class={`btn tall ${selIdentOn ? "on" : ""}`} disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={identifySel}
           title={t("Locate the selected fixtures: full light, open shutter, home position, lamp on")}>{selIdentOn ? t("Stop identifying") : t("Identify selection")}</button>
@@ -71,30 +72,30 @@ export function Patch() {
         <button class="btn tall primary" onClick={() => setAdding(true)}>{t("+ Add fixtures")}</button>
       </PageHead>
       {view === "map" ? <div class="grow scroll"><UniverseMap fixtures={fixtures} /></div> : <>
-        <div class="vrow" style={{ background: "var(--bg-2)", height: 32, fontSize: "var(--fs-xs)", color: "var(--text-dim)", textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 700 }}>
-          <span style={cell(48)}>ID</span><span style={cell(170)}>{t("Name")}</span><span class="grow hide-narrow">{t("Profile")}</span><span class="grow-narrow" style={cell(110)}>{t("Mode")}</span><span style={cell(70)}>{t("Univ")}</span><span style={cell(76)}>{t("Addr")}</span><span style={cell(40)}>{t("Ch")}</span><span style={cell(52)}>{t("End")}</span><span style={cell(56)} title={t("Identify")}>◎</span>
-          <span class="hide-narrow" style={cell(66)}>X</span><span class="hide-narrow" style={cell(66)}>Y</span><span class="hide-narrow" style={cell(66)}>Z</span>
+        <div class="vrow patch-cols">
+          <span style={cell(48)}>ID</span><span style={cell(190)}>{t("Name")}</span><span class="grow hide-narrow">{t("Profile")}</span><span class="grow-narrow" style={cell(150)}>{t("Mode")}</span><span style={cell(88)}>{t("Univ")}</span><span style={cell(96)}>{t("Addr")}</span><span class="hide-narrow" style={cell(44)}>{t("Ch")}</span><span style={cell(56)}>{t("End")}</span><span style={cell(56)} title={t("Identify")}>◎</span>
+          <span class="hide-narrow" style={cell(76)}>X</span><span class="hide-narrow" style={cell(76)}>Y</span><span class="hide-narrow" style={cell(76)}>Z</span>
         </div>
         {rows.length === 0 ? <EmptyState icon="⌖" title={fixtures.length ? t("No fixtures match the filter") : t("Nothing patched yet")} hint={t("Add fixtures from the library, choose a universe and DMX address.")} >
           {!fixtures.length && <button class="btn primary tall" onClick={() => setAdding(true)}>{t("+ Add fixtures")}</button>}</EmptyState> :
           <VirtualList class="grow" label={t("Fixtures")} items={rows} rowHeight={ROW} render={(x, idx) => {
             const m = modeOf(x), fp = footprint(m), p = profileById(x.profile);
             return (
-              <div key={x.id} role="listitem" class={`vrow ${sel.has(x.id) ? "sel" : ""} ${bad.has(x.id) ? "bad" : ""}`} style={{ height: ROW }} onClick={(e) => click(e as MouseEvent, x.id, idx)}>
+              <div key={x.id} role="listitem" class={`vrow patch-row ${sel.has(x.id) ? "sel" : ""} ${bad.has(x.id) ? "bad" : ""}`} style={{ height: ROW }} onClick={(e) => click(e as MouseEvent, x.id, idx)}>
                 <span class="mono" style={cell(48)}>{x.id}</span>
-                <span style={cell(170)} onClick={(e) => e.stopPropagation()}><NameCell x={x} /></span>
+                <span style={cell(190)} onClick={(e) => e.stopPropagation()}><NameCell x={x} /></span>
                 <span class="grow dim hide-narrow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={x.profile}>{p ? `${p.manufacturer} ${p.model}` : <span style={{ color: "var(--stop)" }}>{t("missing:")} {x.profile}</span>}</span>
-                <span style={cell(110)} onClick={(e) => e.stopPropagation()}>
+                <span style={cell(150)} onClick={(e) => e.stopPropagation()}>
                   <Select class="bare" label={t("Mode")} value={x.mode} options={(p?.modes ?? [{ name: x.mode }]).map((md) => ({ value: md.name, label: md.name }))} onChange={(mode) => upd(x, { mode })} /></span>
-                <span style={cell(70)} onClick={(e) => e.stopPropagation()}><Select<number> class="bare" label={t("Universe")} value={x.universe} options={unis.some((u) => u.value === x.universe) ? unis : [...unis, { value: x.universe, label: String(x.universe) }]} onChange={(universe) => upd(x, { universe })} /></span>
-                <span style={cell(76)} onClick={(e) => e.stopPropagation()}><NumberField class="bare" label={t("Address")} value={x.address} min={1} max={512} onChange={(address) => upd(x, { address })} /></span>
-                <span class="mono dim" style={cell(40)}>{fp}</span>
-                <span class="mono" style={{ ...cell(52), color: bad.has(x.id) ? "var(--stop)" : undefined }}>{x.address + fp - 1}</span>
+                <span style={cell(88)} onClick={(e) => e.stopPropagation()}><Select<number> class="bare" label={t("Universe")} value={x.universe} options={unis.some((u) => u.value === x.universe) ? unis : [...unis, { value: x.universe, label: String(x.universe) }]} onChange={(universe) => upd(x, { universe })} /></span>
+                <span style={cell(96)} onClick={(e) => e.stopPropagation()}><NumberField class="bare" label={t("Address")} value={x.address} min={1} max={512} onChange={(address) => upd(x, { address })} /></span>
+                <span class="mono dim hide-narrow" style={cell(44)}>{fp}</span>
+                <span class="mono" style={{ ...cell(56), color: bad.has(x.id) ? "var(--stop)" : undefined }}>{x.address + fp - 1}</span>
                 <span style={cell(56)} onClick={(e) => e.stopPropagation()}>
-                  <button class={`btn icon ${identifying.has(x.id) ? "on" : ""}`} style={{ width: 44, height: 44 }} aria-pressed={identifying.has(x.id)} aria-label={t("Identify fixture {id}", { id: x.id })}
+                  <button class={`btn icon ${identifying.has(x.id) ? "on" : ""}`} aria-pressed={identifying.has(x.id)} aria-label={t("Identify fixture {id}", { id: x.id })}
                     title={t("Identify (locate)")} onClick={() => send({ type: "identify", fixture: x.id, on: !identifying.has(x.id) }, { quiet: true }).catch(() => {})}>◎</button>
                 </span>
-                {[0, 1, 2].map((i) => <span key={i} class="hide-narrow" style={cell(66)} onClick={(e) => e.stopPropagation()}>
+                {[0, 1, 2].map((i) => <span key={i} class="hide-narrow" style={cell(76)} onClick={(e) => e.stopPropagation()}>
                   <NumberField float class="bare" label={"XYZ"[i]} value={x.pos[i]} step={0.5} onChange={(v) => { const pos = [...x.pos] as [number, number, number]; pos[i] = v; upd(x, { pos }); }} /></span>)}
               </div>
             );
@@ -104,6 +105,6 @@ export function Patch() {
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
       {morphing && <MorphDialog ids={selection.value} onClose={() => setMorphing(false)} />}
       {locating && (() => { const fx = fixtures.find((x) => selection.value.includes(x.id)); return fx ? <LocateDialog fixture={fx} onClose={() => setLocating(false)} /> : null; })()}
-    </div>
+    </div></div></div>
   );
 }
