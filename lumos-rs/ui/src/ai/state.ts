@@ -1,7 +1,7 @@
 // Assistant state: config from the server, per-window chat session, event reducer.
 // Provider-neutral on purpose — the UI never assumes which model/vendor is behind it.
 import { computed, effect, signal } from "@preact/signals";
-import { hooks, selection, send, toast } from "../store";
+import { connected, hooks, selection, send, toast } from "../store";
 import { lang, t } from "../i18n";
 import { tErr } from "../i18n/errors";
 import { winId } from "../lib/windows";
@@ -82,17 +82,27 @@ const KEY = `ai.items.${SESSION}`;
 let nid = 1;
 const next = () => nid++;
 
+let staleTurn = false;
 function load(): Item[] {
   try {
     const raw = sessionStorage.getItem(KEY);
     if (!raw) return [];
     const arr = JSON.parse(raw) as Item[];
     nid = arr.reduce((m, i) => Math.max(m, i.id), 0) + 1;
-    // A restored turn can't be streaming; unresolved confirmations belong to a dead turn.
-    return arr.map((i) => (i.k === "ai" ? { ...i, streaming: false } : i.k === "tool" && i.state === "running" ? { ...i, state: "error" as AiToolState } : i));
+    // A reloaded page can't resume a turn: close its open cards and cancel the server side (see below).
+    return arr.map((i) => {
+      if (i.k === "ai" && i.streaming) { staleTurn = true; return { ...i, streaming: false }; }
+      if (i.k === "tool" && i.state === "running") { staleTurn = true; return { ...i, state: "error" as AiToolState }; }
+      if (i.k === "confirm" && !i.resolved) { staleTurn = true; return { ...i, resolved: "no" as const }; }
+      if (i.k === "ask" && i.answered === undefined) { staleTurn = true; return { ...i, answered: "—" }; }
+      return i;
+    });
   } catch { return []; }
 }
 export const items = signal<Item[]>(load());
+if (staleTurn) {
+  const stop = effect(() => { if (connected.value) { void send({ type: "ai_cancel", session: SESSION }, { quiet: true }).catch(() => {}); queueMicrotask(() => stop()); } });
+}
 
 let saveT: ReturnType<typeof setTimeout> | undefined;
 effect(() => {
