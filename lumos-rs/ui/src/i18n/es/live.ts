@@ -439,6 +439,10 @@ export const live: Record<string, string> = {
   "pulse": "Pulso",
   "ramp": "Rampa",
   "{f} fixtures · {a} values": "{f} aparatos · {a} valores",
+  "● Scene": "● Escena",
+  "Warm white": "Blanco cálido",
+  "Cool white": "Blanco frío",
+  "Hue and saturation wheel": "Rueda de matiz y saturación",
 };
 
 /** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */
@@ -459,4 +463,6 @@ export const capLabelsEs: Record<string, string> = {
   "Strobe slow→fast": "Strobe lento→rápido",
   "Fog output": "Salida de niebla",
   "Haze output": "Salida de haze",
+  "Options": "Opciones",
+  "Go to cue {n}": "Ir al cue {n}",
 };

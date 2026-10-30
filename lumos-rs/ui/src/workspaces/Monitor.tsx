@@ -10,7 +10,7 @@ import { t } from "../i18n";
 
 type Fmt = "dec" | "hex" | "pct";
 type Info = { fixture: number; name: string; attr: string } | null;
-const CELL_H = 38;
+const CELL_H = 54;
 
 function css(name: string) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
 const fmtVal = (v: number, f: Fmt) => (f === "hex" ? v.toString(16).toUpperCase().padStart(2, "0") : f === "pct" ? `${Math.round((v / 255) * 100)}` : String(v));
@@ -63,11 +63,11 @@ export function Monitor() {
   useEffect(() => {
     const canvas = cv.current!, box = wrap.current!;
     const ctx = canvas.getContext("2d")!;
-    const col = { bg: css("--bg-1"), bg2: css("--bg-2"), line: css("--line"), text: css("--text"), faint: css("--text-faint"), accent: css("--accent"), live: css("--live"), dim: css("--text-dim") };
+    const col = { bg: css("--ink-1"), bg2: css("--ink-2"), line: css("--line"), text: css("--text"), faint: css("--mute"), accent: css("--cyan"), live: css("--amber"), dim: css("--mute") };
     let w = 0, raf = 0, dpr = 1;
     const layout = () => {
       w = box.clientWidth;
-      const cols = Math.max(8, Math.min(32, 2 ** Math.floor(Math.log2(Math.max(8, w / 46)))));
+      const cols = Math.max(8, Math.min(32, 2 ** Math.floor(Math.log2(Math.max(8, w / 66)))));
       st.current.cols = cols;
       const h = (512 / cols) * CELL_H;
       dpr = window.devicePixelRatio || 1;
@@ -103,12 +103,12 @@ export function Monitor() {
         if (age < 400) { ctx.globalAlpha = 1 - age / 400; ctx.strokeStyle = col.live; ctx.lineWidth = 2; ctx.strokeRect(x + 1.5, y + 1.5, cw - 3, CELL_H - 3); ctx.globalAlpha = 1; }
         if (s.parked.has(i + 1)) {
           ctx.strokeStyle = col.live; ctx.lineWidth = 2; ctx.strokeRect(x + 1.5, y + 1.5, cw - 3, CELL_H - 3);
-          ctx.fillStyle = col.live; ctx.font = "700 10px ui-monospace, monospace"; ctx.textAlign = "right"; ctx.fillText("P", x + cw - 4, y + 11);
+          ctx.fillStyle = col.live; ctx.font = "700 13px JetBrains Mono, ui-monospace, monospace"; ctx.textAlign = "right"; ctx.fillText("P", x + cw - 6, y + 15);
         }
         if (s.hover === i + 1 || s.pin === i + 1) { ctx.strokeStyle = col.text; ctx.lineWidth = 1; ctx.strokeRect(x + 0.5, y + 0.5, cw - 1, CELL_H - 1); }
-        ctx.fillStyle = col.faint; ctx.font = "9px ui-monospace, monospace"; ctx.textAlign = "left"; ctx.fillText(String(i + 1), x + 4, y + 11);
-        ctx.fillStyle = v ? col.text : col.faint; ctx.font = "600 13px ui-monospace, monospace"; ctx.textAlign = "center";
-        ctx.fillText(fmtVal(v, s.fmt), x + cw / 2, y + CELL_H - 9);
+        ctx.fillStyle = v ? col.text : col.dim; ctx.font = "500 12px JetBrains Mono, ui-monospace, monospace"; ctx.textAlign = "left"; ctx.fillText(String(i + 1), x + 6, y + 16);
+        ctx.fillStyle = v ? col.text : col.dim; ctx.font = "700 18px JetBrains Mono, ui-monospace, monospace"; ctx.textAlign = "center";
+        ctx.fillText(fmtVal(v, s.fmt), x + cw / 2, y + CELL_H - 12);
       }
     };
     raf = requestAnimationFrame(draw);
@@ -134,10 +134,10 @@ export function Monitor() {
         <ParkedButton onOpen={() => setParkedOpen(true)} />
       </PageHead>
       {unis.length === 0 ? <EmptyState title={t("No universes")} hint={t("Add universes in Settings.")} /> : <>
-        <div class="row scroll" role="tablist" aria-label={t("Universes")} style={{ padding: "6px 12px", gap: 4, flex: "none", borderBottom: "1px solid var(--line)" }}>
+        <div class="row scroll" role="tablist" aria-label={t("Universes")} style={{ padding: "10px 16px", gap: 8, flex: "none", borderBottom: "1px solid var(--line)" }}>
           {unis.map((id) => (
-            <button key={id} role="tab" aria-selected={id === u} class={`btn sm ${id === u ? "sel" : ""}`} style={{ minWidth: 44 }} onClick={() => { setU(id); setPin(null); }} title={show.value?.universes.find((x) => x.id === id)?.name}>
-              <span class={`dot ${active.has(id) ? "ok" : ""}`} style={{ width: 6, height: 6 }} />U{id}
+            <button key={id} role="tab" aria-selected={id === u} class={`btn pill mono ${id === u ? "sel" : ""}`} style={{ minWidth: 72 }} onClick={() => { setU(id); setPin(null); }} title={show.value?.universes.find((x) => x.id === id)?.name}>
+              <span class={`dot ${active.has(id) ? "ok" : ""}`} />U{id}
             </button>
           ))}
         </div>
@@ -146,7 +146,7 @@ export function Monitor() {
             onMouseMove={(e) => setHover(chAt(e as MouseEvent))} onMouseLeave={() => setHover(null)}
             onClick={(e) => { const c = chAt(e as MouseEvent); setPin(c === pin ? null : c); const f = c ? chInfo.get(c) : null; if (f) selection.value = [f.fixture]; }} />
         </div>
-        <div class="statusbar" style={{ height: pin ? 56 : 34, fontSize: "var(--fs-sm)" }} aria-live="polite">
+        <div class="statusbar" style={{ height: pin ? 72 : 48, fontSize: "var(--fs-md)", padding: "0 var(--s-4)" }} aria-live="polite">
           {shown ? <>
             <b class="mono" style={{ color: "var(--text)" }}>U{u}.{String(shown).padStart(3, "0")}</b>
             <span class="mono" style={{ color: "var(--text)" }}>{v} · 0x{v.toString(16).toUpperCase().padStart(2, "0")} · {Math.round((v / 255) * 100)}%</span>
@@ -154,9 +154,9 @@ export function Monitor() {
             {pin && <span class="faint">{t("(pinned — click again to release)")}</span>}
             {pin && <span class="sp" />}
             {pin && (parked.has(pin)
-              ? <button class="btn" style={{ minHeight: 44 }} onClick={() => unparkChannel(u, pin)}>{t("Unpark")}</button>
-              : <button class="btn on" style={{ minHeight: 44 }} onClick={() => parkChannel(u, pin, v)}>{t("Park at {v}", { v })}</button>)}
-          </> : <span class="faint">{t("Hover a channel for details, click to pin and select its fixture.")}</span>}
+              ? <button class="btn" onClick={() => unparkChannel(u, pin)}>{t("Unpark")}</button>
+              : <button class="btn on" onClick={() => parkChannel(u, pin, v)}>{t("Park at {v}", { v })}</button>)}
+          </> : <span class="faint">{t("Tap a channel for details and to select its fixture.")}</span>}
         </div>
       </>}
       {parkedOpen && <ParkedList onClose={() => setParkedOpen(false)} />}

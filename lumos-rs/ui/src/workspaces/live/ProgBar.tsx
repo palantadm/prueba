@@ -62,7 +62,7 @@ export function RecordBar() {
     <div class="lv-recbar" role="toolbar" aria-label={t("Record")}>
       <button class="btn lg grow" disabled={!n} onClick={() => setRecPal(true)}>{t("● Palette")}</button>
       <button class="btn lg grow" disabled={!n} onClick={() => setRecScene(true)}>{t("● Scene")}</button>
-      <button class="btn lg primary grow2" disabled={!n} onClick={() => setRecCue(true)}><span class="rec-dot" />{t("● Record cue")}</button>
+      <button class="btn lg primary grow2" disabled={!n} onClick={() => setRecCue(true)}>{t("● Record cue")}</button>
       {recCue && <RecordCue onClose={() => setRecCue(false)} />}
       {recPal && <RecordPalette onClose={() => setRecPal(false)} />}
       {recScene && <PromptDialog title={t("Record scene from programmer")} label={t("Name")} ok={t("Record")} initial={t("Scene {n}", { n: Math.max(0, ...scenes.map((x) => x.id)) + 1 })}

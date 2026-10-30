@@ -16,6 +16,8 @@ lumos = { path = "../..", features = ["midi"] }
 tokio = { version = "1", features = ["full"] }
 opener = "0.7"
 anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [profile.release]

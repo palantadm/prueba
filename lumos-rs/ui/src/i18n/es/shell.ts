@@ -132,7 +132,7 @@ export const shell: Record<string, string> = {
   "Group {group} {attr}": "Grupo {group} {attr}",
   "Host": "Host",
   "Host (empty = broadcast)": "Host (vacío = broadcast)",
-  "Hover a channel for details, click to pin and select its fixture.": "Pasa el ratón sobre un canal para ver detalles; haz clic para fijarlo y seleccionar su aparato.",
+  "Tap a channel for details and to select its fixture.": "Toca un canal para ver sus detalles y seleccionar su aparato.",
   "How many": "Cuántos",
   "IN:": "ENT:",
   "Import GDTF, QLC+ (.qxf) or Open Fixture Library (.json) fixture files": "Importa archivos de aparatos GDTF, QLC+ (.qxf) u Open Fixture Library (.json)",

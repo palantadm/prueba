@@ -17,18 +17,18 @@ function ChannelDialog(p: { uni: number; ch: number; live: number; parked: numbe
   const [v, setV] = useState(String(p.parked ?? p.live));
   const n = Math.max(0, Math.min(255, Math.round(Number(v) || 0)));
   return (
-    <Modal title={t("Channel U{u}.{c}", { u: p.uni, c: p.ch })} onClose={p.onClose} footer={<button class="btn" style={{ minHeight: 44 }} onClick={p.onClose}>{t("Close")}</button>}>
+    <Modal title={t("Channel U{u}.{c}", { u: p.uni, c: p.ch })} onClose={p.onClose} footer={<button class="btn" onClick={p.onClose}>{t("Close")}</button>}>
       <div class="dim">{p.parked !== undefined ? t("Parked at {v}", { v: p.parked }) : t("Output now: {v}", { v: p.live })}</div>
       <div class="field"><label>{t("Value (0–255)")}</label>
         <div class="row">
-          <input class="input num" style={{ minHeight: 44 }} type="number" min={0} max={255} autoFocus value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
-          <button class="btn lg primary" style={{ minHeight: 44 }} onClick={() => { setOv(p.uni, p.ch, n); p.onClose(); }}>{t("Park at {v}", { v: n })}</button>
+          <input class="input num" type="number" min={0} max={255} autoFocus value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
+          <button class="btn lg primary" onClick={() => { setOv(p.uni, p.ch, n); p.onClose(); }}>{t("Park at {v}", { v: n })}</button>
         </div>
       </div>
       <div class="row wrap">
-        {[0, 64, 128, 255].map((x) => <button key={x} class="btn" style={{ minHeight: 44, minWidth: 64 }} onClick={() => setV(String(x))}>{x}</button>)}
+        {[0, 64, 128, 255].map((x) => <button key={x} class="btn" style={{ minWidth: 72 }} onClick={() => setV(String(x))}>{x}</button>)}
       </div>
-      <button class="btn lg" style={{ minHeight: 44 }} disabled={p.parked === undefined && overrides.value[key(p.uni, p.ch)] === undefined}
+      <button class="btn lg" disabled={p.parked === undefined && overrides.value[key(p.uni, p.ch)] === undefined}
         onClick={() => { unparkChannel(p.uni, p.ch); p.onClose(); }}>{t("Unpark")}</button>
     </Modal>
   );
@@ -63,20 +63,20 @@ export function Desk() {
   const fmt = (v: number) => (pct ? `${Math.round((v / 255) * 100)}%` : String(v));
   return (
     <div class="lv-desk">
-      <div class="row wrap" style={{ padding: "var(--s-2) var(--s-3)", borderBottom: "1px solid var(--line)", background: "var(--bg-1)" }}>
+      <div class="row wrap lv-deskbar">
         <label class="label" for="desk-uni">{t("Universe")}</label>
         <select id="desk-uni" class="input" style={{ width: 200 }} value={uni} onChange={(e) => { setUni(Number((e.target as HTMLSelectElement).value)); setPage(0); }}>
           {universes.map((u) => <option key={u.id} value={u.id}>{u.id} — {u.name}</option>)}
         </select>
         <div class="row" role="tablist" aria-label={t("Channel page")}>
           {Array.from({ length: 512 / PAGE }, (_, i) => (
-            <button key={i} role="tab" aria-selected={i === page} class={`btn sm ${i === page ? "sel" : ""}`} onClick={() => setPage(i)}>{i * PAGE + 1}</button>
+            <button key={i} role="tab" aria-selected={i === page} class={`btn pill mono ${i === page ? "sel" : ""}`} style={{ minWidth: 60 }} onClick={() => setPage(i)}>{i * PAGE + 1}</button>
           ))}
         </div>
         <span class="sp" />
         <ParkedButton onOpen={() => setParkedOpen(true)} />
-        <button class={`btn sm ${pct ? "sel" : ""}`} onClick={() => setPct(!pct)}>{pct ? "%" : "0–255"}</button>
-        <button class="btn sm danger" disabled={!heldOnPage.length} onClick={() => heldOnPage.forEach((k) => { const [u, c] = k.split(":").map(Number); setOv(u, c, null); })}>{t("Release page")}</button>
+        <button class={`btn ${pct ? "sel" : ""}`} onClick={() => setPct(!pct)}>{pct ? "%" : "0–255"}</button>
+        <button class="btn danger" disabled={!heldOnPage.length} onClick={() => heldOnPage.forEach((k) => { const [u, c] = k.split(":").map(Number); setOv(u, c, null); })}>{t("Release page")}</button>
       </div>
       <div class="lv-desk-strips" role="group" aria-label={t("DMX faders")}>
         {Array.from({ length: PAGE }, (_, i) => {
@@ -88,14 +88,14 @@ export function Desk() {
           return (
             <div key={ch} class={`lv-ch ${ov !== undefined ? "held" : ""}`}>
               <button class="lv-ch-n lv-ch-btn" aria-label={t("Channel {n} actions (park / unpark)", { n: ch })} onClick={() => setChDlg(ch)}>{ov !== undefined ? <b style={{ color: "var(--live)" }}>P</b> : null}{ch}</button>
-              <Fader value={v / 255} held={ov !== undefined} color={o ? attrColor(o.attr) : "var(--accent)"} width={36} height="auto"
+              <Fader value={v / 255} held={ov !== undefined} color={o ? attrColor(o.attr) : "var(--accent)"} width={56} height="auto"
                 ariaLabel={t("Channel {n}", { n: ch })} onChange={(x) => setOv(uni, ch, Math.round(x * 255))} />
               <div class="lv-ch-v" style={{ color: ov !== undefined ? "var(--live)" : undefined }}>{fmt(v)}</div>
-              <button class="btn sm" aria-label={t("Flash channel {n}", { n: ch })}
+              <button class="btn" aria-label={t("Flash channel {n}", { n: ch })}
                 onPointerDown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); fire({ type: "dmx_set", universe: uni, channel: ch, value: 255 }); }}
                 onPointerUp={() => fire({ type: "dmx_set", universe: uni, channel: ch, value: overrides.value[key(uni, ch)] ?? null })}
                 onPointerCancel={() => fire({ type: "dmx_set", universe: uni, channel: ch, value: overrides.value[key(uni, ch)] ?? null })}>{t("FL")}</button>
-              <button class="btn sm ghost" disabled={ov === undefined} aria-label={t("Release channel {n}", { n: ch })} onClick={() => setOv(uni, ch, null)}>{t("REL")}</button>
+              <button class="btn ghost" disabled={ov === undefined} aria-label={t("Release channel {n}", { n: ch })} onClick={() => setOv(uni, ch, null)}>{t("REL")}</button>
               <div class="lv-ch-lbl" title={o ? `${o.name} · ${attrLabel(o.attr)}${o.fine ? " " + t("(fine)") : ""}` : ""}>
                 {o ? <>{o.name}<br />{attrLabel(o.attr)}{o.fine ? " ʟ" : ""}</> : ""}
               </div>

@@ -175,18 +175,18 @@ function PositionCard({ fxs, attrs, held, onRelease }: { fxs: Fixture[]; attrs: 
           <div class="label">{t("Fine")}</div>
           <div class="lv-nudge">
             <span />
-            <button class="btn lg" aria-label={t("Tilt up")} onClick={() => nudge("tilt", 0.002)}>▲</button>
+            <button class="btn" aria-label={t("Tilt up")} onClick={() => nudge("tilt", 0.002)}>▲</button>
             <span />
-            <button class="btn lg" aria-label={t("Pan left")} onClick={() => nudge("pan", -0.002)}>◀</button>
-            <button class="btn lg" onClick={() => setAttrs(ids, { pan: 0.5, tilt: 0.5 })}>{t("Home")}</button>
-            <button class="btn lg" aria-label={t("Pan right")} onClick={() => nudge("pan", 0.002)}>▶</button>
+            <button class="btn" aria-label={t("Pan left")} onClick={() => nudge("pan", -0.002)}>◀</button>
+            <button class="btn" onClick={() => setAttrs(ids, { pan: 0.5, tilt: 0.5 })}>{t("Home")}</button>
+            <button class="btn" aria-label={t("Pan right")} onClick={() => nudge("pan", 0.002)}>▶</button>
             <span />
-            <button class="btn lg" aria-label={t("Tilt down")} onClick={() => nudge("tilt", -0.002)}>▼</button>
+            <button class="btn" aria-label={t("Tilt down")} onClick={() => nudge("tilt", -0.002)}>▼</button>
             <span />
           </div>
           <div class="label" style={{ marginTop: 6 }}>{t("Fan across selection")}</div>
-          <Fader horizontal width="100%" value={fan} onChange={setFan} color="var(--attr-position)" ariaLabel={t("Fan width")} />
-          <button class="btn lg" disabled={ids.length < 2} onClick={doFan}>{t("Fan pan ({n}%)", { n: Math.round(fan * 200) })}</button>
+          <Fader horizontal width="100%" height={48} value={fan} onChange={setFan} color="var(--attr-position)" ariaLabel={t("Fan width")} />
+          <button class="btn" disabled={ids.length < 2} onClick={doFan}>{t("Fan pan ({n}%)", { n: Math.round(fan * 200) })}</button>
         </div>
       </div>
     </Card>
