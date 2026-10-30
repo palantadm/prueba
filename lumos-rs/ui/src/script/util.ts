@@ -61,7 +61,7 @@ export type Position = {
 export function position(s: Script, rt: ScriptRt | undefined): Position {
   const flat = flatMarks(s);
   const bi = rt && rt.block ? blockIndex(s, rt.block) : -1;
-  const last = rt?.mark != null ? flat.find((f) => f.mark.id === rt.mark)?.idx ?? -1 : -1;
+  const last = rt?.mark != null ? (flat.find((f) => f.block.id === rt.block && f.mark.id === rt.mark) ?? flat.find((f) => f.mark.id === rt.mark))?.idx ?? -1 : -1;
   const firstOfBlock = bi >= 0 ? flat.find((f) => f.bi >= bi)?.idx ?? flat.length : 0;
   const passed = Math.max(last, firstOfBlock - 1);
   const next = rt?.next ? flat.find((f) => f.block.id === rt.next![0] && f.mark.id === rt.next![1]) ?? null : flat[passed + 1] ?? null;
