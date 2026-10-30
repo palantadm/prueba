@@ -56,6 +56,8 @@ pub enum EngineIn {
     ShowEdit { f: ShowEditFn, reply: oneshot::Sender<Result<serde_json::Value, String>> },
     /// Dry-run of a fixture morph (REST `POST /api/morph/preview`).
     MorphPreview { ids: Vec<u32>, profile: String, mode: String, reply: oneshot::Sender<Result<MorphPreview, String>> },
+    /// Read-only copy of show + runtime + library + output frames (AI assistant tools).
+    AiState { reply: oneshot::Sender<crate::ai::AiState> },
 }
 
 #[derive(Clone)]
@@ -83,6 +85,11 @@ impl Handle {
             return vec![];
         }
         rx.await.unwrap_or_default()
+    }
+    pub async fn ai_state(&self) -> Option<crate::ai::AiState> {
+        let (r, rx) = oneshot::channel();
+        self.tx.send(EngineIn::AiState { reply: r }).ok()?;
+        rx.await.ok()
     }
     pub async fn get_show(&self) -> Option<Show> {
         let (r, rx) = oneshot::channel();
@@ -129,6 +136,7 @@ pub fn spawn(store: Store) -> Handle {
     let io = IoHub::new(io_tx);
     let mut engine = Engine::new(store.clone(), out.clone(), io);
     engine.midi = midi;
+    engine.ai.attach(tx.downgrade());
     tokio::spawn(engine.run(rx, io_rx));
     Handle { tx, out, store }
 }
@@ -212,6 +220,8 @@ struct Engine {
     fx_clock: HashMap<u32, (f64, f64)>,
     /// Backups, node discovery, output test, identify (see data.rs).
     data: DataRt,
+    /// In-app AI assistant (lives outside the engine task; see `ai/mod.rs`).
+    ai: crate::ai::AiHub,
 }
 
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
@@ -243,6 +253,7 @@ impl Engine {
         let now = Instant::now();
         let mut e = Engine {
             data: DataRt::new(&store),
+            ai: crate::ai::AiHub::new(store.clone(), out.clone()),
             store,
             t0: now,
             out,
@@ -364,9 +375,19 @@ impl Engine {
                     self.midi_ports_json(),
                     self.backups_json(),
                     self.nodes_json(),
+                    self.ai.config_json(),
                 ];
                 v.push(json(&ServerMsg::Rt { rt: self.build_rt() }));
                 let _ = reply.send(v);
+            }
+            EngineIn::AiState { reply } => {
+                let _ = reply.send(crate::ai::AiState {
+                    show: self.show.clone(),
+                    rt: self.build_rt(),
+                    profiles: self.library_list(),
+                    frames: self.frames.iter().map(|(u, f)| (*u, f.to_vec())).collect(),
+                    merged: self.last_merged.clone(),
+                });
             }
             EngineIn::GetShow { reply } => {
                 let _ = reply.send(self.show.clone());
@@ -907,7 +928,7 @@ impl Engine {
             // be-script
             ScriptSave { .. } | ScriptRemove { .. } | ScriptGo { .. } | ScriptBack { .. } | ScriptGoto { .. } | ScriptFire { .. } | ScriptFollow { .. } | ScriptReset { .. } => {}
             // be-ai
-            AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } => {}
+            c @ (AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } | AiListModels { .. } | AiTestProvider { .. }) => return self.ai.dispatch(c),
             // be-data
             c @ (BackupCreate { .. } | BackupRestore { .. } | BackupDelete { .. } | NodesScan | OutputTest { .. } | Identify { .. }) => {
                 self.data_command(c)?
