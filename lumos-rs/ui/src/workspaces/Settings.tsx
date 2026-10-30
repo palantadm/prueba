@@ -5,6 +5,7 @@ import { BindingsPage } from "./settings/Bindings";
 import { ArtNetInPage, OscPage } from "./settings/Inputs";
 import { GeneralPage, NetworkPage, TimecodePage } from "./settings/Misc";
 import { MscPage } from "./settings/Msc";
+import { AiPage } from "./settings/Ai";
 import { t } from "../i18n";
 
 const cats = [
@@ -16,9 +17,15 @@ const cats = [
   { id: "timecode", icon: "⏱", label: "Timecode", c: TimecodePage },
   { id: "msc", icon: "🎬", label: "Show Control (MSC)", c: MscPage },
   { id: "network", icon: "🌐", label: "Network", c: NetworkPage },
+  { id: "ai", icon: "✨", label: "Assistant", c: AiPage },
   { id: "general", icon: "⚙", label: "General", c: GeneralPage },
 ];
 const cat = signal(localStorage.getItem("settings.cat") ?? "universes");
+
+export function setSettingsCat(id: string) {
+  cat.value = id;
+  localStorage.setItem("settings.cat", id);
+}
 
 export function Settings() {
   const cur = cats.find((c) => c.id === cat.value) ?? cats[0];

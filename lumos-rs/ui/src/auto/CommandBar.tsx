@@ -4,6 +4,7 @@ import { rt, send } from "../store";
 import { Modal } from "../ui";
 import { t } from "../i18n";
 import { tErr } from "../i18n/errors";
+import { askAssistant } from "../ai/state";
 import {
   KEYPAD, appendToken, applySuggestion, helpData, helpSections, keywords, loadHelp, softKeys, suggest,
 } from "./grammar";
@@ -100,6 +101,14 @@ export function CommandBar() {
   const submit = async () => {
     const line = text.trim();
     if (!line) return;
+    // "?question" or "/ia question" goes to the assistant instead of the command parser
+    const ai = /^(?:\?|\/ia\b)\s*(.*)$/i.exec(line);
+    if (ai) {
+      cmdText.value = "";
+      cmdError.value = "";
+      askAssistant(ai[1] || t("What can you do here?"));
+      return;
+    }
     pushHistory(line);
     histIdx.current = -1;
     cmdError.value = "";
@@ -153,7 +162,11 @@ export function CommandBar() {
               {l.msg && <span class="dim"> — {l.ok ? l.msg : tErr(l.msg)}</span>}
             </div>
           ))}
-          {cmdError.value && <div class="cmd-line err"><span aria-hidden="true">✕</span><span>{cmdError.value}</span></div>}
+          {cmdError.value && (
+            <div class="cmd-line err"><span aria-hidden="true">✕</span><span class="grow">{cmdError.value}</span>
+              <button class="btn sm" onMouseDown={keep} onClick={() => askAssistant(t("This command failed: “{c}” — {e}. What did I do wrong?", { c: text, e: cmdError.value }))}>{t("Ask the assistant")}</button>
+            </div>
+          )}
         </div>
       )}
       <div class="cmd-row">

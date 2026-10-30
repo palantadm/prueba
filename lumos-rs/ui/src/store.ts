@@ -41,7 +41,7 @@ let dmxSub: number[] | null | undefined = undefined; // remembered for reconnect
 /** Server-side (native) MIDI ports. `native=false` → the UI uses Web MIDI instead. `null` until the server says. */
 export const midiPorts = signal<{ native: boolean; inputs: MidiPortInfo[]; outputs: MidiPortInfo[] } | null>(null);
 
-export const hooks: { midiOut?: (port: string | null, bytes: number[]) => void } = {};
+export const hooks: { midiOut?: (port: string | null, bytes: number[]) => void; ai?: (m: ServerMsg) => void } = {};
 
 export function onLearned(cb: (s: Source) => void) {
   learnedListeners.add(cb);
@@ -101,6 +101,7 @@ function onMessage(ev: MessageEvent) {
     case "learned": learnedListeners.forEach((f) => f(m.source)); break;
     case "midi_ports": midiPorts.value = { native: m.native, inputs: m.inputs, outputs: m.outputs }; break;
     case "midi_out": hooks.midiOut?.(m.port, m.bytes); break;
+    case "ai_event": case "ai_config": case "ai_test": hooks.ai?.(m); break;
     case "log":
       serverLog.value = [{ level: m.level, msg: m.msg, at: Date.now() }, ...serverLog.value].slice(0, 200);
       if (m.level === "error") toast(tErr(m.msg), "err");
