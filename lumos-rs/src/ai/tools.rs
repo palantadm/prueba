@@ -267,7 +267,7 @@ pub fn command_risk(c: &Command, blind: bool) -> AiRisk {
         ProgRecordPalette { .. } | ProgRecordCue { .. } | FixtureAdd { .. } | FixtureUpdate { .. } | FixtureMorph { .. } | LibraryImportOfl { .. } | GroupSave { .. } | GroupRemove { .. } | PaletteSave { .. } | PaletteRemove { .. }
         | EffectSave { .. } | EffectRemove { .. } | SceneRecord { .. } | SceneSave { .. } | SceneRemove { .. } | CueUpdate { .. } | ChaseSave { .. } | ChaseRemove { .. } | SpeedSave { .. } | SpeedRemove { .. }
         | MacroSave { .. } | MacroRemove { .. } | TimelineSave { .. } | TimelineRemove { .. } | CuelistSave { .. } | CueSave { .. } | CueRemove { .. } | ExecSave { .. } | ExecRemove { .. } | SettingsSave { .. } | BindingSave { .. }
-        | BindingRemove { .. } | StageSave { .. } | VcSave { .. } | ShowRename { .. } | ShowSave { .. } | BackupCreate { .. } | BlindSet { .. } | Undo | Redo | NodesScan | ShowSave2 => AiRisk::Edit,
+        | BindingRemove { .. } | StageSave { .. } | VcSave { .. } | ShowRename { .. } | ShowSave { .. } | BackupCreate { .. } | BlindSet { .. } | Undo | Redo | NodesScan => AiRisk::Edit,
         // everything else changes output now, is destructive, or touches the outside world
         _ => AiRisk::Live,
     }
@@ -756,7 +756,7 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
         "send_command" => {
             let raw = input.get("command").cloned().ok_or("Falta `command`")?;
             let ty = raw.get("type").and_then(|t| t.as_str()).unwrap_or("").to_string();
-            if ty.starts_with("ai_") || ty == "command_line" && false {
+            if ty.starts_with("ai_") {
                 return Err("Ese comando no está permitido para el asistente.".into());
             }
             let cmd: Command = serde_json::from_value(raw).map_err(|e| format!("Comando no válido: {e}. Revisa los campos del tipo `{ty}`."))?;
@@ -816,7 +816,7 @@ mod tests {
                 assert!(!s.contains(bad), "{} uses {bad}", t.name);
             }
         }
-        assert_eq!(definitions().len(), 10);
+        assert_eq!(definitions().len(), 11);
     }
 
     #[test]

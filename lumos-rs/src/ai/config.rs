@@ -1,6 +1,7 @@
 //! Machine-level assistant configuration: providers, keys, active model. Stored in `<data>/ai.json`
 //! (0600, atomic writes), never inside the show, never sent to clients with keys.
 
+use super::types::Target;
 use crate::model::*;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
