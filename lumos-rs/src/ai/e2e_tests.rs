@@ -680,3 +680,20 @@ async fn no_duplicate_creations_and_tolerant_arguments() {
     assert!(ex(json!({"command":{"type":"chase_run","id":sh.chases[0].id,"on":true}})).await.is_ok());
     assert!(ex(json!({"nada": 1})).await.unwrap_err().contains("Falta `command`"));
 }
+
+#[tokio::test]
+async fn partial_fixture_update_and_shape_hint() {
+    let r = rig("partial").await;
+    let ex = |v: Value| {
+        let h = r.h.clone();
+        async move { super::tools::execute(&h, "send_command", &v).await }
+    };
+    let ok = ex(json!({"command":{"type":"fixture_update","fixture":{"id":2,"pos":[1.5,5.0,0.5],"name":"Frente 2"}}})).await;
+    assert!(ok.is_ok(), "{ok:?}");
+    let f = r.show().await.fixtures.into_iter().find(|f| f.id == 2).unwrap();
+    assert_eq!((f.name.as_str(), f.pos), ("Frente 2", [1.5, 5.0, 0.5]));
+    assert_eq!(f.profile, "generic/rgb-par", "untouched fields kept");
+    assert!(ex(json!({"command":{"type":"fixture_update","fixture":{"id":99,"name":"x"}}})).await.unwrap_err().contains("no existe"));
+    let e = ex(json!({"command":{"type":"group_save","group":{"name":"sin id"}}})).await.unwrap_err();
+    assert!(e.contains("Forma esperada: group_save"), "{e}");
+}

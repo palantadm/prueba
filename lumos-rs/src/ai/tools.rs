@@ -866,7 +866,23 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
             if ty.starts_with("ai_") {
                 return Err("Ese comando no está permitido para el asistente.".into());
             }
-            let cmd: Command = serde_json::from_value(raw).map_err(|e| format!("Comando no válido: {e}. Revisa los campos del tipo `{ty}`."))?;
+            let mut raw = raw;
+            // `fixture_update` may carry just `id` + the changed fields: complete the rest from the patched fixture
+            if ty == "fixture_update" {
+                if let Some(fid) = raw.pointer("/fixture/id").and_then(|v| v.as_u64()) {
+                    let st = h.ai_state().await.ok_or("Motor detenido")?;
+                    let cur = st.show.fixtures.iter().find(|f| f.id as u64 == fid).ok_or_else(|| format!("El aparato {fid} no existe (get_show fixtures)."))?;
+                    if let (Some(Value::Object(base)), Some(Value::Object(new))) = (serde_json::to_value(cur).ok(), raw.get("fixture").cloned()) {
+                        let mut merged = base;
+                        merged.extend(new);
+                        raw["fixture"] = Value::Object(merged);
+                    }
+                }
+            }
+            let cmd: Command = serde_json::from_value(raw).map_err(|e| {
+                let shape = command_catalog().iter().find(|(n, _)| *n == ty).map(|(n, f)| format!(" Forma esperada: {n} {f}")).unwrap_or_default();
+                format!("Comando no válido: {e}. Revisa los campos del tipo `{ty}`.{shape}")
+            })?;
             // Patch guard: never stack fixtures on top of each other without saying so.
             match &cmd {
                 Command::FixtureAdd { profile, mode, count, name: Some(n), .. } if {
