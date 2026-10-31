@@ -11,6 +11,7 @@ import {
   toggleHidden, workLight, bloomOn, smokeCurrents, smokeDebug, smokeDiss, smokeHvac, smokeInfo, smokeOpen, smokeSliceY, smokeVent, smokeWind, quality, showAudience, showMannequin, venueMode, type CamPreset, type QualityPref, type VenueMode,
 } from "./state";
 import { getSmoke } from "./smoke";
+import { coarsePointer, openPad } from "./numpad";
 import { hasStream, startCapture, stopCapture, streamVersion, uploadMedia } from "./media";
 
 export const leftOpen = signal(typeof window === "undefined" ? true : window.innerWidth > 1000);
@@ -18,29 +19,48 @@ export const rightOpen = signal(typeof window === "undefined" ? true : window.in
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 
-function Num(props: { value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; width?: number; title?: string }) {
+/** Touch-size mono cell. On coarse pointers it opens the numeric keypad sheet instead of the OS keyboard. */
+function Num(props: { value: number; onChange: (v: number) => void; step?: number; min?: number; max?: number; title?: string; label?: string; axis?: string }) {
+  const step = props.step ?? 0.1;
   return (
-    <input
-      class="input num st-num" type="number" step={props.step ?? 0.1} min={props.min} max={props.max} title={props.title}
-      style={props.width ? { width: props.width } : undefined}
-      value={r3(props.value)}
-      onInput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (Number.isFinite(v)) props.onChange(v); }}
-    />
+    <label class="st-cell">
+      {props.axis && <span class="st-ax">{props.axis}</span>}
+      <input
+        class="st-num mono" type="number" step={step} min={props.min} max={props.max} title={props.title} aria-label={props.label}
+        value={r3(props.value)}
+        onFocus={(e) => {
+          if (!coarsePointer()) return;
+          (e.target as HTMLInputElement).blur();
+          openPad({ label: props.label ?? props.title ?? "", value: props.value, step, apply: props.onChange });
+        }}
+        onInput={(e) => { const v = parseFloat((e.target as HTMLInputElement).value); if (Number.isFinite(v)) props.onChange(v); }}
+      />
+    </label>
   );
 }
 
 function Vec3(props: { label: string; value: [number, number, number]; step?: number; onChange: (i: number, v: number) => void }) {
   return (
     <div class="st-vec">
-      <span class="label">{t(props.label)}</span>
-      {[0, 1, 2].map((i) => (
-        <Num key={i} value={props.value[i]} step={props.step} onChange={(v) => props.onChange(i, v)} title={"xyz"[i]} />
-      ))}
+      <div class="st-h">{t(props.label)}</div>
+      <div class="st-vec-row">
+        {[0, 1, 2].map((i) => (
+          <Num key={i} value={props.value[i]} step={props.step} axis={"XYZ"[i]} title={"xyz"[i]} label={`${t(props.label)} ${"XYZ"[i]}`} onChange={(v) => props.onChange(i, v)} />
+        ))}
+      </div>
     </div>
   );
 }
 
 function Tip(props: { children: ComponentChildren }) { return <div class="st-hint">{props.children}</div>; }
+
+function Range(p: { value: number; min: number; max: number; step: number; onInput: (v: number) => void; label?: string }) {
+  const pct = ((p.value - p.min) / (p.max - p.min)) * 100;
+  return (
+    <input class="st-range" type="range" min={p.min} max={p.max} step={p.step} value={p.value} aria-label={p.label}
+      style={{ "--p": `${pct}%` }} onInput={(e) => p.onInput(parseFloat((e.target as HTMLInputElement).value))} />
+  );
+}
 
 // ── toolbar ─────────────────────────────────────────────
 const PRESETS: { id: CamPreset; label: string; title: string }[] = [
@@ -51,81 +71,104 @@ const PRESETS: { id: CamPreset; label: string; title: string }[] = [
   { id: "free", label: "Free", title: "Free camera (remembered)" },
 ];
 
+const viewOpen = signal(false);
+
+function Tg(p: { on: boolean; set: (v: boolean) => void; label: string; title?: string }) {
+  return <button class={`btn ${p.on ? "sel" : ""}`} title={p.title ? t(p.title) : undefined} aria-pressed={p.on} onClick={() => p.set(!p.on)}>{t(p.label)}</button>;
+}
+
+/** Floating chrome over the viewport: edit/camera pill (top), HUD chip, tools + layers pills (bottom). */
 export function Toolbar(props: { onFullscreen: () => void }) {
   const edit = editMode.value;
-  const Tg = (p: { on: boolean; set: (v: boolean) => void; label: string; title?: string }) => (
-    <button class={`btn sm ${p.on ? "sel" : ""}`} title={p.title ? t(p.title) : undefined} aria-pressed={p.on} onClick={() => p.set(!p.on)}>{t(p.label)}</button>
-  );
   return (
     <>
-    <div class="st-toolbar">
-      <div class="st-group">
-        <button class={`btn sm ${edit ? "sel" : ""}`} onClick={() => (editMode.value = true)} title={t("Edit stage")}>{t("Edit")}</button>
-        <button class={`btn sm ${!edit ? "sel" : ""}`} onClick={() => { editMode.value = false; aimTool.value = false; }} title={t("Clean preview")}>{t("View")}</button>
-      </div>
-      <div class="st-group">
-        {PRESETS.map((p) => (
-          <button key={p.id} class={`btn sm ${camPreset.value === p.id ? "sel" : ""}`} title={t(p.title)} onClick={() => (camPreset.value = p.id)}>{t(p.label)}</button>
-        ))}
-      </div>
-      {edit && (
-        <div class="st-group">
-          {(["translate", "rotate", "scale"] as const).map((m, i) => (
-            <button key={m} class={`btn sm ${gizmoMode.value === m && !aimTool.value ? "sel" : ""}`} title={`${t(["Move", "Rotate", "Scale"][i])} (${"WER"[i]})`}
-              onClick={() => { gizmoMode.value = m; aimTool.value = false; }}>{t(["Move", "Rotate", "Scale"][i])}</button>
-          ))}
-          <Tg on={snapOn.value} set={(v) => (snapOn.value = v)} label="Snap" title="0.1 m / 15°" />
-          <Tg on={aimTool.value} set={(v) => (aimTool.value = v)} label="◎ Aim" title="Click the stage to aim selected moving heads (A)" />
+      <div class="st-top st-card">
+        <div class="st-pill" role="group">
+          <button class={`btn ${edit ? "sel" : ""}`} onClick={() => (editMode.value = true)} title={t("Edit stage")}>{t("Edit")}</button>
+          <button class={`btn ${!edit ? "sel" : ""}`} onClick={() => { editMode.value = false; aimTool.value = false; }} title={t("Clean preview")}>{t("View")}</button>
         </div>
-      )}
-      <div class="st-group">
-        <Tg on={showBeams.value} set={(v) => (showBeams.value = v)} label="Beams" />
-        <Tg on={showPools.value} set={(v) => (showPools.value = v)} label="Pools" />
-        <Tg on={showGrid.value} set={(v) => (showGrid.value = v)} label="Grid" />
-        <Tg on={showLabels.value} set={(v) => (showLabels.value = v)} label="IDs" />
+        <span class="st-vsep" />
+        <div class="st-pill" role="group">
+          {PRESETS.map((p) => (
+            <button key={p.id} class={`btn ${camPreset.value === p.id ? "sel" : ""}`} title={t(p.title)} aria-pressed={camPreset.value === p.id} onClick={() => (camPreset.value = p.id)}>{t(p.label)}</button>
+          ))}
+        </div>
+        {edit && (
+          <div class="st-pill st-narrow-only" role="group">
+            <button class={`btn ${leftOpen.value ? "sel" : ""}`} onClick={() => (leftOpen.value = !leftOpen.value)}>{t("Objects")}</button>
+            <button class={`btn ${rightOpen.value ? "sel" : ""}`} onClick={() => (rightOpen.value = !rightOpen.value)}>{t("Props")}</button>
+          </div>
+        )}
+        <button class="btn icon" onClick={props.onFullscreen} title={t("Fullscreen")} aria-label={t("Fullscreen")}>⛶</button>
+      </div>
+      <div class="st-hudrow">
+        {stats.value.warn && <span class="st-warn" role="status" title={t("Pick a quality level to retry")}>⚠ {stats.value.warn}</span>}
+        <span class="st-hud mono" title={t("fps · draw calls · real lights")}>{stats.value.fps} fps · {stats.value.calls} dc · {stats.value.lights} L · {stats.value.q}</span>
+      </div>
+      <div class="st-dockrow">
+        {viewOpen.value && <ViewCard />}
+        {edit && (
+          <div class="st-pill st-card" role="group" aria-label={t("Tools")}>
+            {(["translate", "rotate", "scale"] as const).map((m, i) => (
+              <button key={m} class={`btn ${gizmoMode.value === m && !aimTool.value ? "sel" : ""}`} title={`${t(["Move", "Rotate", "Scale"][i])} (${"WER"[i]})`}
+                aria-pressed={gizmoMode.value === m && !aimTool.value}
+                onClick={() => { gizmoMode.value = m; aimTool.value = false; }}>{t(["Move", "Rotate", "Scale"][i])}</button>
+            ))}
+            <Tg on={snapOn.value} set={(v) => (snapOn.value = v)} label="Snap" title="0.1 m / 15°" />
+            <Tg on={aimTool.value} set={(v) => (aimTool.value = v)} label="◎ Aim" title="Click the stage to aim selected moving heads (A)" />
+          </div>
+        )}
+        <div class="st-pill st-card" role="group" aria-label={t("Layers")}>
+          <Tg on={showBeams.value} set={(v) => (showBeams.value = v)} label="Beams" />
+          <Tg on={showPools.value} set={(v) => (showPools.value = v)} label="Pools" />
+          <Tg on={showGrid.value} set={(v) => (showGrid.value = v)} label="Grid" />
+          <Tg on={showLabels.value} set={(v) => (showLabels.value = v)} label="IDs" />
+          <Tg on={smokeOpen.value} set={(v) => (smokeOpen.value = v)} label="Smoke" title="Smoke & haze simulation" />
+          <button class={`btn ${viewOpen.value ? "sel" : ""}`} aria-pressed={viewOpen.value} aria-label={t("Display options")} title={t("Display options")} onClick={() => (viewOpen.value = !viewOpen.value)}>⋯</button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** Secondary display options (lighting aids, venue shell, quality, haze) that did not fit the layers pill. */
+function ViewCard() {
+  return (
+    <div class="st-viewcard st-card" role="dialog" aria-label={t("Display options")}>
+      <div class="st-h">{t("Display options")}</div>
+      <div class="st-viewgrid">
         <Tg on={workLight.value} set={(v) => (workLight.value = v)} label="Work light" title="Bright ambient light for editing" />
         <Tg on={bloomOn.value} set={(v) => (bloomOn.value = v)} label="Bloom" title="HDR glow around bright lights and LED screens" />
         <Tg on={showMannequin.value} set={(v) => (showMannequin.value = v)} label="Scale" title="1.75 m figure for scale" />
         <Tg on={showAudience.value} set={(v) => (showAudience.value = v)} label="House" title="Audience seating" />
-        <select class="input st-sel" aria-label={t("Venue")} title={t("Venue shell")} value={venueMode.value} onChange={(e) => (venueMode.value = (e.target as HTMLSelectElement).value as VenueMode)}>
+      </div>
+      <div class="st-selrow">
+        <select class="input" aria-label={t("Venue")} title={t("Venue shell")} value={venueMode.value} onChange={(e) => (venueMode.value = (e.target as HTMLSelectElement).value as VenueMode)}>
           <option value="theatre">{t("Theatre")}</option>
           <option value="blackbox">{t("Black box")}</option>
           <option value="cyc">{t("Cyclorama")}</option>
           <option value="open">{t("Open stage")}</option>
         </select>
-        <select class="input st-sel" aria-label={t("Quality")} title={t("Render quality")} value={quality.value} onChange={(e) => (quality.value = (e.target as HTMLSelectElement).value as QualityPref)}>
+        <select class="input" aria-label={t("Quality")} title={t("Render quality")} value={quality.value} onChange={(e) => (quality.value = (e.target as HTMLSelectElement).value as QualityPref)}>
           <option value="auto">{t("Quality: auto")}</option>
           <option value="low">{t("Low")}</option>
           <option value="med">{t("Medium")}</option>
           <option value="high">{t("High")}</option>
         </select>
-        <label class="st-haze" title={t("Haze: makes beams more visible")}>
-          <span class="label">{t("Haze")}</span>
-          <input type="range" min="0" max="1" step="0.01" value={haze.value} onInput={(e) => (haze.value = parseFloat((e.target as HTMLInputElement).value))} />
-        </label>
-        <Tg on={smokeOpen.value} set={(v) => (smokeOpen.value = v)} label="Smoke" title="Smoke & haze simulation" />
       </div>
-      <span class="sp" />
-      {edit && (
-        <div class="st-group st-narrow-only">
-          <button class={`btn sm ${leftOpen.value ? "sel" : ""}`} onClick={() => (leftOpen.value = !leftOpen.value)}>{t("Objects")}</button>
-          <button class={`btn sm ${rightOpen.value ? "sel" : ""}`} onClick={() => (rightOpen.value = !rightOpen.value)}>{t("Props")}</button>
-        </div>
-      )}
-      <span class="st-hud mono" title={t("fps · draw calls · real lights")}>{stats.value.fps} fps · {stats.value.calls} dc · {stats.value.lights} L · {stats.value.q}</span>
-      {stats.value.warn && <span class="st-warn" role="status" title={t("Pick a quality level to retry")}>⚠ {stats.value.warn}</span>}
-      <button class="btn sm" onClick={props.onFullscreen} title={t("Fullscreen")}>⛶</button>
+      <div class="st-row-field" title={t("Haze: makes beams more visible")}>
+        <span class="st-lbl">{t("Haze")}</span>
+        <Range value={haze.value} min={0} max={1} step={0.01} label={t("Haze")} onInput={(v) => (haze.value = v)} />
+      </div>
     </div>
-    {smokeOpen.value && <SmokePanel />}
-    </>
   );
 }
 
 function Seg<T extends string>(p: { value: T; set: (v: T) => void; opts: [T, string][] }) {
   return (
-    <div class="st-seg" role="group">
+    <div class="st-pill st-seg" role="group">
       {p.opts.map(([v, l]) => (
-        <button key={v} class={`btn sm ${p.value === v ? "sel" : ""}`} aria-pressed={p.value === v} onClick={() => p.set(v)}>{t(l)}</button>
+        <button key={v} class={`btn ${p.value === v ? "sel" : ""}`} aria-pressed={p.value === v} onClick={() => p.set(v)}>{t(l)}</button>
       ))}
     </div>
   );
@@ -135,31 +178,37 @@ function Seg<T extends string>(p: { value: T; set: (v: T) => void; opts: [T, str
 export function SmokePanel() {
   const info = smokeInfo.value;
   const sm = getSmoke();
+  const active = info.mean > 0.004;
   return (
-    <div class="st-smoke panel" role="dialog" aria-label={t("Smoke & haze simulation")}>
-      <div class="panel-head"><span class="grow">{t("Smoke & haze simulation")}</span><button class="btn ghost sm" aria-label={t("Close")} onClick={() => (smokeOpen.value = false)}>✕</button></div>
-      <div class="panel-body col" style={{ gap: 10 }}>
-        <div class="field"><label>{t("Air currents")}</label>
-          <Seg value={smokeCurrents.value} set={(v) => (smokeCurrents.value = v)} opts={[["off", "Off"], ["low", "Low"], ["med", "Medium"], ["high", "High"]]} /></div>
-        <div class="field"><label title={t("0° = towards the audience")}>{t("Wind direction")} · {smokeWind.value}°</label>
-          <input type="range" min="0" max="359" step="5" value={smokeWind.value} onInput={(e) => (smokeWind.value = parseInt((e.target as HTMLInputElement).value, 10))} /></div>
-        <div class="field"><label>{t("Air conditioning (HVAC)")}</label>
-          <Seg value={smokeHvac.value} set={(v) => (smokeHvac.value = v)} opts={[["none", "None"], ["down", "Down-draft"], ["up", "Up-draft"]]} /></div>
-        <div class="field"><label>{t("Dissipation")} · ×{smokeDiss.value.toFixed(2)}</label>
-          <input type="range" min="0.1" max="4" step="0.05" value={smokeDiss.value} onInput={(e) => (smokeDiss.value = parseFloat((e.target as HTMLInputElement).value))} /></div>
-        <label class="check"><input type="checkbox" checked={smokeVent.value} onChange={(e) => (smokeVent.value = (e.target as HTMLInputElement).checked)} />{t("Room vent open")}</label>
-        <div class="row">
-          <button class="btn sm" onClick={() => sm.purge()}>{t("Purge room")}</button>
-          <button class="btn sm danger" onClick={() => sm.reset()}>{t("Reset smoke")}</button>
-        </div>
-        <div class="field"><label>{t("Show density")}</label>
-          <Seg value={smokeDebug.value} set={(v) => (smokeDebug.value = v)} opts={[["off", "Off"], ["slice", "Slice"], ["volume", "Volume"]]} /></div>
-        {smokeDebug.value === "slice" && (
-          <div class="field"><label>{t("Slice height")} · {smokeSliceY.value.toFixed(1)} m</label>
-            <input type="range" min="0.1" max="7" step="0.1" value={smokeSliceY.value} onInput={(e) => (smokeSliceY.value = parseFloat((e.target as HTMLInputElement).value))} /></div>
-        )}
-        <div class="st-hint">{tp(info.machines, "{n} smoke machine patched", "{n} smoke machines patched")} · {t("Mean density")} {(info.mean * 100).toFixed(1)}% · {info.grid} · {info.stepMs.toFixed(1)} ms</div>
+    <div class="st-smoke st-card" role="dialog" aria-label={t("Smoke & haze simulation")}>
+      <div class="st-cardhead">
+        <div class="st-h">{t("Smoke")}</div>
+        <span class="grow" />
+        <span class={`chip ${active ? "ok" : ""}`}>{active ? t("Smoke active") : t("Clear air")}</span>
+        <button class="btn ghost icon" aria-label={t("Close")} onClick={() => (smokeOpen.value = false)}>✕</button>
       </div>
+      <div class="st-field"><span class="st-lbl">{t("Air currents")}</span>
+        <Seg value={smokeCurrents.value} set={(v) => (smokeCurrents.value = v)} opts={[["off", "Off"], ["low", "Low"], ["med", "Medium"], ["high", "High"]]} /></div>
+      <div class="st-row-field"><span class="st-lbl" title={t("0° = towards the audience")}>{t("Wind direction")} · {smokeWind.value}°</span>
+        <Range value={smokeWind.value} min={0} max={359} step={5} label={t("Wind direction")} onInput={(v) => (smokeWind.value = Math.round(v))} /></div>
+      <div class="st-field"><span class="st-lbl">{t("Air conditioning (HVAC)")}</span>
+        <Seg value={smokeHvac.value} set={(v) => (smokeHvac.value = v)} opts={[["none", "None"], ["down", "Down-draft"], ["up", "Up-draft"]]} /></div>
+      <div class="st-row-field"><span class="st-lbl">{t("Dissipation")} · ×{smokeDiss.value.toFixed(2)}</span>
+        <Range value={smokeDiss.value} min={0.1} max={4} step={0.05} label={t("Dissipation")} onInput={(v) => (smokeDiss.value = v)} /></div>
+      <button class="switch-row" role="switch" aria-checked={smokeVent.value} onClick={() => (smokeVent.value = !smokeVent.value)}>
+        <span class={`switch ${smokeVent.value ? "on" : ""}`} /><span>{t("Room vent open")}</span>
+      </button>
+      <div class="st-btnrow">
+        <button class="btn tall" onClick={() => sm.purge()}>{t("Purge room")}</button>
+        <button class="btn tall danger" onClick={() => sm.reset()}>{t("Reset smoke")}</button>
+      </div>
+      <div class="st-field"><span class="st-lbl">{t("Show density")}</span>
+        <Seg value={smokeDebug.value} set={(v) => (smokeDebug.value = v)} opts={[["off", "Off"], ["slice", "Slice"], ["volume", "Volume"]]} /></div>
+      {smokeDebug.value === "slice" && (
+        <div class="st-row-field"><span class="st-lbl">{t("Slice height")} · {smokeSliceY.value.toFixed(1)} m</span>
+          <Range value={smokeSliceY.value} min={0.1} max={7} step={0.1} label={t("Slice height")} onInput={(v) => (smokeSliceY.value = v)} /></div>
+      )}
+      <div class="st-hint">{tp(info.machines, "{n} smoke machine patched", "{n} smoke machines patched")} · {t("Mean density")} {(info.mean * 100).toFixed(1)}% · {info.grid} · {info.stepMs.toFixed(1)} ms</div>
     </div>
   );
 }
@@ -182,29 +231,29 @@ export function LeftPanel() {
     selObject.value = id;
   };
   return (
-    <aside class="st-side st-left">
-      <div class="panel-head">{t("Add to stage")}</div>
+    <aside class="st-lcol st-card" aria-label={t("Add to stage")}>
+      <div class="st-h">{t("Add to stage")}</div>
       <div class="st-addgrid">
-        {TEMPLATES.map((tpl, i) => <button key={tpl.label} class="btn sm" onClick={() => add(i)}>{t(tpl.label)}</button>)}
+        {TEMPLATES.map((tpl, i) => <button key={tpl.label} class="st-tile" onClick={() => add(i)}>{t(tpl.label)}</button>)}
       </div>
-      <div class="panel-head">{t("Objects")} <span class="faint">{objs.length}</span></div>
+      <div class="st-h st-h2">{t("Objects")} <span class="faint">{objs.length}</span></div>
       <div class="st-list scroll">
         {objs.length === 0 && <div class="st-empty dim">{t("No objects yet. Add trusses, decor and screens above.")}</div>}
-        {objs.map((o) => (
-          <div key={o.id} class={`st-row ${selObject.value === o.id ? "sel" : ""} ${hidden.has(o.id) ? "off" : ""}`}
-            onClick={() => { selObject.value = o.id; }}>
-            <span class="st-ico">{KIND_ICON[o.kind] ?? "■"}</span>
-            <span class="grow st-name">{o.name}</span>
-            <button class="btn ghost sm icon" title={hidden.has(o.id) ? t("Show object") : t("Hide object")} onClick={(e) => { e.stopPropagation(); toggleHidden(o.id); }}>{hidden.has(o.id) ? "◌" : "◉"}</button>
-            <button class="btn ghost sm icon" title={t("Duplicate")} onClick={(e) => { e.stopPropagation(); duplicateObject(o.id); }}>⧉</button>
-            <button class="btn ghost sm icon" title={t("Delete")} onClick={(e) => { e.stopPropagation(); deleteObject(o.id); }}>✕</button>
-          </div>
-        ))}
+        {objs.map((o) => {
+          const sel = selObject.value === o.id;
+          return (
+            <div key={o.id} class={`st-row ${sel ? "sel" : ""} ${hidden.has(o.id) ? "off" : ""}`} onClick={() => { selObject.value = o.id; }}>
+              <span class="st-ico">{KIND_ICON[o.kind] ?? "■"}</span>
+              <span class="grow st-name">{o.name}</span>
+              <button class="btn ghost icon" title={hidden.has(o.id) ? t("Show object") : t("Hide object")} aria-label={hidden.has(o.id) ? t("Show object") : t("Hide object")} onClick={(e) => { e.stopPropagation(); toggleHidden(o.id); }}>{hidden.has(o.id) ? "◌" : "◉"}</button>
+              {sel && <button class="btn ghost icon" title={t("Duplicate")} aria-label={t("Duplicate")} onClick={(e) => { e.stopPropagation(); duplicateObject(o.id); }}>⧉</button>}
+              {sel && <button class="btn ghost icon" title={t("Delete")} aria-label={t("Delete")} onClick={(e) => { e.stopPropagation(); deleteObject(o.id); }}>✕</button>}
+            </div>
+          );
+        })}
       </div>
-      <div class="panel-head">{t("Fixtures")} <span class="faint">{fixtures.length}</span>
-        <span class="sp" />
-        <button class="btn sm" title={t("Place selected (or unplaced) fixtures along the first truss")} onClick={arrangeFixtures}>{t("Arrange on truss")}</button>
-      </div>
+      <div class="st-h st-h2">{t("Fixtures")} <span class="faint">{fixtures.length}</span></div>
+      <button class="btn tall" title={t("Place selected (or unplaced) fixtures along the first truss")} onClick={arrangeFixtures}>{t("Arrange on truss")}</button>
       <div class="st-list scroll st-fxlist">
         {fixtures.length === 0 && <div class="st-empty dim">{t("Patch fixtures to see them here.")}</div>}
         {fixtures.map((f) => {
@@ -322,12 +371,12 @@ function ObjectProps(props: { o: StageObject }) {
   const isScreen = o.kind === "screen";
   return (
     <div class="col st-props">
-      <div class="field"><label>{t("Name")}</label><input class="input" value={o.name} onChange={(e) => up((x) => { x.name = (e.target as HTMLInputElement).value; })} /></div>
-      <div class="chip">{t(o.kind)}</div>
+      <div class="field"><label>{t("Name")}</label><input class="input st-in" value={o.name} onChange={(e) => up((x) => { x.name = (e.target as HTMLInputElement).value; })} /></div>
+      <div><span class="chip">{t(o.kind)}</span></div>
       <Vec3 label="Position m" value={o.pos} onChange={(i, v) => up((x) => { x.pos[i] = v; })} />
       <Vec3 label="Rotation °" value={o.rot} step={5} onChange={(i, v) => up((x) => { x.rot[i] = v; })} />
       <Vec3 label={o.kind === "truss" ? "Len / side / side" : "Size W H D"} value={o.size} onChange={(i, v) => up((x) => { x.size[i] = Math.max(0.02, v); })} />
-      <div class="row">
+      <div class="row st-colorrow">
         <span class="label">{isScreen && o.screen_type === "projection" ? t("Surface") : t("Colour")}</span>
         <input type="color" class="st-color" value={o.color.length === 7 ? o.color : "#888888"} onInput={(e) => up((x) => { x.color = (e.target as HTMLInputElement).value; })} />
       </div>
@@ -345,9 +394,9 @@ function ObjectProps(props: { o: StageObject }) {
           <MediaEditor o={o} />
         </>
       )}
-      <div class="row">
-        <button class="btn sm" onClick={() => duplicateObject(o.id)}>{t("Duplicate")}</button>
-        <button class="btn sm danger" onClick={() => deleteObject(o.id)}>{t("Delete")}</button>
+      <div class="st-btnrow">
+        <button class="btn tall" onClick={() => duplicateObject(o.id)}>{t("Duplicate")}</button>
+        <button class="btn tall danger" onClick={() => deleteObject(o.id)}>{t("Delete")}</button>
       </div>
     </div>
   );
@@ -362,15 +411,15 @@ function FixtureProps(props: { fxs: Fixture[] }) {
   return (
     <div class="col st-props">
       {!multi && (
-        <div class="field"><label>{t("Name")}</label><input class="input" value={f.name} onChange={(e) => each((x) => { x.name = (e.target as HTMLInputElement).value; })} /></div>
+        <div class="field"><label>{t("Name")}</label><input class="input st-in" value={f.name} onChange={(e) => each((x) => { x.name = (e.target as HTMLInputElement).value; })} /></div>
       )}
-      <div class="chip">{multi ? tp(props.fxs.length, "{n} fixture", "{n} fixtures") : `#${f.id} · U${f.universe}.${f.address}`}</div>
       {!multi && <div class="dim st-small">{prof ? `${prof.manufacturer} ${prof.model} — ${f.mode}` : f.profile}</div>}
       <Vec3 label="Position m" value={f.pos} onChange={(i, v) => each((x) => { x.pos[i] = v; })} />
       <Vec3 label="Rotation °" value={f.rot} step={5} onChange={(i, v) => each((x) => { x.rot[i] = v; })} />
-      <div class="row">
-        <button class={`btn sm ${aimTool.value ? "sel" : ""}`} onClick={aim}>{t("◎ Aim at point")}</button>
-        <button class="btn sm" title={t("Pan/tilt to centre")} onClick={() => props.fxs.forEach((x) => send({ type: "prog_set", fixtures: [x.id], attrs: { pan: 0.5, tilt: 0.5 } }, { quiet: true }))}>{t("Home")}</button>
+      <div class="st-btnrow">
+        <button class={`btn tall ${aimTool.value ? "sel" : ""}`} aria-pressed={aimTool.value} onClick={aim}>{t("◎ Aim at point")}</button>
+        <button class="btn tall" title={t("Pan/tilt to centre")} onClick={() => props.fxs.forEach((x) => send({ type: "prog_set", fixtures: [x.id], attrs: { pan: 0.5, tilt: 0.5 } }, { quiet: true }))}>{t("Home")}</button>
+        <button class="btn tall" title={t("Place selected (or unplaced) fixtures along the first truss")} onClick={arrangeFixtures}>{t("On truss")}</button>
       </div>
       {aimTool.value && <Tip>{t("Click on the floor or any object to aim the selected moving heads (writes pan/tilt to the programmer).")}</Tip>}
     </div>
@@ -381,9 +430,12 @@ export function RightPanel() {
   const stage = effStage();
   const obj = selObject.value !== null ? stage?.objects.find((o) => o.id === selObject.value) : undefined;
   const fxs = effFixtures().filter((f) => selection.value.includes(f.id));
+  const kicker = obj ? t(obj.kind) : fxs.length > 1 ? tp(fxs.length, "{n} fixture", "{n} fixtures") : fxs.length ? `${t("Fixture")} ${fxs[0].id} · U${fxs[0].universe}.${fxs[0].address}` : t("Properties");
+  const title = obj ? obj.name : fxs.length === 1 ? fxs[0].name : "";
   return (
-    <aside class="st-side st-right">
-      <div class="panel-head">{t("Properties")}</div>
+    <aside class="st-rprops st-card" aria-label={t("Properties")}>
+      <div class="st-h">{kicker}</div>
+      {title && <div class="st-title">{title}</div>}
       <div class="scroll grow st-propwrap">
         {obj ? <ObjectProps o={obj} /> : fxs.length ? <FixtureProps fxs={fxs} /> : (
           <div class="st-empty dim">{t("Select an object or a fixture in the viewport or the lists.")}<br /><br />

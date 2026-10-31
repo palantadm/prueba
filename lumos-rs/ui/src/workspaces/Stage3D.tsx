@@ -5,9 +5,10 @@ import { fire, library, selection, send, show, toast } from "../store";
 import { t, tp } from "../i18n";
 import { releaseDmx, requestDmx } from "../lib/dmxsub";
 import { StageScene } from "../stage/scene";
-import { LeftPanel, RightPanel, Toolbar, deleteObject, duplicateObject, leftOpen, rightOpen } from "../stage/panels";
+import { LeftPanel, RightPanel, SmokePanel, Toolbar, deleteObject, duplicateObject, leftOpen, rightOpen } from "../stage/panels";
+import { NumPadHost } from "../stage/numpad";
 import {
-  aimTool, draftVersion, editFixture, editMode, editObject, effFixtures, effStage, gizmoMode, hiddenObjs, selObject,
+  smokeOpen, aimTool, draftVersion, editFixture, editMode, editObject, effFixtures, effStage, gizmoMode, hiddenObjs, selObject,
 } from "../stage/state";
 
 let glChecked: boolean | null = null;
@@ -109,7 +110,6 @@ export function Stage3D() {
   void send;
   return (
     <div class={`st-root ${edit ? "" : "viewonly"}`} ref={root}>
-      {edit && leftOpen.value && <LeftPanel />}
       <div class="st-view">
         <div class="st-canvas" ref={host} />
         {!glOk && (
@@ -119,11 +119,16 @@ export function Stage3D() {
             {t("The 3D view needs hardware-accelerated graphics. Update your graphics drivers, or open Lumos in a browser (Help → Open in browser). The 2D view works without it.")}
           </div>
         )}
+        {edit && leftOpen.value && <LeftPanel />}
+        <div class="st-rcol">
+          {edit && rightOpen.value && <RightPanel />}
+          {smokeOpen.value && <SmokePanel />}
+        </div>
         <Toolbar onFullscreen={fullscreen} />
         {aimTool.value && <div class="st-banner">{t("AIM — click the stage to point the selected moving heads · Esc to cancel")}</div>}
         {!show.value && <div class="st-banner">{t("Waiting for the engine…")}</div>}
       </div>
-      {edit && rightOpen.value && <RightPanel />}
+      <NumPadHost />
     </div>
   );
 }
