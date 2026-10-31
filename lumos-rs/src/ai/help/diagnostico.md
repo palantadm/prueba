@@ -4,7 +4,7 @@ Usa `get_fixture_state` con los ids afectados: indica en `notes` las causas prob
 2. **Dimmer a 0**: nadie lo sube (programador vacío, cuelist parada, escena apagada).
 3. **Blind** activo: el programador no sale a escena (`blind off`).
 4. **Perfil o modo que no existe** en la biblioteca: el aparato no emite.
-5. **Universo sin salida activa** o con error (Monitor → salidas; Ajustes → Universos). Art-Net: ¿IP/host y red correctos? sACN: ¿multicast permitido? Serie: ¿puerto correcto?
+5. **Universo sin salida activa** o con error: usa `diagnose_outputs` (revisa Art-Net, sACN, serie, nodos, IP del equipo y da el arreglo). Detalle en el tema `salidas`.
 6. **Direcciones solapadas** o fuera de rango (dirección + canales > 512).
 7. **Canales aparcados** (`park`) que fijan un valor; `unpark`.
 8. **Test de salida** activo (`output_test`) sustituye la salida normal.
@@ -16,3 +16,6 @@ Usa `get_fixture_state` con los ids afectados: indica en `notes` las causas prob
 - *Los fundidos no se ven*: tiempos de la cue a 0, o el programador ocupando el atributo.
 - *MIDI/OSC no responde*: Monitor → entradas; revisar puerto, canal y número del binding.
 - *Latencia o saltos*: `tick_hz` en Ajustes (44 es el máximo útil del DMX512 con tramas completas) y red cableada para Art-Net/sACN.
+
+- *Localizar no enciende un móvil/cabeza*: el perfil necesita más que el dimmer (color/blanco, lámpara, shutter abierto). Mira `get_show` sección `locate` y `get_profile`; ajusta con `locate_save {profile, attrs}` o captura los valores de un aparato bien configurado con `locate_capture {fixture}`.
+- *El guion no avanza / no lanza*: tema `guion`; `get_runtime` → `scripts` indica bloque, última marca y siguiente.

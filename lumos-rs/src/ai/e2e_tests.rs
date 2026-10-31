@@ -513,3 +513,32 @@ async fn new_clients_receive_config_without_keys() {
     assert!(!snap.contains(AKEY));
     assert!(snap.contains("\"has_key\":true"));
 }
+
+/// The assistant can inspect a misconfigured Art-Net output on a live engine and gets the concrete fix.
+#[tokio::test]
+async fn diagnose_outputs_reads_a_real_engine() {
+    let r = rig("diag").await;
+    r.h.command(Command::UniverseSave {
+        universe: UniverseCfg { id: 1, name: "Frente".into(), outputs: vec![OutputCfg { enabled: true, kind: OutputKind::ArtNet { host: "203.0.113.9".into(), port: 6455, net: 0, subnet: 0, universe: 0 } }] },
+    })
+    .await
+    .unwrap();
+    let out = super::tools::execute(&r.h, "diagnose_outputs", &json!({ "scan": false })).await.unwrap();
+    let v: Value = serde_json::from_str(&out).unwrap();
+    let text = v["hallazgos"].to_string();
+    assert!(text.contains("6454"), "{text}");
+    assert!(text.contains("no ha respondido a ArtPoll"), "{text}");
+    assert_eq!(v["universos"][0]["outputs"][0]["kind"], "artnet");
+    assert!(v["universos"][0]["fixtures"].as_u64().unwrap() >= 4);
+    let only = super::tools::execute(&r.h, "diagnose_outputs", &json!({ "universe": 99, "scan": false })).await.unwrap();
+    assert!(only.contains("no existe en el show"));
+    // read-only: never needs confirmation
+    assert_eq!(super::tools::tool_risk("diagnose_outputs", &json!({}), false), AiRisk::Read);
+    for t in ["script_save", "locate_save"] {
+        let c = match t {
+            "script_save" => json!({"type":"script_save","script":{"id":1,"name":"x","blocks":[]}}),
+            _ => json!({"type":"locate_save","profile":"p","attrs":null}),
+        };
+        assert_eq!(super::tools::tool_risk("send_command", &json!({ "command": c }), false), AiRisk::Edit, "{t}");
+    }
+}

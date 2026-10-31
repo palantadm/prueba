@@ -152,7 +152,7 @@ pub fn type_def(name: &str) -> Option<String> {
 }
 
 fn send_command_description() -> String {
-    let skip = ["command_line", "midi_in", "subscribe_dmx", "learn_start", "learn_stop", "vc_press", "vc_value", "vc_xy", "midi_enable", "ai_"];
+    let skip = ["command_line", "midi_in", "subscribe_dmx", "learn_start", "learn_stop", "ai_"];
     let mut s = String::from(
         "Send ONE raw Lumos command as a JSON object `{\"type\": \"<name>\", ...fields}` (fields marked `?` are optional). \
          Attribute values are 0..1 floats; a PerFixture map is `{\"<fixture id>\": {\"dimmer\": 1, \"red\": 0.5}}`. \
@@ -207,7 +207,7 @@ pub fn definitions() -> Vec<ToolDef> {
         tool("send_command", &send_command_description(), json!({ "command": { "type": "object", "description": "The command object; must contain `type`." } }), &["command"]),
         tool(
             "get_show",
-            "Read the show document, compactly. `section`: all (counts + names, default), fixtures, groups, palettes, scenes, cuelists, chases, macros, timelines, universes, settings, vconsole, stage, speed_masters, executors, effects, bindings. \
+            "Read the show document, compactly. `section`: all (counts + names, default), fixtures, groups, palettes, scenes, cuelists, chases, macros, timelines, universes, settings, vconsole, stage, speed_masters, executors, effects, bindings, scripts (Guion: blocks + cue marks), locate (per-profile «Localizar» overrides). \
              `id` returns full detail of one item (e.g. a cuelist with all its cues). `limit` caps list length (default 60).",
             json!({
                 "section": { "type": "string", "description": "Which part of the show." },
@@ -229,6 +229,17 @@ pub fn definitions() -> Vec<ToolDef> {
             json!({ "universe": { "type": "integer" }, "from": { "type": "integer", "description": "First channel (1-512), default 1." }, "to": { "type": "integer", "description": "Last channel, default from+63." } }),
             &["universe"],
         ),
+        tool(
+            "diagnose_outputs",
+            "Diagnose the DMX output chain and network: per universe/output config (Art-Net, sACN, OSC, serial, USB), live status and frame counters, Art-Net nodes that answer ArtPoll (re-scans first, ~3 s), \
+             this machine's IP addresses, serial ports, universe/port-address mismatches, subnet problems, blackout/test/park overrides. Returns findings with a concrete fix each. \
+             Use it whenever an output does not work or a node/fixture does not react; fix with `send_command universe_save` (ask first if the fix is ambiguous) and confirm with `output_test`.",
+            json!({
+                "universe": { "type": "integer", "description": "Only this universe (default: all)." },
+                "scan": { "type": "boolean", "description": "Poll for Art-Net nodes first (default true)." }
+            }),
+            &[],
+        ),
         tool("search_library", "Search fixture profiles (built-in, GDTF, QLC+, OFL imports) by manufacturer/model/category words. Use before adding fixtures.", json!({ "query": { "type": "string" }, "limit": { "type": "integer" } }), &["query"]),
         tool("get_profile", "Modes, channels, attributes and capabilities (gobo/colour slots) of one fixture profile.", json!({ "id": { "type": "string", "description": "Profile id from search_library." } }), &["id"]),
         tool(
@@ -247,7 +258,7 @@ pub fn definitions() -> Vec<ToolDef> {
     ]
 }
 
-pub const READ_TOOLS: &[&str] = &["get_show", "get_runtime", "get_fixture_state", "get_dmx", "search_library", "get_profile", "get_help", "ask_user", "wait"];
+pub const READ_TOOLS: &[&str] = &["get_show", "get_runtime", "get_fixture_state", "get_dmx", "diagnose_outputs", "search_library", "get_profile", "get_help", "ask_user", "wait"];
 
 // ───────────────────────────── risk ─────────────────────────────
 
@@ -267,7 +278,7 @@ pub fn command_risk(c: &Command, blind: bool) -> AiRisk {
         ProgRecordPalette { .. } | ProgRecordCue { .. } | FixtureAdd { .. } | FixtureUpdate { .. } | FixtureMorph { .. } | LibraryImportOfl { .. } | GroupSave { .. } | GroupRemove { .. } | PaletteSave { .. } | PaletteRemove { .. }
         | EffectSave { .. } | EffectRemove { .. } | SceneRecord { .. } | SceneSave { .. } | SceneRemove { .. } | CueUpdate { .. } | ChaseSave { .. } | ChaseRemove { .. } | SpeedSave { .. } | SpeedRemove { .. }
         | MacroSave { .. } | MacroRemove { .. } | TimelineSave { .. } | TimelineRemove { .. } | CuelistSave { .. } | CueSave { .. } | CueRemove { .. } | ExecSave { .. } | ExecRemove { .. } | SettingsSave { .. } | BindingSave { .. }
-        | BindingRemove { .. } | StageSave { .. } | VcSave { .. } | ShowRename { .. } | ShowSave { .. } | BackupCreate { .. } | BlindSet { .. } | Undo | Redo | NodesScan => AiRisk::Edit,
+        | BindingRemove { .. } | StageSave { .. } | VcSave { .. } | ShowRename { .. } | ShowSave { .. } | BackupCreate { .. } | BlindSet { .. } | Undo | Redo | NodesScan | ScriptSave { .. } | ScriptRemove { .. } | LocateSave { .. } | LocateCapture { .. } => AiRisk::Edit,
         // everything else changes output now, is destructive, or touches the outside world
         _ => AiRisk::Live,
     }
@@ -409,6 +420,16 @@ fn label_of(t: &str) -> &'static str {
         "library_remove" => "Quitar perfil de la librería",
         "timecode_ctl" => "Control del timecode",
         "nodes_scan" => "Buscar nodos Art-Net",
+        "script_save" => "Guardar guion",
+        "script_remove" => "Eliminar guion",
+        "script_go" => "GO del guion",
+        "script_back" => "Atrás en el guion",
+        "script_goto" => "Ir a un punto del guion",
+        "script_fire" => "Lanzar una marca del guion",
+        "script_follow" => "Seguimiento del guion",
+        "script_reset" => "Reiniciar el guion",
+        "locate_save" => "Guardar ajuste de Localizar del perfil",
+        "locate_capture" => "Capturar ajuste de Localizar desde un aparato",
         _ => "",
     }
 }
@@ -445,6 +466,7 @@ pub fn summary(name: &str, input: &Value) -> String {
         "get_show" => format!("Consultar el show ({})", input.get("section").and_then(|s| s.as_str()).unwrap_or("resumen")),
         "get_runtime" => "Consultar el estado en vivo".into(),
         "get_fixture_state" => "Diagnosticar aparatos".into(),
+        "diagnose_outputs" => "Diagnosticar salidas y red".into(),
         "get_dmx" => format!("Leer DMX del universo {}", input.get("universe").and_then(|u| u.as_u64()).unwrap_or(0)),
         "search_library" => format!("Buscar en la librería: «{}»", short(input.get("query").and_then(|s| s.as_str()).unwrap_or(""), 50)),
         "get_profile" => format!("Ver perfil {}", short(input.get("id").and_then(|s| s.as_str()).unwrap_or(""), 60)),
@@ -589,6 +611,8 @@ pub fn get_show(show: &Show, st: &AiState, input: &Value) -> Result<String, Stri
         "settings" => serde_json::to_value(&show.settings).unwrap_or_default(),
         "bindings" => list(show.bindings.iter().map(|b| serde_json::to_value(b).unwrap_or_default()).collect()),
         "vconsole" => list(show.vconsole.iter().map(|p| json!({ "id": p.id, "name": p.name, "cols": p.cols, "rows": p.rows, "widgets": p.widgets.iter().map(|w| json!({ "id": w.id, "kind": w.kind, "label": w.label, "x": w.x, "y": w.y, "w": w.w, "h": w.h, "action": w.action })).collect::<Vec<_>>() })).collect()),
+        "scripts" => list(show.scripts.iter().filter(|x| id.map_or(true, |i| x.id as i64 == i)).map(|x| if id.is_some() { serde_json::to_value(x).unwrap_or_default() } else { json!({ "id": x.id, "name": x.name, "blocks": x.blocks.len(), "marks": x.blocks.iter().map(|b| b.marks.len()).sum::<usize>(), "pdf": x.pdf }) }).collect()),
+        "locate" => json!({ "profiles": show.locate.iter().map(|(k, v)| json!({ "profile": k, "attrs": attrs_compact(v) })).collect::<Vec<_>>() }),
         "stage" => json!({ "size": show.stage.size, "objects": show.stage.objects.iter().map(|o| json!({ "id": o.id, "kind": o.kind, "name": o.name, "pos": o.pos, "size": o.size })).collect::<Vec<_>>() }),
         other => return Err(format!("Sección desconocida: {other}")),
     };
@@ -606,7 +630,7 @@ pub fn get_runtime(st: &AiState, verbose: bool) -> String {
         "morph": rt.morph, "chases": rt.chases.iter().filter(|c| c.running).collect::<Vec<_>>(), "effects_running": rt.effects_running,
         "speed_masters": rt.speed, "timelines": rt.timelines.iter().filter(|t| t.running).collect::<Vec<_>>(),
         "outputs": rt.outputs, "inputs": rt.inputs, "timecode": rt.timecode.text, "timecode_running": rt.timecode.running,
-        "parked": rt.parked, "testing": rt.testing, "identifying": rt.identifying,
+        "parked": rt.parked, "testing": rt.testing, "identifying": rt.identifying, "scripts": rt.scripts, "macros_running": rt.macros_running, "learn": rt.learn,
         "last_commands": rt.cmd_log.iter().rev().take(6).collect::<Vec<_>>(),
     });
     if verbose {
@@ -774,6 +798,16 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
                 _ => get_profile(&st, input),
             }
         }
+        "diagnose_outputs" => {
+            if input.get("scan").and_then(|v| v.as_bool()).unwrap_or(true) {
+                h.command(Command::NodesScan).await?;
+                tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
+            }
+            let st = h.ai_state().await.ok_or("Motor detenido")?;
+            let serial: Vec<String> = crate::io::list_serial_ports().into_iter().map(|(n, _)| n).collect();
+            let u = num(input, "universe").map(|u| u as u16);
+            Ok(cap(super::netdiag::analyze(&st, &serial, u).to_string(), MAX_RESULT))
+        }
         "get_help" => Ok(super::help::lookup(input.get("topic").and_then(|t| t.as_str()).unwrap_or(""))),
         other => Err(format!("Herramienta desconocida: {other}")),
     }
@@ -816,7 +850,7 @@ mod tests {
                 assert!(!s.contains(bad), "{} uses {bad}", t.name);
             }
         }
-        assert_eq!(definitions().len(), 11);
+        assert_eq!(definitions().len(), 12);
     }
 
     #[test]

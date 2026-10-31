@@ -12,6 +12,7 @@
 #![allow(dead_code)]
 
 mod artnet;
+pub use artnet::{port_address, ARTNET_PORT};
 mod inputs;
 mod mtc;
 mod nodes;
@@ -108,6 +109,8 @@ pub struct IoHub {
     artnet_error: String,
     pub(crate) artnet_port: u16,
     scanner: Option<nodes::NodeScanner>,
+    /// Unicast hosts of the enabled Art-Net outputs: polled directly so nodes outside the broadcast domain show up.
+    art_hosts: Vec<std::net::Ipv4Addr>,
 
     feedback: Option<(UdpSocket, SocketAddr)>,
     feedback_key: String,
@@ -139,6 +142,7 @@ impl IoHub {
             artnet_error: String::new(),
             artnet_port: artnet::ARTNET_PORT,
             scanner: None,
+            art_hosts: Vec::new(),
             feedback: None,
             feedback_key: String::new(),
             osc_tx: UdpSocket::bind("0.0.0.0:0").ok().and_then(|s| s.set_nonblocking(true).ok().map(|_| s)),
@@ -163,15 +167,21 @@ impl IoHub {
         }
         self.outputs.retain(|k, _| wanted.contains_key(k));
         let mut art_ports: Vec<u16> = Vec::new();
+        let mut art_hosts: Vec<std::net::Ipv4Addr> = Vec::new();
         for (&(uid, idx), cfg) in &wanted {
             // sACN embeds the node name in every packet.
             let mut key = cfg_key(cfg);
             if matches!(cfg.kind, OutputKind::Sacn { .. }) {
                 key.push_str(&self.node_name);
             }
-            if let OutputKind::ArtNet { net, subnet, universe, .. } = &cfg.kind {
+            if let OutputKind::ArtNet { net, subnet, universe, host, .. } = &cfg.kind {
                 if cfg.enabled {
                     art_ports.push(artnet::port_address(*net, *subnet, *universe));
+                    if let Ok(ip) = host.trim().parse::<std::net::Ipv4Addr>() {
+                        if !art_hosts.contains(&ip) {
+                            art_hosts.push(ip);
+                        }
+                    }
                 }
             }
             if self.outputs.get(&(uid, idx)).map(|e| e.key == key).unwrap_or(false) {
@@ -190,6 +200,7 @@ impl IoHub {
         }
         let _ = name_changed;
         *self.artnet_shared.out_ports.lock() = art_ports.clone();
+        self.art_hosts = art_hosts;
 
         // ── OSC input ──
         let want_osc = settings.osc_in.enabled.then_some(settings.osc_in.port);
@@ -314,7 +325,9 @@ impl IoHub {
                 }
             }
         }
-        let targets = nodes::poll_targets(self.artnet_port, &self.artnet_shared.nodes.ips());
+        let mut known = self.artnet_shared.nodes.ips();
+        known.extend(self.art_hosts.iter().copied());
+        let targets = nodes::poll_targets(self.artnet_port, &known);
         if let Some(s) = &self.scanner {
             s.poll(&targets);
         }
@@ -357,6 +370,16 @@ fn open_sink(kind: &OutputKind, node_name: &str) -> Result<Box<dyn Sink>, String
         OutputKind::Serial { driver, port } => Box::new(serial::SerialSink::new(*driver, port)),
         OutputKind::Usb { driver, serial } => usb::new_usb(driver, serial.as_deref()),
     })
+}
+
+/// IPv4 addresses of this machine's network interfaces, loopback excluded.
+pub fn local_ipv4s() -> Vec<String> {
+    let mut v: Vec<String> = local_ip_address::list_afinet_netifas()
+        .map(|l| l.into_iter().filter_map(|(_, ip)| if let std::net::IpAddr::V4(a) = ip { (!a.is_loopback()).then(|| a.to_string()) } else { None }).collect())
+        .unwrap_or_default();
+    v.sort();
+    v.dedup();
+    v
 }
 
 /// Available serial ports (for the settings UI): `(port name, description)`.

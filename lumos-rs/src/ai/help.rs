@@ -16,6 +16,7 @@ pub const TOPICS: &[(&str, &str, &str)] = &[
     ("macros-timelines", "Macros, timelines, timecode y MSC", include_str!("help/macros-timelines.md")),
     ("salidas", "Universos y salidas DMX (Art-Net, sACN, serie…)", include_str!("help/salidas.md")),
     ("entradas", "Entradas: MIDI, OSC, Art-Net y bindings", include_str!("help/entradas.md")),
+    ("guion", "Guion: escaleta, marcas de cue y seguimiento en directo", include_str!("help/guion.md")),
     ("consola-virtual", "Consola virtual", include_str!("help/consola-virtual.md")),
     ("escenario", "Visualizador 3D, planta 2D y escenario", include_str!("help/escenario.md")),
     ("shows", "Shows, copias de seguridad e importar/exportar", include_str!("help/shows.md")),

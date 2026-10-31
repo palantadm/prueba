@@ -14,3 +14,6 @@ El **patch** asigna a cada aparato un perfil (qué canales tiene), un modo (cuá
 
 ## Atajos de numeración
 Los ids de aparato son números correlativos. Los comandos de selección (`fixture 1 thru 8`) usan esos ids, no la dirección DMX.
+
+## Localizar
+El botón **Localizar** de un aparato lo enciende en blanco/pleno de forma que se vea de verdad: sube el dimmer, el color (o blanco), abre shutter y enciende la lámpara si el perfil lo necesita. Si un perfil sigue sin encender, ajusta qué valores usa con `locate_save {profile, attrs}` (quitar el ajuste: `attrs: null`) o `locate_capture {fixture}` para copiarlos de lo que tiene ahora un aparato.

@@ -391,6 +391,8 @@ impl Engine {
                     profiles: self.library_list(),
                     frames: self.frames.iter().map(|(u, f)| (*u, f.to_vec())).collect(),
                     merged: self.last_merged.clone(),
+                    nodes: self.io.nodes().1,
+                    local_ips: crate::io::local_ipv4s(),
                 });
             }
             EngineIn::GetShow { reply } => {

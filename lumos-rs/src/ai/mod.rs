@@ -16,6 +16,7 @@ pub mod anthropic;
 pub mod client;
 pub mod config;
 pub mod help;
+pub mod netdiag;
 pub mod openai;
 pub mod prompt;
 pub mod sse;
@@ -43,6 +44,10 @@ pub struct AiState {
     pub frames: Vec<(u16, Vec<u8>)>,
     /// Programmer + playback merged values, before DMX encoding.
     pub merged: PerFixture,
+    /// Art-Net nodes that answered the latest ArtPoll.
+    pub nodes: Vec<ArtNode>,
+    /// IPv4 addresses of this machine's network interfaces (loopback excluded).
+    pub local_ips: Vec<String>,
 }
 
 impl AiState {
