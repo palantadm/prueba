@@ -16,7 +16,7 @@ export function SettingsPage(props: { title: string; sub?: string; bar?: Compone
   return (
     <div class="page">
       <PageHead title={props.title} sub={props.sub}>{props.bar}</PageHead>
-      <div class="page-body col" style={{ gap: 16, maxWidth: 900 }}>{props.children}</div>
+      <div class="page-body"><div class="col" style={{ gap: 16, maxWidth: 960 }}>{props.children}</div></div>
     </div>
   );
 }

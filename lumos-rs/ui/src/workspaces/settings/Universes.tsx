@@ -235,7 +235,7 @@ export function UniversesPage() {
                   <span class="n">{u.id}</span>
                   <span class="nm">{u.name}</span>
                   <span class="outs">
-                    {u.outputs.length === 0 ? <span class="ochip none">{t("No output")}</span> : u.outputs.map((o, i) => <span key={i} class={`ochip ${o.kind.type} ${o.enabled ? "" : "off"}`}>{summarize(o)}</span>)}
+                    {u.outputs.length === 0 ? <span class="ochip none">{t("No output")}</span> : <>{u.outputs.map((o, i) => <span key={i} class={`ochip ${o.kind.type} ${o.enabled ? "" : "off"} ${i > 0 ? "extra" : ""}`}>{summarize(o)}</span>)}{u.outputs.length > 1 && <span class="ochip more">+{u.outputs.length - 1}</span>}</>}
                   </span>
                   <span class="st" title={st.map((x) => x.message).filter(Boolean).join("\n")}>
                     <StatusDot state={w} title={{ ok: t("OK"), err: t("Error"), off: t("Off") }[w]} />{{ ok: t("Sending"), err: t("Error"), off: u.outputs.length ? t("Off") : t("No output") }[w]}

@@ -180,3 +180,9 @@
 .uni-ed .hd .cap { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-rail { gap: 4px; padding: 10px; }
 .set-lang { padding: 10px; }
+
+.ochip.more { display: none; }
+@media (max-width: 1240px) { .ochip.extra { display: none; } .ochip.more { display: inline-flex; } }
+.uni-ed .bd { gap: 10px; padding: 12px 14px; }
+.uni-ed .ft { padding: 8px 14px 10px; }
+.uni-ed .ft .btn { min-height: 48px; }
