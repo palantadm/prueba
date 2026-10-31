@@ -165,7 +165,7 @@ const ATTR_ALIASES: &[(&str, &[&str])] = &[
     ("uv", &["uv", "ultravioleta"]),
     ("lime", &["lime", "lima"]),
     ("cto", &["cto"]),
-    ("colorwheel", &["colorwheel", "wheel", "rueda"]),
+    ("colorwheel", &["colorwheel", "colourwheel", "color_wheel", "colour_wheel", "wheel", "rueda"]),
     ("gobo", &["gobo"]),
     ("gobo_rot", &["gobo_rot", "goborot"]),
     ("prism", &["prism", "prisma"]),
@@ -545,6 +545,10 @@ impl<'a> P<'a> {
     fn is_at(&self) -> bool {
         matches!(self.peek(), Some(Tok { t: T::At, .. })) || self.word_in(KW_AT)
     }
+    /// A number that ends the statement right after an attribute word (`colorwheel 100`): accepted as the value.
+    fn value_shorthand(&self) -> bool {
+        matches!(self.peek(), Some(Tok { t: T::Num(_), .. })) && matches!(self.peek_n(1), None | Some(Tok { t: T::Sep, .. }))
+    }
     fn eat_at(&mut self) -> bool {
         if self.is_at() {
             self.i += 1;
@@ -901,8 +905,9 @@ impl<'a> P<'a> {
         }
         if let Some(attr) = attr_of(w) {
             self.i += 1;
-            let sel = if self.starts_selection() { Some(self.selection()?) } else { None };
-            if !self.eat_at() {
+            // `red 100` = `red at 100` when the number ends the statement
+            let sel = if self.starts_selection() && !self.value_shorthand() { Some(self.selection()?) } else { None };
+            if !self.eat_at() && !self.value_shorthand() {
                 return Err(self.here(format!("expected 'at <value>' after '{attr}'")));
             }
             let val = self.val()?;
@@ -976,7 +981,7 @@ impl<'a> P<'a> {
         if let Some(w) = self.word().map(|s| s.to_string()) {
             if let Some(attr) = attr_of(&w) {
                 self.i += 1;
-                if !self.eat_at() {
+                if !self.eat_at() && !self.value_shorthand() {
                     return Err(self.here(format!("expected 'at <value>' after '{attr}'")));
                 }
                 let val = self.val()?;
@@ -1025,6 +1030,12 @@ impl<'a> P<'a> {
                     mode = RecordMode::Merge;
                 } else if self.eat_kw(KW_RELEASE) {
                     release = true;
+                } else if cuelist.is_none() && matches!(self.peek(), Some(Tok { t: T::Num(_), .. })) {
+                    // `record cue 4 1 Name`: the second number is the cuelist
+                    cuelist = Some(self.uint("a cuelist number")?);
+                } else if matches!(self.peek(), Some(Tok { t: T::Str(_) | T::Word(_), .. })) {
+                    // a bare (quoted) text is the name
+                    label = self.rest_text();
                 } else {
                     return Err(self.unexpected());
                 }
@@ -2343,6 +2354,21 @@ mod tests {
     fn set_without_selection_errors() {
         assert!(err_of("at 50").contains("no fixtures selected"));
         assert!(err_of("red at 100").contains("no fixtures selected"));
+    }
+
+    #[test]
+    fn attribute_value_shorthand_and_aliases() {
+        let c = run("fixture 2 thru 3; colorwheel 100").unwrap();
+        assert_eq!(progset(&c[0]).1["colorwheel"], 1.0);
+        let c = run("fixture 2 thru 3 colourwheel 50").unwrap();
+        assert_eq!(progset(&c[0]).1["colorwheel"], 0.5);
+        let c = run("fixture 1; red 100; dimmer 1 thru 2 at 70").unwrap();
+        assert_eq!(progset(&c[0]).1["red"], 1.0);
+        // ranges after an attribute are still selections
+        assert_eq!(progset(&c[1]).0, vec![1, 2]);
+        assert!(err_of("red").contains("expected 'at <value>' after 'red'"));
+        assert!(run("fixture 1; record cue 4 cuelist 1 \"EfectoColor\"").is_ok());
+        assert!(run("fixture 1; record cue 4 1 EfectoColor").is_ok());
     }
 
     #[test]
