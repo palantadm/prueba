@@ -112,3 +112,16 @@
 }
 button.sc-follow { background: none; border: 0; color: var(--text); padding: 0 var(--s-2); font: inherit; font-size: var(--fs-md); font-weight: 600; }
 button.sc-action-title { display: flex; align-items: center; gap: var(--s-2); flex: 1; min-width: 0; min-height: var(--touch); background: none; border: 0; color: inherit; font: inherit; text-align: left; padding: 0; cursor: pointer; }
+
+/* local (Whisper) voice panel */
+.sc-lv { align-items: flex-end; }
+.sc-lv-field { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-xs, 12px); color: var(--dim); min-width: 140px; }
+.sc-lv-field .input { min-height: 44px; }
+.sc-lv-field.grow { flex: 1 1 260px; }
+.sc-lv-meter { display: inline-block; width: 90px; height: 10px; border-radius: 5px; background: var(--ink-3); overflow: hidden; align-self: center; }
+.sc-lv-meter i { display: block; height: 100%; background: var(--green); transition: width 80ms linear; }
+.sc-lv-dl { display: inline-flex; align-items: center; gap: 8px; align-self: center; }
+.sc-lv-bar { display: inline-block; width: 140px; height: 8px; border-radius: 4px; background: var(--ink-3); overflow: hidden; }
+.sc-lv-bar i { display: block; height: 100%; background: var(--cyan); }
+.sc-lv-adv { display: flex; gap: var(--s-3); align-items: flex-end; flex-wrap: wrap; flex-basis: 100%; }
+.sc-lv-heard { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

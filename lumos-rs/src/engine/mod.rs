@@ -19,6 +19,7 @@ mod script;
 mod speed;
 mod timeline;
 mod vconsole;
+mod voice;
 mod xfade;
 
 pub use cmdline::{complete as cmdline_complete, help_json as cmdline_help};
@@ -239,6 +240,7 @@ struct Engine {
     data: DataRt,
     /// In-app AI assistant (lives outside the engine task; see `ai/mod.rs`).
     ai: crate::ai::AiHub,
+    voice: voice::Voice,
     /// Script reader pointers and follow flags (see script.rs).
     script: script::ScriptState,
 }
@@ -273,6 +275,7 @@ impl Engine {
         let mut e = Engine {
             data: DataRt::new(&store),
             ai: crate::ai::AiHub::new(store.clone(), out.clone()),
+            voice: voice::Voice::load(&store),
             script: Default::default(),
             store,
             t0: now,
@@ -458,6 +461,7 @@ impl Engine {
                 let j = self.midi_ports_json();
                 let _ = self.out.send(Out::Json(Arc::from(j)));
             }
+            ev @ (IoEvent::Speech { .. } | IoEvent::SpeechStatus { .. } | IoEvent::SpeechDownloaded { .. }) => self.on_voice_event(ev),
             IoEvent::ExternalDmx { universe, data } => {
                 self.ext_dmx.insert(universe, (Instant::now(), data));
                 self.dirty = true;
@@ -957,6 +961,7 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            c @ (SpeechConfigure { .. } | SpeechListen { .. } | SpeechModelGet { .. } | SpeechModelRemove { .. }) => self.voice_command(c)?,
             // be-ai
             c @ (AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } | AiListModels { .. } | AiTestProvider { .. }) => return self.ai.dispatch(c),
             // be-data
@@ -2051,6 +2056,7 @@ impl Engine {
             learn: self.learn,
             fps: self.fps,
             scripts: self.scripts_rt(),
+            speech: self.voice_rt(),
             blind: self.prog.blind,
             undo: self.prog.hist.counts().0,
             redo: self.prog.hist.counts().1,

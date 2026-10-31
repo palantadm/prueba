@@ -17,3 +17,11 @@ Desde el espacio Guion: PDF, .txt, .md o Fountain (`/api/script/import`). Devuel
 - `script_save` guarda el guion entero: lee primero con `get_show` (`id`), cambia lo mínimo y reenvía todo, con los ids de bloque y marca existentes; los ids nuevos deben ser únicos dentro del guion.
 - Lanzar marcas (`script_go`, `script_fire`) ejecuta acciones reales (luces, vídeo, sonido): es acción en directo.
 - Ante «no pasa nada al lanzar»: revisa las acciones de la marca (host/puerto OSC, URL HTTP, texto de consola válido con `console_command`) y el estado `scripts` del runtime.
+
+## Seguimiento por voz (sin internet)
+Botón 🎙 **Voz** del espacio Guion. Lumos escucha el micrófono y mueve el lector según lo que dicen los actores, con reconocimiento **local** (Whisper): no sale audio del equipo. Es el motor de Lumos, no el navegador: sigue funcionando con la interfaz cerrada.
+- **Primer uso:** elegir idioma (`es`, `gl`, `ca`, `eu`, `en`…) y descargar un modelo (`speech_model_get`; `small-q5_1`, 181 MB, es un buen equilibrio; `medium-q5_0` y `large-v3-turbo-q5_0` aciertan más y piden un PC potente). Para gallego mejor que el genérico se puede usar un ajuste fino convertido a ggml (`custom_model`: ruta al `.bin`).
+- **Cómo sigue:** compara las últimas palabras oídas con las ~48 siguientes del guion (ignora acotaciones y notas), tolerante a errores de reconocimiento. Solo avanza, nunca retrocede. El texto que viene ayuda al reconocimiento (nombres propios, palabras raras).
+- **Cues:** por defecto la voz solo mueve el lector. Con `fire_cues` también lanza la marca siguiente, **solo con frases completas** (un parcial puede corregirse; un cue lanzado no).
+- **Comandos:** `speech_configure {cfg}`, `speech_listen {on}`, `speech_model_get {id}`, `speech_model_remove {id}`. Estado en `get_runtime` → `speech` (escuchando, modelo listo, descarga, última frase oída, error).
+- **Límites:** retardo de 1–2 s; en una sala con mucho ruido o voces solapadas falla más; los números dichos en cifras («3») no coinciden con «tres». Si falla, GO a mano.

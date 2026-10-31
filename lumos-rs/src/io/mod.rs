@@ -44,6 +44,12 @@ pub enum IoEvent {
     ExternalDmx { universe: u16, data: Vec<u8> },
     /// Raw MIDI bytes from an enabled native input port (same path as `Command::MidiIn`).
     Midi { port: String, bytes: Vec<u8> },
+    /// Words recognised from the microphone (`partial`: the utterance is still going on).
+    Speech { text: String, partial: bool },
+    /// Voice recogniser started/stopped (`error` non-empty = it stopped because of it).
+    SpeechStatus { listening: bool, error: String },
+    /// A model download finished (`error` empty = ok).
+    SpeechDownloaded { id: String, error: String },
     /// Native MIDI port lists / enabled state changed.
     MidiPorts { inputs: Vec<MidiPortInfo>, outputs: Vec<MidiPortInfo> },
 }
@@ -127,6 +133,11 @@ fn cfg_key(o: &OutputCfg) -> String {
 }
 
 impl IoHub {
+    /// Sender other subsystems (voice recognition) use to deliver events to the engine.
+    pub fn sender(&self) -> UnboundedSender<IoEvent> {
+        self.tx.clone()
+    }
+
     pub fn new(tx: UnboundedSender<IoEvent>) -> Self {
         IoHub {
             tx,

@@ -12,7 +12,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = [] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-dialog = "2"
-lumos = { path = "../..", features = ["midi"] }
+lumos = { path = "../..", features = ["midi", "whisper"] }
 tokio = { version = "1", features = ["full"] }
 opener = "0.7"
 anyhow = "1"

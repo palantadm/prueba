@@ -1,4 +1,7 @@
 export type { Action } from "./gen/Action";
+export type { SpeechCfg } from "./gen/SpeechCfg";
+export type { SpeechModelInfo } from "./gen/SpeechModelInfo";
+export type { SpeechRt } from "./gen/SpeechRt";
 export type { AiConfigIn } from "./gen/AiConfigIn";
 export type { AiConfigOut } from "./gen/AiConfigOut";
 export type { AiContext } from "./gen/AiContext";

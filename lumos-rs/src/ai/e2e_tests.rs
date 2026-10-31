@@ -678,7 +678,9 @@ async fn no_duplicate_creations_and_tolerant_arguments() {
     assert_eq!(sh.chases.len(), 1);
     assert_eq!(sh.chases[0].steps.len(), 5);
     assert!(ex(json!({"command":{"type":"chase_run","id":sh.chases[0].id,"on":true}})).await.is_ok());
-    assert!(ex(json!({"nada": 1})).await.unwrap_err().contains("Falta `command`"));
+    let e = ex(json!({"nada": 1})).await.unwrap_err();
+    assert!(e.contains("Falta `type`") && e.contains("nada"), "{e}");
+    assert!(ex(json!({})).await.unwrap_err().contains("Falta `command`"));
 }
 
 #[tokio::test]

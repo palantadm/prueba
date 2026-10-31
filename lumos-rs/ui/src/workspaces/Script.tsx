@@ -10,6 +10,7 @@ import { ImportSheet } from "../script/ImportSheet";
 import { MarkEditorHost, BlockEditorHost } from "../script/MarkEditor";
 import { PdfPanel } from "../script/PdfPanel";
 import { VoiceBar, useVoiceFollow, voiceSupported } from "../script/Voice";
+import { LocalVoicePanel } from "../script/LocalVoice";
 import { ApiError, suggestMarks } from "../script/api";
 import { activeId, currentScript, editMode, fontSize, pdfOpen, setActive, setFontSize, setPdfOpen, sel, moving, suggestions, visibleScripts, saveScript } from "../script/store";
 import { blankScript } from "../script/util";
@@ -30,7 +31,9 @@ export function Script() {
   useEffect(() => { if (!editMode.value) { sel.value = null; moving.value = null; suggestions.value = []; } }, [editMode.value]);
   useEffect(() => { suggestions.value = []; }, [cur?.id]);
 
-  const voiceState = useVoiceFollow(cur ?? { id: 0, name: "", blocks: [], pdf: null }, srt, voice && !!cur, voiceFire);
+  const local = rt.value?.speech?.available ? rt.value.speech : undefined;
+  // the offline engine (Whisper) replaces the browser's Web Speech whenever this build has it
+  const voiceState = useVoiceFollow(cur ?? { id: 0, name: "", blocks: [], pdf: null }, srt, voice && !!cur && !local, voiceFire);
 
   let lastGo = 0;
   const modalOpen = () => !!document.querySelector(".modal-back");
@@ -87,7 +90,7 @@ export function Script() {
             <button class="btn" aria-label={t("Larger text")} disabled={fontSize.value >= 48} onClick={() => setFontSize(fontSize.value + 4)}>A+</button>
           </span>
           {cur.pdf && <button class={`btn ${pdfOpen.value ? "sel" : ""}`} aria-pressed={pdfOpen.value} onClick={() => setPdfOpen(!pdfOpen.value)}>PDF</button>}
-          {voiceSupported() && <button class={`btn ${voice ? "sel" : ""}`} aria-pressed={voice} title={t("Experimental: follows the actors' voice")} onClick={() => setVoice(!voice)}>🎙 {t("Voice")}</button>}
+          {(local || voiceSupported()) && <button class={`btn ${voice ? "sel" : ""}`} aria-pressed={voice} title={local ? t("Follows the actors' voice, offline") : t("Experimental: follows the actors' voice")} onClick={() => setVoice(!voice)}>🎙 {t("Voice")}</button>}
           {editMode.value && <button class="btn" disabled={suggesting} onClick={suggest}>{suggesting ? t("Analysing…") : `✦ ${t("Suggest cues")}`}</button>}
           <button class={`btn ${editMode.value ? "primary" : ""}`} aria-pressed={editMode.value} onClick={() => (editMode.value = !editMode.value)}>{editMode.value ? t("Done") : t("Edit")}</button>
         </>
@@ -103,7 +106,8 @@ export function Script() {
           <div class="sc-body">
             <div class="sc-main">
               <Reader script={cur} rt={srt} />
-              {voice && <VoiceBar heard={voiceState.heard} err={voiceState.err} fireCues={voiceFire} onFireCues={setVoiceFire} />}
+              {voice && local && cur && <LocalVoicePanel sp={local} scriptId={cur.id} />}
+              {voice && !local && <VoiceBar heard={voiceState.heard} err={voiceState.err} fireCues={voiceFire} onFireCues={setVoiceFire} />}
             </div>
             {pdfOpen.value && cur.pdf && <PdfPanel url={cur.pdf} page={cur.blocks.find((b) => b.id === srt?.block)?.page ?? 1} />}
           </div>

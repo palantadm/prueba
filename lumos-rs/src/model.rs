@@ -1040,6 +1040,73 @@ pub struct Script {
     pub pdf: Option<String>,
 }
 
+/// Voice-follow preferences (machine level, `speech.json`; not part of the show).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SpeechCfg {
+    /// Spoken language, Whisper code: `es`, `gl`, `en`, `ca`, `eu`…
+    #[serde(default = "d_lang")]
+    pub lang: String,
+    /// Catalogue model id (see `SpeechRt.models`).
+    #[serde(default = "d_speech_model")]
+    pub model: String,
+    /// Path to a custom ggml `.bin` (e.g. a Galician fine-tune); overrides `model` when set.
+    #[serde(default)]
+    pub custom_model: String,
+    /// Voice may also fire the cue marks (otherwise it only moves the reader).
+    #[serde(default)]
+    pub fire_cues: bool,
+    /// Input device name ("" = system default).
+    #[serde(default)]
+    pub device: String,
+    /// Script to follow (0 = the first one).
+    #[serde(default)]
+    pub script: u32,
+}
+
+fn d_lang() -> String {
+    "es".into()
+}
+fn d_speech_model() -> String {
+    "small-q5_1".into()
+}
+
+impl Default for SpeechCfg {
+    fn default() -> Self {
+        SpeechCfg { lang: d_lang(), model: d_speech_model(), custom_model: String::new(), fire_cues: false, device: String::new(), script: 0 }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SpeechModelInfo {
+    pub id: String,
+    pub label: String,
+    pub size_mb: u32,
+    pub installed: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SpeechRt {
+    /// This build can recognise speech locally (`whisper` feature).
+    pub available: bool,
+    /// Microphone open and recognising.
+    pub listening: bool,
+    pub cfg: SpeechCfg,
+    pub models: Vec<SpeechModelInfo>,
+    pub devices: Vec<String>,
+    /// The selected model file exists.
+    pub model_ready: bool,
+    /// `(model id, 0..1)` while a model downloads.
+    pub download: Option<(String, f32)>,
+    /// Last words heard (newest at the end).
+    pub heard: String,
+    /// Microphone level 0..1.
+    pub level: f32,
+    pub error: String,
+}
+
 /// Result of `POST /api/script/import` (multipart: .pdf .txt .md .fountain .docx? text) — a draft, not saved.
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -1482,6 +1549,9 @@ pub struct Runtime {
     pub timelines: Vec<TimelineRt>,
     #[serde(default)]
     pub scripts: Vec<ScriptRt>,
+    /// Local voice-follow (Whisper) state.
+    #[serde(default)]
+    pub speech: SpeechRt,
     #[serde(default)]
     pub macros_running: Vec<u32>,
     /// Output test pattern running.
@@ -1647,6 +1717,15 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── voice follow (local Whisper) ──
+    /// Save voice-follow preferences (language, model, device, script, fire cues).
+    SpeechConfigure { cfg: SpeechCfg },
+    /// Start/stop listening to the microphone and following the script.
+    SpeechListen { on: bool },
+    /// Download a catalogue model.
+    SpeechModelGet { id: String },
+    /// Delete a downloaded model.
+    SpeechModelRemove { id: String },
     // ── data & network (be-data) ──
     BackupCreate { label: String },
     BackupRestore { id: String },

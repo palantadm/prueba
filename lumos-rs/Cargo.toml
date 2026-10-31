@@ -25,6 +25,8 @@ futures-util = "0.3"
 local-ip-address = "0.6"
 rusb = { version = "0.9", optional = true }
 midir = { version = "0.10", optional = true }
+whisper-rs = { version = "0.16", optional = true }
+cpal = { version = "0.17", optional = true }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 roxmltree = "0.20"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls-webpki-roots-no-provider"] }
@@ -37,6 +39,8 @@ pdf-extract = "0.9"
 usb = ["dep:rusb"]
 # Native MIDI in/out (needs libasound2-dev on Linux). Desktop app and CI enable it.
 midi = ["dep:midir"]
+# Local speech recognition (whisper.cpp) from the microphone, for following the Guion offline. Needs cmake + a C++ compiler (+ libasound2-dev on Linux).
+whisper = ["dep:whisper-rs", "dep:cpal"]
 
 [profile.release]
 lto = "thin"

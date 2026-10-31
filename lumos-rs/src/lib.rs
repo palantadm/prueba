@@ -4,6 +4,7 @@ pub mod ai;
 pub mod api;
 pub mod backups;
 pub mod engine;
+pub mod speech;
 pub mod gdtf;
 pub mod glb;
 pub mod io;

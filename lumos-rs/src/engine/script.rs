@@ -357,6 +357,29 @@ impl Engine {
         Ok(())
     }
 
+    /// Voice-follow: the speaker said `heard` (normalised words). If that phrase sits ahead of the reader, move the
+    /// reader there (`fire`: also GO the next mark when it lies at or before the spoken block). Returns whether it moved.
+    pub(super) fn script_move_by_words(&mut self, id: u32, heard: &[String], fire: bool) -> Result<bool, String> {
+        let sc = self.require_script(id)?;
+        let r = self.script.runs.get(&id).cloned().unwrap_or_default();
+        let cur = if r.block == 0 { None } else { block_pos(sc, r.block) };
+        let Some(target) = crate::speech::matcher::target_block(sc, cur.unwrap_or(0), heard) else { return Ok(false) };
+        if Some(target) == cur {
+            return Ok(false);
+        }
+        let list = flat(sc);
+        let idx = next_index(sc, &r, &list);
+        let next_block = list.get(idx).and_then(|(b, _)| block_pos(sc, *b));
+        let target_id = sc.blocks[target].id;
+        match next_block {
+            Some(nb) if fire && nb <= target => {
+                self.script_go(id)?;
+            }
+            _ => self.script_goto(id, target_id, None)?,
+        }
+        Ok(true)
+    }
+
     pub(super) fn script_reset(&mut self, id: u32) -> Result<(), String> {
         self.require_script(id)?;
         self.script.runs.remove(&id);
@@ -534,7 +557,7 @@ impl Engine {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::super::tests_support::*;
     use super::*;
     use std::net::UdpSocket;

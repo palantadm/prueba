@@ -31,7 +31,7 @@ Tests: `cargo test` (engine + I/O, regenerates `ui/src/gen`), `node scripts/e2e.
 fades, follow and timecode · executors · **fixture libraries: GDTF (MagicQ/MA3/GDTF-Share, with real 3D models, wheels, optics),
 QLC+ `.qxf`, Open Fixture Library JSON** (Patch → Import fixtures) · unlimited universes, each routed to any number of outputs
 (Art-Net, sACN, OSC, Enttec Open/Pro/DMXking serial, uDMX with `--features usb`) · inputs: Web MIDI, OSC, Art-Net, MTC ·
-**Virtual Console**: pages of buttons, sliders, knobs, XY pads, cue-list and speed-dial widgets mapped to MIDI/OSC/touch with
+**Guion** (running order with cue marks; PDF import; follow-by-voice **offline** with Whisper in Spanish/Galician/Catalan/English… — models download on first use, `--features whisper`) · **Virtual Console**: pages of buttons, sliders, knobs, XY pads, cue-list and speed-dial widgets mapped to MIDI/OSC/touch with
 MIDI-LED / motor-fader / OSC feedback and learn mode · **3D visualiser** (PBR fixtures, volumetric beams, gobo projection, shadows,
 GDTF models, trusses/decor/LED & projection screens) · **2D plan/elevation visualiser** (moving-head beams and floor footprints,
 drag-to-aim) · DMX monitor.

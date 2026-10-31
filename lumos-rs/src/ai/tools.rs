@@ -305,6 +305,61 @@ pub fn lenient_json(raw: &str) -> Option<Value> {
     (a < b).then(|| serde_json::from_str::<Value>(&t[a..=b]).ok()).flatten().and_then(obj)
 }
 
+/// Small models send the command in many shapes. Accept the recognisable ones and rebuild `{type, ...fields}`:
+/// `{command:{type,..}}`, fields at the top level, `command` as JSON text, `command` as the type name with the fields
+/// beside it, another key for the type (`name`/`action`/`cmd`/`kind`/`command_type`), or `{<type>: {fields}}`.
+pub fn normalize_command(input: &Value) -> Result<Value, String> {
+    let known = |s: &str| super::cmdref::find(s).is_some() || s.starts_with("ai_") || super::cmdref::NOT_FOR_AI.contains(&s);
+    let take_obj = |v: &Value| -> Option<Value> {
+        match v {
+            Value::Object(_) => Some(v.clone()),
+            Value::String(t) => lenient_json(t),
+            _ => None,
+        }
+    };
+    let mut base = match input.get("command") {
+        Some(c) => match take_obj(c) {
+            Some(o) => o,
+            // `command` is just the type name; the fields sit beside it
+            None => match c.as_str() {
+                Some(t) if known(t) => {
+                    let mut o = input.as_object().cloned().unwrap_or_default();
+                    o.remove("command");
+                    o.insert("type".into(), json!(t));
+                    Value::Object(o)
+                }
+                _ => return Err("`command` debe ser un objeto JSON con `type`. Forma: send_command {\"command\": {\"type\": \"<tipo>\", ...campos}}. Mira get_help `comandos`.".into()),
+            },
+        },
+        None if input.as_object().map_or(false, |o| !o.is_empty()) => input.clone(),
+        None => return Err("Falta `command`: llama a send_command con {\"command\": {\"type\": \"<tipo>\", ...}}. Tipos por grupos: get_help `comandos`; un tipo concreto: get_help `comando <tipo>`.".into()),
+    };
+    let Some(o) = base.as_object_mut() else { return Err("`command` debe ser un objeto".into()) };
+    if o.get("type").and_then(|t| t.as_str()).map_or(true, |t| t.is_empty()) {
+        // another key carries the type name
+        for k in ["command_type", "commandType", "name", "action", "cmd", "kind", "op", "tool", "command"] {
+            if let Some(t) = o.get(k).and_then(|v| v.as_str()).map(|s| s.to_string()) {
+                let t = t.trim().to_lowercase().replace([' ', '-'], "_");
+                if known(&t) {
+                    o.remove(k);
+                    o.insert("type".into(), json!(t));
+                    break;
+                }
+            }
+        }
+    }
+    if o.get("type").is_none() && o.len() == 1 {
+        // `{ "effect_toggle": {"id": 5, "on": true} }`
+        let (k, v) = o.iter().next().map(|(k, v)| (k.clone(), v.clone())).unwrap();
+        if known(&k) {
+            let mut n = v.as_object().cloned().unwrap_or_default();
+            n.insert("type".into(), json!(k));
+            return Ok(Value::Object(n));
+        }
+    }
+    Ok(base)
+}
+
 /// A call that *creates* items: repeating it with the same arguments makes duplicates, never progress.
 pub fn is_creating_call(name: &str, input: &Value) -> bool {
     if name != "send_command" {
@@ -867,12 +922,9 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
             }
         }
         "send_command" => {
-            // tolerate models that put the command's fields at the top level instead of under `command`
-            let raw = match input.get("command") {
-                Some(c) if c.is_object() => c.clone(),
-                Some(Value::String(t)) => lenient_json(t).ok_or("`command` debe ser un objeto JSON con `type`")?,
-                _ if input.get("type").is_some() => input.clone(),
-                _ => return Err("Falta `command`: llama a send_command con {\"command\": {\"type\": \"<tipo>\", ...}} (ver los tipos en la descripción de la herramienta).".into()),
+            let raw = match normalize_command(input) {
+                Ok(v) => v,
+                Err(e) => return Err(e),
             };
             let ty = raw.get("type").and_then(|t| t.as_str()).unwrap_or("").to_string();
             if ty.starts_with("ai_") {
@@ -885,7 +937,8 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
                 return Err(cap(format!("`{ty}` no es un comando de send_command.{console} Los más parecidos:\n{near}\nLista completa por grupos: get_help `comandos`."), MAX_RESULT));
             }
             if ty.is_empty() {
-                return Err("Falta `type` en el comando. Forma: send_command {\"command\": {\"type\": \"<tipo>\", ...campos}}. Tipos habituales: fixture_add, fixture_update, fixture_remove, group_save, palette_save, scene_record, cuelist_save, chase_save, chase_run, universe_save, output_test, grand_master, blackout, go. La lista completa con sus campos está en la descripción de send_command.".into());
+                let got = raw.as_object().map(|o| o.keys().cloned().collect::<Vec<_>>().join(", ")).unwrap_or_default();
+                return Err(format!("Falta `type` en el comando (recibí los campos: [{got}]). Cada comando lleva `type` con el nombre del comando y luego sus campos, p. ej. {{\"command\": {{\"type\": \"effect_toggle\", \"id\": 5, \"on\": true}}}}. Tipos habituales: fixture_add, fixture_update, fixture_remove, group_save, palette_save, scene_record, cuelist_save, chase_save, chase_run, universe_save, output_test, grand_master, blackout, go. La lista completa con sus campos está en la descripción de send_command."));
             }
             // `fixture_update` may carry just `id` + the changed fields: complete the rest from the patched fixture
             if ty == "fixture_update" {
@@ -993,6 +1046,28 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn command_shapes_are_normalised() {
+        let want = json!({"type":"effect_toggle","id":5,"on":true});
+        for input in [
+            json!({"command":{"type":"effect_toggle","id":5,"on":true}}),
+            json!({"type":"effect_toggle","id":5,"on":true}),
+            json!({"command":"{\"type\":\"effect_toggle\",\"id\":5,\"on\":true}"}),
+            json!({"command":"effect_toggle","id":5,"on":true}),
+            json!({"command":{"name":"effect_toggle","id":5,"on":true}}),
+            json!({"command":{"action":"effect toggle","id":5,"on":true}}),
+            json!({"command":{"command_type":"effect_toggle","id":5,"on":true}}),
+            json!({"command":{"effect_toggle":{"id":5,"on":true}}}),
+            json!({"effect_toggle":{"id":5,"on":true}}),
+        ] {
+            assert_eq!(normalize_command(&input).unwrap(), want, "{input}");
+        }
+        assert!(normalize_command(&json!({})).unwrap_err().contains("Falta `command`"));
+        assert!(normalize_command(&json!({"command":"hola"})).is_err());
+        // unknown shapes pass through unchanged so the caller can report what it received
+        assert_eq!(normalize_command(&json!({"command":{"fixtures":[1]}})).unwrap(), json!({"fixtures":[1]}));
+    }
 
     #[test]
     fn lenient_args_and_creating_calls() {
