@@ -93,7 +93,7 @@ export function AudioPage() {
           <NumberField label={t("Master output (dB)")} value={draft.master_db} min={-60} max={12} step={1} float onChange={(v) => upd((c) => { c.master_db = v; })} />
           <div class="field"><label>{t("On start")}</label><Toggle checked={draft.autostart} onChange={(v) => upd((c) => { c.autostart = v; })} label={t("Open audio when Lumos starts")} /></div>
         </div>
-        <div class="panel-body dim">{running ? `${a.in_channels ? `${t("Inputs")}: ${a.in_channels} ch` : ""} ${a.out_channels ? `· ${t("Outputs")}: ${a.out_channels} ch` : ""}` : t("Open audio to see the real channel count of the devices.")}</div>
+        <div class="panel-body dim">{running ? [a.in_channels ? `${t("Inputs")}: ${a.in_channels} ch` : "", a.out_channels ? `${t("Outputs")}: ${a.out_channels} ch` : ""].filter(Boolean).join(" · ") : t("Open audio to see the real channel count of the devices.")}</div>
       </div>
 
       <div class="panel">
