@@ -43,7 +43,7 @@
 .st-dockrow > .st-card { pointer-events: auto; }
 .st-dockrow { max-width: calc(100% - 340px - 2 * var(--s-4)); }
 .st-viewcard {
-  position: absolute; left: 0; bottom: calc(100% + 10px); width: min(360px, calc(100vw - 2 * var(--s-4))); padding: var(--s-4);
+  position: absolute; z-index: 6; left: 0; bottom: calc(100% + 10px); width: min(360px, calc(100vw - 2 * var(--s-4))); padding: var(--s-4);
   display: flex; flex-direction: column; gap: var(--s-3);
 }
 .st-viewgrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
@@ -52,7 +52,7 @@
 
 /* left: add palette + lists */
 .st-lcol {
-  position: absolute; left: var(--s-4); top: var(--s-4); bottom: 92px; width: 248px; z-index: 4; padding: var(--s-3);
+  position: absolute; left: var(--s-4); top: var(--s-4); width: 248px; max-height: calc(100% - 108px); z-index: 4; padding: var(--s-3);
   display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overscroll-behavior: contain;
 }
 .st-addgrid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-2); }
@@ -62,8 +62,9 @@
 }
 .st-tile:hover { background: var(--ink-3); }
 .st-tile:active { transform: scale(.97); background: var(--ink-4); }
-.st-list { flex: none; max-height: 190px; min-height: 52px; padding: 2px 0; overflow-y: auto; }
-.st-fxlist { max-height: 220px; }
+.st-list { flex: 1 1 auto; min-height: 52px; padding: 2px 0; overflow-y: auto; }
+.st-tabs { flex-wrap: nowrap; gap: 4px; }
+.st-tabs .btn { flex: 1 1 0; min-width: 0; padding: 0 4px; font-size: var(--fs-xs); line-height: 1.1; }
 .st-row { display: flex; align-items: center; gap: 6px; padding: 0 var(--s-2); min-height: 48px; cursor: pointer; border-radius: var(--r-sm); border: 1px solid transparent; font-size: var(--fs-sm); }
 .st-row:hover { background: var(--ink-2); }
 .st-row.sel { background: var(--cyan-fill); border-color: var(--cyan); }
@@ -79,12 +80,13 @@
   justify-content: space-between; pointer-events: none;
 }
 .st-rcol > * { pointer-events: auto; }
-.st-rprops { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 14px; overflow: hidden; }
-.st-propwrap { overflow-y: auto; min-height: 0; padding: var(--s-2) 0 0; overscroll-behavior: contain; }
+.st-rprops { flex: 0 0 auto; max-height: calc(100% - 206px); min-height: 0; display: flex; flex-direction: column; gap: 6px; padding: 14px; overflow: hidden; }
+.st-propwrap { flex: 0 1 auto; overflow-y: auto; min-height: 0; padding: var(--s-2) 0 0; overscroll-behavior: contain; }
 .st-props { gap: var(--s-3); }
-.st-smoke { flex: none; margin-top: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 100%; overflow-y: auto; }
+.st-smoke { flex: 0 1 auto; min-height: 0; margin-top: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; overscroll-behavior: contain; }
 .st-field { display: flex; flex-direction: column; gap: 6px; }
-.st-row-field { display: flex; flex-direction: column; gap: 2px; }
+.st-row-field { display: grid; grid-template-columns: 112px 1fr; align-items: center; gap: var(--s-2); }
+.st-row-field .st-lbl { line-height: 1.2; }
 .st-btnrow { display: flex; gap: var(--s-2); }
 .st-btnrow .btn { flex: 1 1 0; min-height: 52px; padding: 0 var(--s-2); }
 .st-seg { gap: 6px; }
@@ -144,11 +146,13 @@
   .st-top::-webkit-scrollbar { display: none; }
   .st-top > * { flex: none; }
   .st-narrow-only { display: flex; }
+  .st-top .btn { padding: 0 10px; }
+  .st-top { gap: 4px; }
+  .st-vsep { display: none; }
   .st-hud { display: none; }
   .st-hudrow { top: 84px; }
-  .st-lcol { top: 84px; bottom: 100px; box-shadow: var(--shadow-2); max-width: calc(100% - 2 * var(--s-4)); }
+  .st-lcol { top: 84px; max-height: calc(100% - 200px); box-shadow: var(--shadow-2); max-width: calc(100% - 2 * var(--s-4)); }
   .st-rcol { top: 84px; width: min(340px, calc(100% - 2 * var(--s-4))); }
   .st-dockrow { max-width: none; }
   .st-banner { bottom: 100px; }
 }
-@media (max-width: 1000px) and (min-width: 760px) { .st-rcol:has(.st-rprops):has(.st-smoke) .st-smoke { max-height: 60%; } }

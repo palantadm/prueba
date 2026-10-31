@@ -269,4 +269,5 @@ export const stage: Record<string, string> = {
   "Display options": "Opciones de vista",
   "Smoke active": "Niebla activa",
   "Clear air": "Aire limpio",
+  "Add": "Añadir",
 };

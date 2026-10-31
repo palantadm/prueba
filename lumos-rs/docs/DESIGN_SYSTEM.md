@@ -44,3 +44,11 @@ Legacy names (`--bg-0…4`, `--text-dim`, `--accent`, `--live`, `--go`, `--stop`
 2. Check every control ≥ 48 px (primary 56+) and that nothing depends on hover.
 3. Numbers → `.mono`; labels → uppercase `.label`; keep all strings in `t()`.
 4. Workspaces fill `main` (`height: 100%`, `min-height: 0`); the dock and command bar are provided by the shell.
+
+## Viewport workspaces (3D / 2D)
+Full-bleed canvas with **floating cards** (`.st-card`: ink-1 93 %, radius 18, blur) — no fixed side panels.
+- 3D: top pill (Edit/View · camera presets · fullscreen), left card with tabs (Add 2×N tiles of 64 px · Objects · Fixtures), right column (properties card + smoke card, never overlapping), bottom pills (tools, layers, `⋯` display options), HUD chip top-right.
+- Numeric properties are 52 px mono cells (`.st-cell`); on coarse pointers focusing one opens the keypad sheet (`stage/numpad.tsx`) instead of the OS keyboard.
+- Sliders in cards use `.st-range` (44 px track, 18×52 white cap).
+- 2D: top cards (view · tools · stack/fan · lock), bottom stack (layers / plan-image popover, legend, selection info, dock with zoom, layers, PNG, labels, HUD).
+- ≤ 1000 px (3D) / ≤ 820 px (2D): cards open on demand, labels collapse to icons, popovers become full-width sheets. Secondary windows use the same rules.

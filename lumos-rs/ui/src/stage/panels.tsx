@@ -218,6 +218,8 @@ const KIND_ICON: Record<string, string> = {
   truss: "▤", platform: "▭", wall: "▮", column: "●", curtain: "≋", tree: "▲", box: "■", screen: "▣",
 };
 
+const leftTab = signal<"add" | "objects" | "fixtures">("add");
+
 export function LeftPanel() {
   const stage = effStage();
   const objs = stage?.objects ?? [];
@@ -232,44 +234,54 @@ export function LeftPanel() {
   };
   return (
     <aside class="st-lcol st-card" aria-label={t("Add to stage")}>
-      <div class="st-h">{t("Add to stage")}</div>
-      <div class="st-addgrid">
-        {TEMPLATES.map((tpl, i) => <button key={tpl.label} class="st-tile" onClick={() => add(i)}>{t(tpl.label)}</button>)}
+      <div class="st-pill st-tabs" role="tablist">
+        {([["add", t("Add")], ["objects", `${t("Objects")} ${objs.length}`], ["fixtures", `${t("Fixtures")} ${fixtures.length}`]] as const).map(([k, l]) => (
+          <button key={k} role="tab" aria-selected={leftTab.value === k} class={`btn ${leftTab.value === k ? "sel" : ""}`} onClick={() => (leftTab.value = k)}>{l}</button>
+        ))}
       </div>
-      <div class="st-h st-h2">{t("Objects")} <span class="faint">{objs.length}</span></div>
-      <div class="st-list scroll">
-        {objs.length === 0 && <div class="st-empty dim">{t("No objects yet. Add trusses, decor and screens above.")}</div>}
-        {objs.map((o) => {
-          const sel = selObject.value === o.id;
-          return (
-            <div key={o.id} class={`st-row ${sel ? "sel" : ""} ${hidden.has(o.id) ? "off" : ""}`} onClick={() => { selObject.value = o.id; }}>
-              <span class="st-ico">{KIND_ICON[o.kind] ?? "■"}</span>
-              <span class="grow st-name">{o.name}</span>
-              <button class="btn ghost icon" title={hidden.has(o.id) ? t("Show object") : t("Hide object")} aria-label={hidden.has(o.id) ? t("Show object") : t("Hide object")} onClick={(e) => { e.stopPropagation(); toggleHidden(o.id); }}>{hidden.has(o.id) ? "◌" : "◉"}</button>
-              {sel && <button class="btn ghost icon" title={t("Duplicate")} aria-label={t("Duplicate")} onClick={(e) => { e.stopPropagation(); duplicateObject(o.id); }}>⧉</button>}
-              {sel && <button class="btn ghost icon" title={t("Delete")} aria-label={t("Delete")} onClick={(e) => { e.stopPropagation(); deleteObject(o.id); }}>✕</button>}
-            </div>
-          );
-        })}
-      </div>
-      <div class="st-h st-h2">{t("Fixtures")} <span class="faint">{fixtures.length}</span></div>
-      <button class="btn tall" title={t("Place selected (or unplaced) fixtures along the first truss")} onClick={arrangeFixtures}>{t("Arrange on truss")}</button>
-      <div class="st-list scroll st-fxlist">
-        {fixtures.length === 0 && <div class="st-empty dim">{t("Patch fixtures to see them here.")}</div>}
-        {fixtures.map((f) => {
-          const sel = selection.value.includes(f.id);
-          return (
-            <div key={f.id} class={`st-row ${sel ? "sel" : ""}`} onClick={(e) => {
-              selObject.value = null;
-              selection.value = e.shiftKey || e.ctrlKey ? (sel ? selection.value.filter((x) => x !== f.id) : [...selection.value, f.id]) : [f.id];
-            }}>
-              <span class="st-ico mono faint">{f.id}</span>
-              <span class="grow st-name">{f.name}</span>
-              <span class="faint mono">{f.universe}.{f.address}</span>
-            </div>
-          );
-        })}
-      </div>
+      {leftTab.value === "add" && (
+        <div class="st-addgrid">
+          {TEMPLATES.map((tpl, i) => <button key={tpl.label} class="st-tile" onClick={() => add(i)}>{t(tpl.label)}</button>)}
+        </div>
+      )}
+      {leftTab.value === "objects" && (
+        <div class="st-list scroll">
+          {objs.length === 0 && <div class="st-empty dim">{t("No objects yet. Add trusses, decor and screens above.")}</div>}
+          {objs.map((o) => {
+            const sel = selObject.value === o.id;
+            return (
+              <div key={o.id} class={`st-row ${sel ? "sel" : ""} ${hidden.has(o.id) ? "off" : ""}`} onClick={() => { selObject.value = o.id; }}>
+                <span class="st-ico">{KIND_ICON[o.kind] ?? "■"}</span>
+                <span class="grow st-name">{o.name}</span>
+                <button class="btn ghost icon" title={hidden.has(o.id) ? t("Show object") : t("Hide object")} aria-label={hidden.has(o.id) ? t("Show object") : t("Hide object")} onClick={(e) => { e.stopPropagation(); toggleHidden(o.id); }}>{hidden.has(o.id) ? "◌" : "◉"}</button>
+                {sel && <button class="btn ghost icon" title={t("Duplicate")} aria-label={t("Duplicate")} onClick={(e) => { e.stopPropagation(); duplicateObject(o.id); }}>⧉</button>}
+                {sel && <button class="btn ghost icon" title={t("Delete")} aria-label={t("Delete")} onClick={(e) => { e.stopPropagation(); deleteObject(o.id); }}>✕</button>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {leftTab.value === "fixtures" && (
+        <>
+          <button class="btn tall" title={t("Place selected (or unplaced) fixtures along the first truss")} onClick={arrangeFixtures}>{t("Arrange on truss")}</button>
+          <div class="st-list scroll">
+            {fixtures.length === 0 && <div class="st-empty dim">{t("Patch fixtures to see them here.")}</div>}
+            {fixtures.map((f) => {
+              const sel = selection.value.includes(f.id);
+              return (
+                <div key={f.id} class={`st-row ${sel ? "sel" : ""}`} onClick={(e) => {
+                  selObject.value = null;
+                  selection.value = e.shiftKey || e.ctrlKey ? (sel ? selection.value.filter((x) => x !== f.id) : [...selection.value, f.id]) : [f.id];
+                }}>
+                  <span class="st-ico mono faint">{f.id}</span>
+                  <span class="grow st-name">{f.name}</span>
+                  <span class="faint mono">{f.universe}.{f.address}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </aside>
   );
 }
@@ -417,7 +429,7 @@ function FixtureProps(props: { fxs: Fixture[] }) {
       <Vec3 label="Position m" value={f.pos} onChange={(i, v) => each((x) => { x.pos[i] = v; })} />
       <Vec3 label="Rotation °" value={f.rot} step={5} onChange={(i, v) => each((x) => { x.rot[i] = v; })} />
       <div class="st-btnrow">
-        <button class={`btn tall ${aimTool.value ? "sel" : ""}`} aria-pressed={aimTool.value} onClick={aim}>{t("◎ Aim at point")}</button>
+        <button class={`btn tall ${aimTool.value ? "sel" : ""}`} aria-pressed={aimTool.value} title={t("◎ Aim at point")} onClick={aim}>{t("Aim")}</button>
         <button class="btn tall" title={t("Pan/tilt to centre")} onClick={() => props.fxs.forEach((x) => send({ type: "prog_set", fixtures: [x.id], attrs: { pan: 0.5, tilt: 0.5 } }, { quiet: true }))}>{t("Home")}</button>
         <button class="btn tall" title={t("Place selected (or unplaced) fixtures along the first truss")} onClick={arrangeFixtures}>{t("On truss")}</button>
       </div>
@@ -436,7 +448,7 @@ export function RightPanel() {
     <aside class="st-rprops st-card" aria-label={t("Properties")}>
       <div class="st-h">{kicker}</div>
       {title && <div class="st-title">{title}</div>}
-      <div class="scroll grow st-propwrap">
+      <div class="scroll st-propwrap">
         {obj ? <ObjectProps o={obj} /> : fxs.length ? <FixtureProps fxs={fxs} /> : (
           <div class="st-empty dim">{t("Select an object or a fixture in the viewport or the lists.")}<br /><br />
             <span class="faint">{t("W / E / R move · rotate · scale")}<br />{t("A aim · Del delete · Ctrl+D duplicate")}</span></div>
