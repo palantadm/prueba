@@ -645,3 +645,38 @@ async fn patch_guard_prevents_overlaps() {
     let rp = super::tools::execute(&r.h, "check_patch", &json!({})).await.unwrap();
     assert!(serde_json::from_str::<Value>(&rp).unwrap()["ok"] == true, "{rp} {:?}", sh.fixtures.iter().map(|f| (f.universe, f.address)).collect::<Vec<_>>());
 }
+
+/// A 5-fixture chase request: duplicated creations are refused (by name and by identical repeat), the chase recipe works and
+/// malformed argument shapes from small models are tolerated.
+#[tokio::test]
+async fn no_duplicate_creations_and_tolerant_arguments() {
+    let r = rig("dupes").await; // 4 × rgb-par already present (named "RGB Par n")
+    let ex = |v: Value| {
+        let h = r.h.clone();
+        async move { super::tools::execute(&h, "send_command", &v).await }
+    };
+    let add = json!({"command":{"type":"fixture_add","profile":"generic/rgb-par","mode":"3ch","count":5,"universe":1,"address":null,"name":"PAR"}});
+    assert!(ex(add.clone()).await.is_ok());
+    let n = r.show().await.fixtures.len();
+    // same call again (what the model did): refused, nothing added
+    let e = ex(add.clone()).await.unwrap_err();
+    assert!(e.contains("ya existen 5"), "{e}");
+    assert_eq!(r.show().await.fixtures.len(), n);
+    // fields at the top level instead of under `command` are accepted
+    let flat = json!({"type":"group_save","group":{"id":0,"name":"Pares","fixtures":[5,6,7,8,9]}});
+    assert!(ex(flat).await.is_ok());
+    // command given as a JSON string
+    let s = json!({"command": "{\"type\":\"blackout\",\"on\":false}<|call|>"});
+    let _ = ex(s).await; // parses; engine decides
+    // the chase recipe from the prompt
+    let ids: Vec<u32> = r.show().await.fixtures.iter().filter(|f| f.name.starts_with("PAR")).map(|f| f.id).collect();
+    assert_eq!(ids.len(), 5);
+    let steps: Vec<Value> = ids.iter().map(|i| json!({"values":{ i.to_string(): {"dimmer":1.0,"red":1.0}},"hold":1,"fade":0})).collect();
+    let ch = ex(json!({"command":{"type":"chase_save","chase":{"id":0,"name":"Persecución","bpm":120,"dir":"forward","speed_master":null,"steps":steps}}})).await;
+    assert!(ch.is_ok(), "{ch:?}");
+    let sh = r.show().await;
+    assert_eq!(sh.chases.len(), 1);
+    assert_eq!(sh.chases[0].steps.len(), 5);
+    assert!(ex(json!({"command":{"type":"chase_run","id":sh.chases[0].id,"on":true}})).await.is_ok());
+    assert!(ex(json!({"nada": 1})).await.unwrap_err().contains("Falta `command`"));
+}

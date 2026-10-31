@@ -310,11 +310,7 @@ impl Accum {
                 id = format!("call_{}", CALL_SEQ.fetch_add(1, Ordering::Relaxed));
             }
             seen.push(id.clone());
-            let input = if t.args.trim().is_empty() { Ok(json!({})) } else { serde_json::from_str::<Value>(&t.args) };
-            let input = match input {
-                Ok(v) if v.is_object() => v,
-                _ => json!({ super::agent::INVALID_JSON_KEY: t.args }),
-            };
+            let input = super::tools::lenient_json(&t.args).unwrap_or_else(|| json!({ super::agent::INVALID_JSON_KEY: t.args }));
             blocks.push(Block::ToolUse { id, name: super::tools::clean_tool_name(&t.name), input });
         }
         let has_tools = blocks.iter().any(|b| matches!(b, Block::ToolUse { .. }));

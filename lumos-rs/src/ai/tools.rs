@@ -288,6 +288,39 @@ pub fn clean_tool_name(raw: &str) -> String {
     definitions().iter().find(|d| d.name.eq_ignore_ascii_case(core)).map(|d| d.name.clone()).unwrap_or_else(|| s.to_string())
 }
 
+/// Parse tool arguments leniently: some models append template tokens (`<|call|>`) or wrap the object in prose.
+pub fn lenient_json(raw: &str) -> Option<Value> {
+    let t = raw.split("<|").next().unwrap_or("").trim();
+    let obj = |v: Value| v.is_object().then_some(v);
+    if t.is_empty() {
+        return Some(json!({}));
+    }
+    if let Some(v) = serde_json::from_str::<Value>(t).ok().and_then(obj) {
+        return Some(v);
+    }
+    let (a, b) = (t.find('{')?, t.rfind('}')?);
+    (a < b).then(|| serde_json::from_str::<Value>(&t[a..=b]).ok()).flatten().and_then(obj)
+}
+
+/// A call that *creates* items: repeating it with the same arguments makes duplicates, never progress.
+pub fn is_creating_call(name: &str, input: &Value) -> bool {
+    if name != "send_command" {
+        return false;
+    }
+    let c = input.get("command").unwrap_or(input);
+    let ty = c.get("type").and_then(|t| t.as_str()).unwrap_or("");
+    if ty == "fixture_add" {
+        return true;
+    }
+    // `<kind>_save` / `scene_record` with id 0 or absent = new item
+    let kind = ty.strip_suffix("_save").or_else(|| ty.strip_suffix("_record")).unwrap_or("");
+    if kind.is_empty() || !["group", "palette", "scene", "cuelist", "chase", "macro", "effect", "timeline", "script", "exec", "speed", "binding"].contains(&kind) {
+        return false;
+    }
+    let id = c.pointer(&format!("/{kind}/id")).or_else(|| c.get("id")).and_then(|v| v.as_u64()).unwrap_or(0);
+    id == 0
+}
+
 pub const READ_TOOLS: &[&str] = &["get_show", "get_runtime", "get_fixture_state", "get_dmx", "check_patch", "diagnose_outputs", "search_library", "get_profile", "get_help", "ask_user", "wait"];
 
 // ───────────────────────────── risk ─────────────────────────────
@@ -822,7 +855,13 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
             }
         }
         "send_command" => {
-            let raw = input.get("command").cloned().ok_or("Falta `command`")?;
+            // tolerate models that put the command's fields at the top level instead of under `command`
+            let raw = match input.get("command") {
+                Some(c) if c.is_object() => c.clone(),
+                Some(Value::String(t)) => lenient_json(t).ok_or("`command` debe ser un objeto JSON con `type`")?,
+                _ if input.get("type").is_some() => input.clone(),
+                _ => return Err("Falta `command`: llama a send_command con {\"command\": {\"type\": \"<tipo>\", ...}} (ver los tipos en la descripción de la herramienta).".into()),
+            };
             let ty = raw.get("type").and_then(|t| t.as_str()).unwrap_or("").to_string();
             if ty.starts_with("ai_") {
                 return Err("Ese comando no está permitido para el asistente.".into());
@@ -830,6 +869,13 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
             let cmd: Command = serde_json::from_value(raw).map_err(|e| format!("Comando no válido: {e}. Revisa los campos del tipo `{ty}`."))?;
             // Patch guard: never stack fixtures on top of each other without saying so.
             match &cmd {
+                Command::FixtureAdd { profile, mode, count, name: Some(n), .. } if {
+                    let st = h.ai_state().await.ok_or("Motor detenido")?;
+                    let same = |f: &&Fixture| f.profile == *profile && f.mode == *mode && (f.name == *n || (f.name.strip_prefix(n.as_str()).map_or(false, |r| r.trim().parse::<u32>().is_ok())));
+                    st.show.fixtures.iter().filter(same).count() as u32 >= *count
+                } => {
+                    return Err(format!("No se ha añadido nada: ya existen {count} o más aparatos «{n}» con ese perfil y modo. No repitas el alta; usa los existentes (get_show fixtures) o elige otro nombre si de verdad quieres más."));
+                }
                 Command::FixtureAdd { profile, mode, count, universe, address: Some(a), .. } => {
                     let st = h.ai_state().await.ok_or("Motor detenido")?;
                     let plan = super::patchcheck::plan_add(&st, profile, mode, *count, *universe, *a)?;
@@ -910,6 +956,21 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lenient_args_and_creating_calls() {
+        assert_eq!(lenient_json("{\"a\":1}<|call|>"), Some(json!({"a":1})));
+        assert_eq!(lenient_json("Aquí va: {\"a\":{\"b\":2}} gracias"), Some(json!({"a":{"b":2}})));
+        assert_eq!(lenient_json(""), Some(json!({})));
+        assert_eq!(lenient_json("[1]"), None);
+        assert_eq!(lenient_json("{roto"), None);
+        let fa = json!({"command":{"type":"fixture_add","profile":"p","mode":"m","count":5,"universe":1}});
+        assert!(is_creating_call("send_command", &fa));
+        assert!(is_creating_call("send_command", &json!({"command":{"type":"chase_save","chase":{"id":0,"name":"c","steps":[]}}})));
+        assert!(!is_creating_call("send_command", &json!({"command":{"type":"chase_save","chase":{"id":3,"name":"c","steps":[]}}})), "explicit id overwrites");
+        assert!(!is_creating_call("send_command", &json!({"command":{"type":"go"}})));
+        assert!(!is_creating_call("console_command", &json!({"text":"go"})));
+    }
 
     #[test]
     fn tool_names_are_cleaned() {

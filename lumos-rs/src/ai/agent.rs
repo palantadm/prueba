@@ -186,6 +186,8 @@ async fn turn(inner: &Arc<Inner>, sid: &str, sess: &Arc<Session>, hist: &mut Vec
     let mut tools_on = target.model.tools;
     let mut iter = 0usize;
     let mut no_tools_retry = false;
+    // creating calls that already succeeded in this turn (exact arguments): repeating them only makes duplicates
+    let mut created: std::collections::HashSet<String> = std::collections::HashSet::new();
     loop {
         if *cancel.borrow() {
             return End::Cancelled;
@@ -258,7 +260,17 @@ async fn turn(inner: &Arc<Inner>, sid: &str, sess: &Arc<Session>, hist: &mut Vec
                 results.push(Block::ToolResult { id, content: "Omitida: demasiadas llamadas en un solo mensaje; vuelve a pedirla.".into(), is_error: true });
                 continue;
             }
+            let key = tools::is_creating_call(&name, &args).then(|| format!("{name}{args}"));
+            if key.as_ref().map_or(false, |k| created.contains(k)) {
+                results.push(Block::ToolResult { id, content: "Esta misma creación ya se ha hecho con éxito en este turno; no la repitas (crearía duplicados). Comprueba el resultado con get_show y sigue con el siguiente paso.".into(), is_error: true });
+                continue;
+            }
             let (content, is_error) = run_tool(inner, sid, sess, &h, mode, &id, &name, &args, cancel).await;
+            if !is_error {
+                if let Some(k) = key {
+                    created.insert(k);
+                }
+            }
             results.push(Block::ToolResult { id, content, is_error });
         }
         hist.push(Msg { role: Role::User, blocks: results });

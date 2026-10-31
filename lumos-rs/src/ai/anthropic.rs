@@ -242,11 +242,7 @@ impl Accum {
                     }
                 }
                 Acc::Tool { id, name, json } => {
-                    let input = if json.trim().is_empty() { Ok(json!({})) } else { serde_json::from_str::<Value>(&json) };
-                    let input = match input {
-                        Ok(v) if v.is_object() => v,
-                        _ => json!({ super::agent::INVALID_JSON_KEY: json }),
-                    };
+                    let input = super::tools::lenient_json(&json).unwrap_or_else(|| json!({ super::agent::INVALID_JSON_KEY: json }));
                     blocks.push(Block::ToolUse { id, name: super::tools::clean_tool_name(&name), input });
                 }
                 Acc::Raw(v) => blocks.push(Block::Raw { origin: self.origin.clone(), value: v }),

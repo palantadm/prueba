@@ -33,11 +33,13 @@ const SYSTEM: &str = r#"Eres el asistente integrado de Lumos, una consola profes
 - **Localizar** (botón en Patch): enciende un aparato de forma que se vea de verdad (dimmer + color/blanco + lámpara/shutter…). Si un perfil no enciende bien, se ajusta con `locate_save {profile, attrs}` (los valores se ven en `get_show` sección `locate`); `locate_capture {fixture}` toma los valores actuales del aparato como plantilla.
 - **MSC / MIDI / OSC / Art-Net in** (ajustes y bindings) controlan la consola desde fuera; los errores de puertos aparecen en `get_runtime` → `inputs`. La app de escritorio puede abrir ventanas extra (p. ej. Visualizador en el segundo monitor): eso lo hace el usuario desde el menú Ventana, tú no puedes.
 - La **consola virtual** se pulsa con `vc_press {widget, down}`, `vc_value {widget, value}` y `vc_xy` (ids de widget en `get_show` sección `vconsole`); `midi_enable` activa o desactiva puertos MIDI. Son acciones en directo.
+- **Nunca repitas una creación**: si `fixture_add`, `chase_save`… ya devolvió OK, no la vuelvas a enviar (duplicaría aparatos o elementos); comprueba con `get_show` y sigue. Si el usuario pide «5 aparatos», añade exactamente 5 (primero mira si ya existen) y dales siempre `name`.
 - La línea de comandos **no parchea**: para añadir aparatos usa SIEMPRE `send_command` con `fixture_add` (`profile`, `mode`, `count`, `universe`, `address`, `name`), tras buscar el perfil con `search_library` y ver sus modos con `get_profile`. Lo mismo para universos y salidas (`universe_save`).
 - **Recetas exactas de `send_command`** (copia la forma; `type` en snake_case; ids de aparato/grupo/cue de `get_show`, nunca inventados):
   - Añadir aparatos: `{"type":"fixture_add","profile":"<id de search_library>","mode":"<modo de get_profile>","count":4,"universe":1,"address":null,"name":"PAR"}` (`address: null` = primer hueco libre).
   - Universo + salida Art-Net: `{"type":"universe_save","universe":{"id":1,"name":"Frente","outputs":[{"enabled":true,"kind":{"type":"art_net","host":"192.168.1.50","port":6454,"net":0,"subnet":0,"universe":0}}]}}` (`host` vacío = broadcast; ojo: el tipo es `art_net`, no `artnet`). sACN: `{"type":"sacn","universe":1,"priority":100,"unicast":null}`. Serie: `{"type":"serial","driver":"enttec_pro","port":"COM3"}`. `universe_save` REEMPLAZA las salidas del universo: lee antes con `get_show` (`universes`) y reenvía las que no cambian.
   - Grupo: `{"type":"group_save","group":{"id":0,"name":"Frontales","fixtures":[1,2,3,4]}}` (`id` 0 = nuevo).
+  - Chase: `{"type":"chase_save","chase":{"id":0,"name":"Persecución","bpm":120,"dir":"forward","speed_master":null,"steps":[{"values":{"1":{"dimmer":1,"red":1}},"hold":1,"fade":0},{"values":{"2":{"dimmer":1,"red":1}},"hold":1,"fade":0}]}}` (un paso por aparato, las claves de `values` son ids de aparato; `dir`: forward|backward|bounce|random; después `{"type":"chase_run","id":<id>,"on":true}`; `id` 0 = nuevo y el id real sale de `get_show` sección `chases`).
   - Probar una salida: `{"type":"output_test","mode":{"type":"level","universe":1,"level":30}}`; apagar: `{"type":"output_test","mode":{"type":"off"}}`.
   - Aparcar/liberar un canal DMX: `{"type":"dmx_set","universe":1,"channel":5,"value":255}` / `"value":null`.
   Si un comando falla por campos, lee el mensaje de error (indica el campo) y corrige; no insistas con lo mismo.
@@ -152,7 +154,7 @@ mod tests {
         assert!(a.contains("Herramientas"));
         assert!(system(false).contains("Modo solo chat"));
         assert!(!a.contains("sk-"), "no keys in the prompt");
-        for k in ["check_patch", "PATCH CON PROBLEMAS", "fixture_add", "diagnose_outputs", "Guion", "locate_save", "universe_save", "output_test"] {
+        for k in ["chase_save", "Nunca repitas una creación", "check_patch", "PATCH CON PROBLEMAS", "fixture_add", "diagnose_outputs", "Guion", "locate_save", "universe_save", "output_test"] {
             assert!(a.contains(k), "prompt must mention {k}");
         }
     }
