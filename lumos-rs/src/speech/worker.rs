@@ -41,18 +41,6 @@ impl Drop for Worker {
     }
 }
 
-/// Names of the audio input devices.
-pub fn list_devices() -> Vec<String> {
-    #[cfg(feature = "whisper")]
-    {
-        use cpal::traits::{DeviceTrait, HostTrait};
-        let host = cpal::default_host();
-        return host.input_devices().map(|d| d.filter_map(|d| d.description().ok().map(|x| x.name().to_string())).collect()).unwrap_or_default();
-    }
-    #[cfg(not(feature = "whisper"))]
-    Vec::new()
-}
-
 /// Texts Whisper invents on silence / noise; never useful for following a script.
 pub fn is_hallucination(t: &str) -> bool {
     let n = super::matcher::norm(t);
@@ -190,9 +178,7 @@ impl Segmenter {
 #[cfg(feature = "whisper")]
 mod real {
     use super::*;
-    use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
     use parking_lot::Mutex;
-    use std::collections::VecDeque;
     use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
     pub struct Recognizer {
@@ -247,78 +233,31 @@ mod real {
         }
     }
 
-    pub fn start(model: PathBuf, cfg: SpeechCfg, tx: UnboundedSender<IoEvent>, level: Arc<AtomicU32>, prompt: Arc<Mutex<String>>) -> Result<Worker, String> {
+    pub fn start(model: PathBuf, cfg: SpeechCfg, tx: UnboundedSender<IoEvent>, level: Arc<AtomicU32>, prompt: Arc<Mutex<String>>, feed: Arc<crate::audio::io::Shared>) -> Result<Worker, String> {
         let stop = Arc::new(AtomicBool::new(false));
         let stop2 = stop.clone();
         let handle = std::thread::Builder::new()
             .name("lumos-speech".into())
             .spawn(move || {
-                let fail = |msg: String| {
-                    let _ = tx.send(IoEvent::SpeechStatus { listening: false, error: msg });
-                };
                 let rec = match Recognizer::load(&model, &cfg.lang) {
                     Ok(r) => r,
-                    Err(e) => return fail(e),
-                };
-                let host = cpal::default_host();
-                let dev = if cfg.device.trim().is_empty() {
-                    host.default_input_device()
-                } else {
-                    host.input_devices().ok().and_then(|mut d| d.find(|d| d.description().map(|x| x.name() == cfg.device).unwrap_or(false))).or_else(|| host.default_input_device())
-                };
-                let Some(dev) = dev else { return fail("No hay micrófono disponible.".into()) };
-                let conf = match dev.default_input_config() {
-                    Ok(c) => c,
-                    Err(e) => return fail(format!("El micrófono no se puede abrir: {e}")),
-                };
-                let (channels, rate, fmt) = (conf.channels() as usize, conf.sample_rate(), conf.sample_format());
-                let queue: Arc<Mutex<VecDeque<f32>>> = Arc::new(Mutex::new(VecDeque::new()));
-                let q = queue.clone();
-                let lv = level.clone();
-                let mut rs = Resampler::new(rate);
-                let mut push = move |mono: Vec<f32>| {
-                    let rms = (mono.iter().map(|x| x * x).sum::<f32>() / mono.len().max(1) as f32).sqrt();
-                    lv.store((rms * 4.0).min(1.0).to_bits(), Ordering::Relaxed);
-                    let mut out = Vec::with_capacity(mono.len() / 2 + 8);
-                    rs.push(&mono, &mut out);
-                    let mut g = q.lock();
-                    g.extend(out);
-                    // never let the queue grow beyond 60 s if the recogniser falls behind
-                    while g.len() > RATE as usize * 60 {
-                        g.pop_front();
+                    Err(e) => {
+                        let _ = tx.send(IoEvent::SpeechStatus { listening: false, error: e });
+                        return;
                     }
                 };
-                let err = |e| tracing::warn!("audio input: {e}");
-                let sc: cpal::StreamConfig = conf.clone().into();
-                macro_rules! build {
-                    ($t:ty, $conv:expr) => {
-                        dev.build_input_stream(&sc, move |d: &[$t], _| push(d.chunks(channels.max(1)).map(|f| f.iter().map($conv).sum::<f32>() / f.len() as f32).collect()), err, None)
-                    };
-                }
-                let stream = match fmt {
-                    cpal::SampleFormat::F32 => build!(f32, |x: &f32| *x),
-                    cpal::SampleFormat::I16 => build!(i16, |x: &i16| *x as f32 / 32768.0),
-                    cpal::SampleFormat::U16 => build!(u16, |x: &u16| (*x as f32 - 32768.0) / 32768.0),
-                    cpal::SampleFormat::I32 => build!(i32, |x: &i32| *x as f32 / 2147483648.0),
-                    other => return fail(format!("Formato de audio no admitido: {other:?}")),
-                };
-                let stream = match stream {
-                    Ok(s) => s,
-                    Err(e) => return fail(format!("No se pudo abrir el micrófono: {e}")),
-                };
-                if let Err(e) = stream.play() {
-                    return fail(format!("No se pudo iniciar el micrófono: {e}"));
-                }
                 let _ = tx.send(IoEvent::SpeechStatus { listening: true, error: String::new() });
                 let mut seg = Segmenter::new();
                 while !stop2.load(Ordering::Relaxed) {
                     std::thread::sleep(std::time::Duration::from_millis(60));
-                    let fresh: Vec<f32> = queue.lock().drain(..).collect();
+                    // 16 kHz mono from the audio input (the channel(s) with role "voice", or channel 1)
+                    let fresh: Vec<f32> = feed.voice_tap.lock().drain(..).collect();
                     if fresh.is_empty() {
                         continue;
                     }
-                    let cut = seg.feed(&fresh);
-                    let (partial, fin) = match cut {
+                    let rms = (fresh.iter().map(|x| x * x).sum::<f32>() / fresh.len() as f32).sqrt();
+                    level.store((rms * 4.0).min(1.0).to_bits(), Ordering::Relaxed);
+                    let (partial, fin) = match seg.feed(&fresh) {
                         Cut::None => continue,
                         Cut::Partial => (true, false),
                         Cut::Final => (false, true),
@@ -337,7 +276,6 @@ mod real {
                         seg.reset(0);
                     }
                 }
-                drop(stream);
                 let _ = tx.send(IoEvent::SpeechStatus { listening: false, error: String::new() });
             })
             .map_err(|e| e.to_string())?;
@@ -349,7 +287,7 @@ mod real {
 pub use real::{start, Recognizer};
 
 #[cfg(not(feature = "whisper"))]
-pub fn start(_model: PathBuf, _cfg: SpeechCfg, _tx: UnboundedSender<IoEvent>, _level: Arc<AtomicU32>, _prompt: Arc<parking_lot::Mutex<String>>) -> Result<Worker, String> {
+pub fn start(_model: PathBuf, _cfg: SpeechCfg, _tx: UnboundedSender<IoEvent>, _level: Arc<AtomicU32>, _prompt: Arc<parking_lot::Mutex<String>>, _feed: Arc<crate::audio::io::Shared>) -> Result<Worker, String> {
     Err("Esta compilación de Lumos no incluye el reconocimiento de voz local.".into())
 }
 

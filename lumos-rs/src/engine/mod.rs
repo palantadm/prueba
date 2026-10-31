@@ -18,6 +18,7 @@ mod scenes;
 mod script;
 mod speed;
 mod timeline;
+mod audio;
 mod vconsole;
 mod voice;
 mod xfade;
@@ -241,6 +242,7 @@ struct Engine {
     /// In-app AI assistant (lives outside the engine task; see `ai/mod.rs`).
     ai: crate::ai::AiHub,
     voice: voice::Voice,
+    audio: audio::AudioState,
     /// Script reader pointers and follow flags (see script.rs).
     script: script::ScriptState,
 }
@@ -276,6 +278,7 @@ impl Engine {
             data: DataRt::new(&store),
             ai: crate::ai::AiHub::new(store.clone(), out.clone()),
             voice: voice::Voice::load(&store),
+            audio: audio::AudioState::load(&store),
             script: Default::default(),
             store,
             t0: now,
@@ -345,6 +348,7 @@ impl Engine {
     // ───────────── main loop ─────────────
 
     async fn run(mut self, mut rx: mpsc::UnboundedReceiver<EngineIn>, mut io_rx: mpsc::UnboundedReceiver<IoEvent>) {
+        self.audio_autostart();
         let mut hz = self.hz;
         let mut ticker = Self::make_ticker(hz);
         loop {
@@ -461,6 +465,7 @@ impl Engine {
                 let j = self.midi_ports_json();
                 let _ = self.out.send(Out::Json(Arc::from(j)));
             }
+            ev @ (IoEvent::AudioBands { .. } | IoEvent::AudioLtc { .. } | IoEvent::AudioStatus { .. } | IoEvent::AudioError { .. }) => self.on_audio_event(ev),
             ev @ (IoEvent::Speech { .. } | IoEvent::SpeechStatus { .. } | IoEvent::SpeechDownloaded { .. }) => self.on_voice_event(ev),
             IoEvent::ExternalDmx { universe, data } => {
                 self.ext_dmx.insert(universe, (Instant::now(), data));
@@ -961,6 +966,7 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            c @ (AudioConfigure { .. } | AudioRun { .. } | SoundPlay { .. } | SoundStop { .. }) => self.audio_command(c)?,
             c @ (SpeechConfigure { .. } | SpeechListen { .. } | SpeechModelGet { .. } | SpeechModelRemove { .. }) => self.voice_command(c)?,
             // be-ai
             c @ (AiSend { .. } | AiCancel { .. } | AiConfirm { .. } | AiAnswer { .. } | AiReset { .. } | AiUndo { .. } | AiConfigure { .. } | AiListModels { .. } | AiTestProvider { .. }) => return self.ai.dispatch(c),
@@ -1537,12 +1543,17 @@ impl Engine {
             }
         }
         self.vc_input(&ev);
+        self.run_bindings(&ev);
+    }
+
+    /// Fire the bindings whose source matches `ev` (no activity log, no learn: used by high-rate audio-reactive input too).
+    fn run_bindings(&mut self, ev: &InEvent) {
         let value = ev.value();
         let matches: Vec<(u32, Action, f32)> = self
             .show
             .bindings
             .iter()
-            .filter(|b| b.enabled && source_matches(&b.source, &ev))
+            .filter(|b| b.enabled && source_matches(&b.source, ev))
             .map(|b| (b.id, b.action.clone(), b.out_min + value * (b.out_max - b.out_min)))
             .collect();
         for (bid, action, mapped) in matches {
@@ -1624,7 +1635,7 @@ impl Engine {
                     self.tc.frames_f += dt * tcfg.fps as f64;
                 }
             }
-            TcSource::Mtc => {
+            TcSource::Mtc | TcSource::Ltc => {
                 if let Some(t) = self.tc.last_mtc {
                     if now - t > 0.5 {
                         self.tc.running = false;
@@ -1861,6 +1872,7 @@ impl Engine {
         self.update_automation(now, dt);
         self.update_playback(now);
         self.data_tick();
+        self.audio_tick();
 
         let before = self.ext_dmx.len();
         self.ext_dmx.retain(|_, (t, _)| t.elapsed() < Duration::from_secs(3));
@@ -2057,6 +2069,7 @@ impl Engine {
             fps: self.fps,
             scripts: self.scripts_rt(),
             speech: self.voice_rt(),
+            audio: self.audio_rt(),
             blind: self.prog.blind,
             undo: self.prog.hist.counts().0,
             redo: self.prog.hist.counts().1,

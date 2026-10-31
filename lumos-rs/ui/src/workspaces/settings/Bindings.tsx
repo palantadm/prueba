@@ -1,5 +1,5 @@
 import { useEffect, useState } from "preact/hooks";
-import type { Action, Binding, MidiKind, Source } from "../../types";
+import type { Action, AudioBand, Binding, MidiKind, Source } from "../../types";
 import { onLearned, send, show } from "../../store";
 import { EmptyState, Modal, NumberField, PageHead, Segmented, Select, TextField, Toggle, confirmDialog } from "../../ui";
 import { ATTRS } from "../../lib/shell-attrs";
@@ -8,6 +8,7 @@ import { t } from "../../i18n";
 
 export function sourceText(s: Source): string {
   if (s.type === "osc") return `OSC ${s.address}`;
+  if (s.type === "audio") return `${t("Audio")} · ${({ level: t("Level"), bass: t("Bass"), mid: t("Mid"), treble: t("Treble"), beat: "Beat" } as Record<string, string>)[s.band]}`;
   const k = { note: t("Note"), cc: "CC", program: t("Program") }[s.kind];
   const ch = s.channel ? t("· ch{n}", { n: s.channel }) : t("· any ch");
   return `MIDI ${k} ${s.number} ${ch}${s.port ? ` · ${s.port}` : ""}`;
@@ -114,12 +115,17 @@ function SourceFields(props: { s: Source; onChange: (s: Source) => void }) {
   return (
     <div class="col" style={{ gap: 12 }}>
       <div class="row">
-        <Segmented value={s.type} onChange={(ty) => props.onChange(ty === "osc" ? { type: "osc", address: "/lumos/fader/1" } : { type: "midi", port: null, kind: "cc", channel: null, number: 1 })}
-          options={[{ value: "midi", label: "MIDI" }, { value: "osc", label: "OSC" }]} />
+        <Segmented value={s.type} onChange={(ty) => props.onChange(ty === "osc" ? { type: "osc", address: "/lumos/fader/1" } : ty === "audio" ? { type: "audio", band: "bass" } : { type: "midi", port: null, kind: "cc", channel: null, number: 1 })}
+          options={[{ value: "midi", label: "MIDI" }, { value: "osc", label: "OSC" }, { value: "audio", label: "Audio" }]} />
         <span class="sp" />
         <button class={`btn tall ${learning ? "on" : ""}`} onClick={() => setLearning(!learning)}>{learning ? t("Listening… move a control (click to cancel)") : t("● Learn")}</button>
       </div>
-      {s.type === "midi" ? (
+      {s.type === "audio" ? (
+        <div class="col" style={{ gap: 8 }}>
+          <Select<AudioBand> label={t("Audio value")} value={s.band} options={[{ value: "level", label: t("Level") }, { value: "bass", label: t("Bass") }, { value: "mid", label: t("Mid") }, { value: "treble", label: t("Treble") }, { value: "beat", label: t("Beat (each hit)") }]} onChange={(band) => props.onChange({ type: "audio", band })} />
+          <div class="dim">{t("Needs an input channel marked «Audio-reactive» (Settings → Audio). Beat is a trigger: use it with GO, flash or toggle actions.")}</div>
+        </div>
+      ) : s.type === "midi" ? (
         <div class="grid2">
           <Select<MidiKind> label={t("Message")} value={s.kind} options={[{ value: "cc", label: t("Control change (CC)") }, { value: "note", label: t("Note") }, { value: "program", label: t("Program change") }]} onChange={(kind) => props.onChange({ ...s, kind })} />
           <NumberField label={t("Number (0–127)")} value={s.number} min={0} max={127} onChange={(number) => props.onChange({ ...s, number })} />

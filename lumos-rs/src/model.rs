@@ -535,6 +535,8 @@ pub enum Source {
         number: u8,
     },
     Osc { address: String },
+    /// Audio-reactive input (needs an input channel with role `reactive`).
+    Audio { band: AudioBand },
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -684,6 +686,8 @@ pub enum TcSource {
     Mtc,
     /// Free-running internal clock started/stopped from the UI.
     Internal,
+    /// LTC timecode decoded from an audio input channel (role `ltc`).
+    Ltc,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
@@ -1038,6 +1042,158 @@ pub struct Script {
     /// Uploaded original (`/media/<file>.pdf`) shown next to the reader.
     #[serde(default)]
     pub pdf: Option<String>,
+}
+
+// ───────────────────────────── Audio I/O ─────────────────────────────
+
+/// What an input channel is used for.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AudioRole {
+    #[default]
+    Off,
+    /// Feeds the voice recogniser (Guion follow-by-voice).
+    Voice,
+    /// Audio-reactive: level, bass/mid/treble and beat/BPM drive bindings.
+    Reactive,
+    /// LTC timecode signal (decoded into the show timecode when `settings.timecode.source = ltc`).
+    Ltc,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AudioIn {
+    /// 1-based input channel of the device.
+    pub channel: u16,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub role: AudioRole,
+    /// Input trim in dB (−24..+24).
+    #[serde(default)]
+    pub gain_db: f32,
+}
+
+/// Internal audio buses that can be routed to output channels.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AudioSource {
+    /// Sounds started by cues, macros, the Guion or `sound` console statements.
+    Sounds,
+    /// The audio file of the timeline that is playing.
+    Timeline,
+    /// The LTC timecode generator (mono).
+    Ltc,
+}
+
+/// One cell of the output matrix: bus channel → device output channel.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AudioRoute {
+    pub source: AudioSource,
+    /// 1-based channel of the bus (1 = left / mono, 2 = right).
+    pub src_ch: u8,
+    /// 1-based output channel of the device.
+    pub out_ch: u16,
+    #[serde(default)]
+    pub gain_db: f32,
+}
+
+/// Machine-level audio setup (`audio.json`; not part of the show).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AudioCfg {
+    /// Input device name ("" = system default).
+    #[serde(default)]
+    pub input_device: String,
+    #[serde(default)]
+    pub output_device: String,
+    /// Input channels that do something (others are ignored).
+    #[serde(default)]
+    pub inputs: Vec<AudioIn>,
+    /// Output matrix. Empty = sounds L/R to outputs 1/2.
+    #[serde(default)]
+    pub routes: Vec<AudioRoute>,
+    /// Master output level in dB.
+    #[serde(default)]
+    pub master_db: f32,
+    /// Open the audio devices when Lumos starts.
+    #[serde(default)]
+    pub autostart: bool,
+}
+
+impl Default for AudioCfg {
+    fn default() -> Self {
+        AudioCfg { input_device: String::new(), output_device: String::new(), inputs: Vec::new(), routes: Vec::new(), master_db: 0.0, autostart: false }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AudioDevice {
+    pub name: String,
+    /// Input / output channel counts (0 = not an input / output device).
+    pub inputs: u16,
+    pub outputs: u16,
+    pub default_in: bool,
+    pub default_out: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LtcRt {
+    pub locked: bool,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct SoundRt {
+    pub id: u32,
+    pub file: String,
+    pub pos_s: f32,
+    pub len_s: f32,
+    pub looped: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct AudioRt {
+    /// This build has audio I/O (`audio` feature).
+    pub available: bool,
+    pub input_running: bool,
+    pub output_running: bool,
+    pub cfg: AudioCfg,
+    pub devices: Vec<AudioDevice>,
+    /// Channels of the open devices.
+    pub in_channels: u16,
+    pub out_channels: u16,
+    /// Peak 0..1 per channel (dBFS mapped −60..0).
+    pub in_levels: Vec<f32>,
+    pub out_levels: Vec<f32>,
+    /// Audio-reactive: overall level, bass, mid, treble (0..1), and tempo.
+    pub reactive: [f32; 4],
+    pub bpm: f32,
+    pub ltc: LtcRt,
+    pub playing: Vec<SoundRt>,
+    /// Audio files in the media folder.
+    pub sounds: Vec<String>,
+    pub error: String,
+}
+
+/// Which audio-reactive value a binding listens to.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum AudioBand {
+    Level,
+    Bass,
+    Mid,
+    Treble,
+    /// Fires 1.0 on every detected beat.
+    Beat,
 }
 
 /// Voice-follow preferences (machine level, `speech.json`; not part of the show).
@@ -1552,6 +1708,9 @@ pub struct Runtime {
     /// Local voice-follow (Whisper) state.
     #[serde(default)]
     pub speech: SpeechRt,
+    /// Audio I/O: devices, levels, playing sounds, LTC, audio-reactive values.
+    #[serde(default)]
+    pub audio: AudioRt,
     #[serde(default)]
     pub macros_running: Vec<u32>,
     /// Output test pattern running.
@@ -1717,6 +1876,15 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── audio I/O ──
+    /// Save the audio setup (devices, input roles, output matrix). Restarts the devices if they are open.
+    AudioConfigure { cfg: AudioCfg },
+    /// Open (`true`) or close (`false`) the audio devices of the setup.
+    AudioRun { on: bool },
+    /// Play a sound file from the media folder (`volume` 0..1) on the `sounds` bus.
+    SoundPlay { file: String, volume: f32, looped: bool },
+    /// Stop one sound by file name, or all (`None`).
+    SoundStop { file: Option<String> },
     // ── voice follow (local Whisper) ──
     /// Save voice-follow preferences (language, model, device, script, fire cues).
     SpeechConfigure { cfg: SpeechCfg },

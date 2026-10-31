@@ -136,6 +136,8 @@ function SourceEditor({ s, onChange }: { s: Source; onChange: (s: Source) => voi
         onChange={(ty) => onChange(ty === "osc" ? { type: "osc", address: "/lumos/fader1" } : { type: "midi", port: null, kind: "cc", channel: null, number: 0 })} />
       {s.type === "osc" ? (
         <TextField class="bare mono" value={s.address} onChange={(v) => onChange({ ...s, address: v })} placeholder="/address" />
+      ) : s.type === "audio" ? (
+        <span class="dim">{t("Audio")} · {s.band}</span>
       ) : (
         <div class="vc-grid2">
           <Select class="bare" value={s.kind} options={[{ value: "note", label: t("Note") }, { value: "cc", label: "CC" }, { value: "program", label: t("Program") }]} onChange={(k) => onChange({ ...s, kind: k })} />
@@ -204,7 +206,7 @@ function FeedbackEditor({ w }: { w: VcWidget }) {
   };
   const learn = useLearn((s) => {
     if (s.type === "midi") patchWidget(w.id, (x) => { x.feedback.push(build(preset, s.number, s.channel ?? 1)); }, false);
-    else patchWidget(w.id, (x) => { x.feedback.push({ type: "osc", host: "192.168.1.50", port: 9000, address: s.address, on: 1, off: 0 }); }, false);
+    else if (s.type === "osc") patchWidget(w.id, (x) => { x.feedback.push({ type: "osc", host: "192.168.1.50", port: 9000, address: s.address, on: 1, off: 0 }); }, false);
   });
   const test = (f: FeedbackTarget) => {
     if (f.type === "osc") { toast(t("OSC feedback: press the widget — the engine sends it"), "info"); return; }

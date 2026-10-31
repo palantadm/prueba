@@ -65,6 +65,7 @@ export function findFree(page: VcPage, w: number, h: number): { x: number; y: nu
 const MIDI_KIND: Record<MidiKind, string> = { note: "Note", cc: "CC", program: "Program" };
 export function describeSource(s: Source): string {
   if (s.type === "osc") return `OSC ${s.address}`;
+  if (s.type === "audio") return `${t("Audio")} ${s.band}`;
   return t("MIDI {kind} #{n} · ch {ch}", { kind: t(MIDI_KIND[s.kind]), n: s.number, ch: s.channel ?? t("any") }) + (s.port ? ` · ${s.port}` : "");
 }
 export function describeFeedback(f: FeedbackTarget): string {

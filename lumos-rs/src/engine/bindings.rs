@@ -33,6 +33,7 @@ pub fn parse_midi(bytes: &[u8]) -> Option<MidiMsg> {
 pub enum InEvent<'a> {
     Midi { port: &'a str, msg: MidiMsg },
     Osc { addr: &'a str, value: Option<f32> },
+    Audio { band: AudioBand, value: f32 },
 }
 
 impl InEvent<'_> {
@@ -40,6 +41,7 @@ impl InEvent<'_> {
         match self {
             InEvent::Midi { msg, .. } => msg.value,
             InEvent::Osc { value, .. } => value.unwrap_or(1.0).clamp(0.0, 1.0),
+            InEvent::Audio { value, .. } => value.clamp(0.0, 1.0),
         }
     }
 
@@ -52,6 +54,7 @@ impl InEvent<'_> {
                 number: msg.number,
             },
             InEvent::Osc { addr, .. } => Source::Osc { address: addr.to_string() },
+            InEvent::Audio { band, .. } => Source::Audio { band: *band },
         }
     }
 
@@ -60,6 +63,7 @@ impl InEvent<'_> {
         match self {
             InEvent::Midi { msg, .. } => !(msg.kind == MidiKind::Note && msg.value == 0.0),
             InEvent::Osc { .. } => true,
+            InEvent::Audio { .. } => false,
         }
     }
 
@@ -70,6 +74,7 @@ impl InEvent<'_> {
                 port, msg.kind, msg.channel, msg.number, msg.value
             ),
             InEvent::Osc { addr, value } => format!("OSC {addr} {}", value.map(|v| format!("{v:.3}")).unwrap_or_default()),
+            InEvent::Audio { band, value } => format!("Audio {band:?} {value:.2}"),
         }
     }
 }
@@ -83,6 +88,7 @@ pub fn source_matches(src: &Source, ev: &InEvent) -> bool {
                 && port.as_ref().map_or(true, |x| x.is_empty() || x == p)
         }
         (Source::Osc { address }, InEvent::Osc { addr, .. }) => address == addr,
+        (Source::Audio { band }, InEvent::Audio { band: b, .. }) => band == b,
         _ => false,
     }
 }

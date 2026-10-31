@@ -6,11 +6,13 @@ import { ArtNetInPage, OscPage } from "./settings/Inputs";
 import { GeneralPage, NetworkPage, TimecodePage } from "./settings/Misc";
 import { MscPage } from "./settings/Msc";
 import { AiPage } from "./settings/Ai";
+import { AudioPage } from "./settings/Audio";
 import { Icon } from "../ui/Icon";
 import { lang, setLang, t } from "../i18n";
 
 const cats = [
   { id: "universes", icon: "M3 12h4l3-8 4 16 3-8h4", label: "Universes & outputs", c: UniversesPage },
+  { id: "audio", icon: "M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2", label: "Audio", c: AudioPage },
   { id: "midi", icon: "M4 7h16v10H4zM8 7v6M12 7v6M16 7v6", label: "MIDI", c: MidiPage },
   { id: "controls", icon: "M6 3v18M12 3v18M18 3v18M4 8h4M10 15h4M16 6h4", label: "Controls", c: BindingsPage },
   { id: "osc", icon: "M4 12c2-6 4-6 6 0s4 6 6 0 3-4 4-2", label: "OSC", c: OscPage },

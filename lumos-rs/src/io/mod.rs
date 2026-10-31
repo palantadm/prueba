@@ -50,6 +50,14 @@ pub enum IoEvent {
     SpeechStatus { listening: bool, error: String },
     /// A model download finished (`error` empty = ok).
     SpeechDownloaded { id: String, error: String },
+    /// Audio-reactive values from an input channel (level, bass, mid, treble), whether a beat fell in the window, tempo.
+    AudioBands { bands: [f32; 4], beat: bool, bpm: f32 },
+    /// An LTC frame decoded from an audio input (`frames` = total frames at `fps`).
+    AudioLtc { frames: u64, fps: u32 },
+    /// The audio devices were closed (by an error or because they were stopped).
+    AudioStatus { input_running: bool, output_running: bool, error: String },
+    /// A sound could not be played (decoding, missing file…).
+    AudioError { error: String },
     /// Native MIDI port lists / enabled state changed.
     MidiPorts { inputs: Vec<MidiPortInfo>, outputs: Vec<MidiPortInfo> },
 }

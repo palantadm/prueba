@@ -71,7 +71,14 @@ jobs:
       - name: Build installers
         if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         working-directory: lumos-rs/desktop
-        run: npx tauri build ${{ matrix.args }}
+        shell: bash
+        # hdiutil on the macOS runners sometimes fails with "Resource busy" while creating the dmg: retry the bundle
+        run: |
+          for attempt in 1 2 3; do
+            npx tauri build ${{ matrix.args }} && exit 0
+            echo "build attempt $attempt failed"; sleep 20
+          done
+          exit 1
 
       - name: Build installers and publish release
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}

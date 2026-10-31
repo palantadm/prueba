@@ -28,7 +28,8 @@ export function TimecodePage() {
       </div>
       <div class="panel panel-body col" style={{ gap: 12 }}>
         <div class="field"><label>{t("Source")}</label>
-          <Segmented<TcSource> value={tcg.source} onChange={(v) => patch((s) => (s.timecode.source = v))} options={[{ value: "off", label: t("Off") }, { value: "mtc", label: "MIDI (MTC)" }, { value: "internal", label: t("Internal clock") }]} /></div>
+          <Segmented<TcSource> value={tcg.source} onChange={(v) => patch((s) => (s.timecode.source = v))} options={[{ value: "off", label: t("Off") }, { value: "mtc", label: "MIDI (MTC)" }, { value: "ltc", label: "LTC (audio)" }, { value: "internal", label: t("Internal clock") }]} /></div>
+        {tcg.source === "ltc" && <div class="dim">{t("LTC arrives through an audio input channel marked «LTC» (Settings → Audio). To send the show timecode out as LTC, route the LTC row of the output matrix.")}</div>}
         {tcg.source === "mtc" && <div class="dim">{t("MTC arrives through an enabled MIDI input port (Settings → MIDI).")}</div>}
         <div class="grid2">
           <Select<number> label={t("Frame rate")} value={tcg.fps} onChange={(fps) => patch((s) => (s.timecode.fps = fps))}

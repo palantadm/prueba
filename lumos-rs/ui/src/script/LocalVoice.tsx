@@ -49,16 +49,10 @@ export function LocalVoicePanel(props: { sp: SpeechRt; scriptId: number }) {
       <button class="btn" aria-expanded={advanced} onClick={() => setAdvanced(!advanced)}>{t("More")}</button>
       {advanced && (
         <div class="sc-lv-adv">
-          <label class="sc-lv-field">{t("Microphone")}
-            <select class="input" value={cfg.device} onChange={(e) => patch({ device: (e.target as HTMLSelectElement).value })}>
-              <option value="">{t("System default")}</option>
-              {sp.devices.map((d) => <option value={d}>{d}</option>)}
-            </select>
-          </label>
           <label class="sc-lv-field grow">{t("Custom model file (.bin, ggml)")}
             <input class="input" type="text" value={cfg.custom_model} placeholder="/ruta/ggml-gallego.bin" onChange={(e) => patch({ custom_model: (e.target as HTMLInputElement).value })} />
           </label>
-          <span class="dim">{t("Offline. The model is downloaded once and stays on this computer.")}</span>
+          <span class="dim">{t("Offline. The model is downloaded once and stays on this computer. The microphone and its channel are chosen in Settings → Audio.")}</span>
         </div>
       )}
       <span class="grow dim sc-lv-heard">

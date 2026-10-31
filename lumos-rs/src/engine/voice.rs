@@ -25,7 +25,6 @@ pub struct Voice {
     level: Arc<AtomicU32>,
     prompt: Arc<Mutex<String>>,
     installed: Vec<bool>,
-    devices: Mutex<Option<Vec<String>>>,
 }
 
 impl Voice {
@@ -42,7 +41,6 @@ impl Voice {
             level: Arc::new(AtomicU32::new(0)),
             prompt: Arc::new(Mutex::new(String::new())),
             installed: Vec::new(),
-            devices: Mutex::new(None),
         };
         v.refresh_installed(&store.dir);
         v
@@ -74,10 +72,9 @@ impl Engine {
                 if models::find(&cfg.model).is_none() && cfg.custom_model.is_empty() {
                     return Err(format!("Modelo «{}» desconocido", cfg.model));
                 }
-                let restart = self.voice.listening && (self.voice.cfg.lang != cfg.lang || self.voice.cfg.model != cfg.model || self.voice.cfg.custom_model != cfg.custom_model || self.voice.cfg.device != cfg.device);
+                let restart = self.voice.listening && (self.voice.cfg.lang != cfg.lang || self.voice.cfg.model != cfg.model || self.voice.cfg.custom_model != cfg.custom_model);
                 self.voice.cfg = cfg;
                 self.voice.save(&self.store)?;
-                *self.voice.devices.lock() = None;
                 self.dirty = true;
                 if restart {
                     self.voice_stop();
@@ -144,7 +141,14 @@ impl Engine {
         self.voice.error.clear();
         self.voice.history.clear();
         self.voice_update_prompt();
-        let w = worker::start(path, self.voice.cfg.clone(), self.io.sender(), self.voice.level.clone(), self.voice.prompt.clone())?;
+        let feed = self.audio_voice_feed()?;
+        let w = match worker::start(path, self.voice.cfg.clone(), self.io.sender(), self.voice.level.clone(), self.voice.prompt.clone(), feed) {
+            Ok(w) => w,
+            Err(e) => {
+                self.audio_voice_release();
+                return Err(e);
+            }
+        };
         self.voice.worker = Some(w);
         self.dirty = true;
         Ok(())
@@ -157,6 +161,7 @@ impl Engine {
         }
         self.voice.listening = false;
         self.voice.level.store(0, Ordering::Relaxed);
+        self.audio_voice_release();
         self.dirty = true;
     }
 
@@ -238,13 +243,7 @@ impl Engine {
     }
 
     pub(super) fn voice_rt(&self) -> SpeechRt {
-        let devices = {
-            let mut g = self.voice.devices.lock();
-            if g.is_none() && worker::AVAILABLE {
-                *g = Some(worker::list_devices());
-            }
-            g.clone().unwrap_or_default()
-        };
+        let devices: Vec<String> = Vec::new(); // the microphone is chosen in Settings → Audio
         let model_ready = if self.voice.cfg.custom_model.is_empty() {
             self.voice.installed.get(models::MODELS.iter().position(|m| m.id == self.voice.cfg.model).unwrap_or(usize::MAX)).copied().unwrap_or(false)
         } else {

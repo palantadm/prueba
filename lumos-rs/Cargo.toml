@@ -27,6 +27,7 @@ rusb = { version = "0.9", optional = true }
 midir = { version = "0.10", optional = true }
 whisper-rs = { version = "0.16", optional = true }
 cpal = { version = "0.17", optional = true }
+symphonia = { version = "0.5", default-features = false, features = ["wav", "mp3", "flac", "ogg", "vorbis", "pcm", "aac", "isomp4"], optional = true }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 roxmltree = "0.20"
 reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls-webpki-roots-no-provider"] }
@@ -40,7 +41,9 @@ usb = ["dep:rusb"]
 # Native MIDI in/out (needs libasound2-dev on Linux). Desktop app and CI enable it.
 midi = ["dep:midir"]
 # Local speech recognition (whisper.cpp) from the microphone, for following the Guion offline. Needs cmake + a C++ compiler (+ libasound2-dev on Linux).
-whisper = ["dep:whisper-rs", "dep:cpal"]
+whisper = ["audio", "dep:whisper-rs"]
+# Audio I/O: device selection, channel routing, sound playback, LTC, audio-reactive input (cpal + symphonia).
+audio = ["dep:cpal", "dep:symphonia"]
 
 [profile.release]
 lto = "thin"

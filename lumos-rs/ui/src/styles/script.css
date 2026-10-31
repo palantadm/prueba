@@ -125,3 +125,15 @@ button.sc-action-title { display: flex; align-items: center; gap: var(--s-2); fl
 .sc-lv-bar i { display: block; height: 100%; background: var(--cyan); }
 .sc-lv-adv { display: flex; gap: var(--s-3); align-items: flex-end; flex-wrap: wrap; flex-basis: 100%; }
 .sc-lv-heard { flex: 1 1 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* audio settings */
+.au-meter { display: inline-block; width: 96px; height: 10px; border-radius: 5px; background: var(--ink-3); overflow: hidden; vertical-align: middle; }
+.au-meter i { display: block; height: 100%; background: var(--green); transition: width 80ms linear; }
+.au-meter.v { width: 10px; height: 38px; display: inline-flex; align-items: flex-end; }
+.au-meter.v i { width: 100%; transition: height 80ms linear; }
+.au-matrix { border-collapse: separate; border-spacing: 4px; }
+.au-matrix th { font-weight: 500; color: var(--dim); text-align: center; }
+.au-matrix .au-row { text-align: right; padding-right: 10px; white-space: nowrap; color: var(--ink-0, inherit); }
+.au-cell { min-width: 48px; min-height: 48px; border-radius: 10px; border: 1px solid var(--line); background: var(--ink-2); color: var(--dim); font: inherit; font-family: var(--mono, monospace); }
+.au-cell.on { background: var(--cyan-fill, var(--ink-3)); border-color: var(--cyan, var(--line)); color: var(--ink-0, inherit); font-weight: 600; }
+.au-tbl td { vertical-align: middle; }

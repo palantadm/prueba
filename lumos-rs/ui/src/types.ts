@@ -1,3 +1,13 @@
+export type { AudioBand } from "./gen/AudioBand";
+export type { AudioCfg } from "./gen/AudioCfg";
+export type { AudioDevice } from "./gen/AudioDevice";
+export type { AudioIn } from "./gen/AudioIn";
+export type { AudioRole } from "./gen/AudioRole";
+export type { AudioRoute } from "./gen/AudioRoute";
+export type { AudioRt } from "./gen/AudioRt";
+export type { AudioSource } from "./gen/AudioSource";
+export type { LtcRt } from "./gen/LtcRt";
+export type { SoundRt } from "./gen/SoundRt";
 export type { Action } from "./gen/Action";
 export type { SpeechCfg } from "./gen/SpeechCfg";
 export type { SpeechModelInfo } from "./gen/SpeechModelInfo";

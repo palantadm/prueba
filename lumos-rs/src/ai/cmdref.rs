@@ -28,6 +28,7 @@ pub const GROUPS: &[(&str, &[&str])] = &[
     ("Chases y velocidad", &["chase_save", "chase_remove", "chase_run", "chase_bpm", "chase_tap", "chase_nudge", "speed_save", "speed_remove", "speed_set", "speed_tap"]),
     ("Executors y masters", &["exec_save", "exec_remove", "exec_level", "exec_go", "exec_back", "exec_flash", "grand_master", "blackout"]),
     ("Macros y timelines", &["macro_save", "macro_remove", "macro_run", "macro_stop", "timeline_save", "timeline_remove", "timeline_run", "timeline_stop", "timeline_seek", "timecode_ctl"]),
+    ("Audio", &["audio_configure", "audio_run", "sound_play", "sound_stop"]),
     ("Guion", &["script_save", "script_remove", "script_go", "script_back", "script_goto", "script_fire", "script_follow", "script_reset", "speech_configure", "speech_listen", "speech_model_get", "speech_model_remove"]),
     ("Salidas, red y ajustes", &["universe_save", "universe_remove", "output_test", "nodes_scan", "settings_save", "binding_save", "binding_remove", "midi_enable"]),
     ("Localizar y copias", &["identify", "locate_save", "locate_capture", "backup_create", "backup_restore", "backup_delete"]),
@@ -127,6 +128,11 @@ pub const REF: &[Entry] = &[
     e("speech_listen", "Empieza/para de escuchar el micrófono y seguir el guion por voz. Necesita un guion y el modelo descargado. Abre el micrófono: acción en directo.", r#"{"type":"speech_listen","on":true}"#, None),
     e("speech_model_get", "Descarga un modelo de voz del catálogo (decenas o cientos de MB); el progreso sale en get_runtime → speech.download.", r#"{"type":"speech_model_get","id":"small-q5_1"}"#, None),
     e("speech_model_remove", "Borra un modelo de voz descargado.", r#"{"type":"speech_model_remove","id":"tiny"}"#, None),
+    // ── audio ──
+    e("audio_configure", "Configura el audio de esta máquina: dispositivos (\"\" = predeterminado), qué hace cada canal de ENTRADA (role: off|voice|reactive|ltc, gain_db) y la MATRIZ de SALIDA (source: sounds|timeline|ltc, src_ch 1=izq/mono 2=der, out_ch = canal físico, gain_db). routes vacío = sonidos L/R a salidas 1/2. Lee antes get_runtime → audio (dispositivos y canales reales) y reenvía el objeto completo.", r#"{"type":"audio_configure","cfg":{"input_device":"","output_device":"","inputs":[{"channel":1,"label":"Micro actores","role":"voice","gain_db":0},{"channel":3,"label":"LTC","role":"ltc","gain_db":0}],"routes":[{"source":"sounds","src_ch":1,"out_ch":1,"gain_db":0},{"source":"sounds","src_ch":2,"out_ch":2,"gain_db":0},{"source":"ltc","src_ch":1,"out_ch":8,"gain_db":0}],"master_db":0,"autostart":false}}"#, None),
+    e("audio_run", "Abre (on true) o cierra los dispositivos de audio de la configuración. Abre el sonido en directo.", r#"{"type":"audio_run","on":true}"#, None),
+    e("sound_play", "Reproduce un archivo de audio de la carpeta de medios por el bus «sounds» (volume 0..1, looped). Abre la salida si hace falta. Las marcas del guion, macros y timelines lo usan con la consola.", r#"{"type":"sound_play","file":"gong.wav","volume":0.8,"looped":false}"#, Some("sound \"gong.wav\" at 80")),
+    e("sound_stop", "Para un sonido (file) o todos (null), con un fundido corto.", r#"{"type":"sound_stop","file":null}"#, Some("sound stop")),
     // ── data & network ──
     e("backup_create", "Crea una copia de seguridad del show.", r#"{"type":"backup_create","label":"Antes del ensayo"}"#, None),
     e("backup_restore", "Restaura una copia (id de get_show/UI). Destructivo: solo si el usuario lo pide.", r#"{"type":"backup_restore","id":"2026-01-01T10-00-00"}"#, None),

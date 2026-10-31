@@ -147,6 +147,8 @@ const KW_FIRE: &[&str] = &["fire", "disparar", "lanzar"];
 const KW_OSC: &[&str] = &["osc"];
 const KW_MIDI: &[&str] = &["midi"];
 const KW_HTTP: &[&str] = &["http", "web"];
+const KW_SOUND: &[&str] = &["sound", "sonido", "audio"];
+const KW_LOOP: &[&str] = &["loop", "bucle", "repetir"];
 const KW_EXEC: &[&str] = &["exec", "executor", "ejecutor"];
 const KW_FLASH: &[&str] = &["flash", "destello"];
 
@@ -217,7 +219,7 @@ const VERB_GROUPS: &[&[&str]] = &[
     KW_FIXTURE, KW_GROUP, KW_ALL, KW_NONE, KW_ODD, KW_EVEN, KW_NEXT, KW_PREV, KW_AT, KW_COLOUR, KW_RECORD, KW_UPDATE,
     KW_DELETE, KW_APPLY, KW_GO, KW_BACK, KW_PAUSE, KW_RELEASE, KW_GOTO, KW_CUELIST, KW_SCENE, KW_CHASE, KW_MACRO,
     KW_TIMELINE, KW_BLACKOUT, KW_GM, KW_CLEAR, KW_PARK, KW_UNPARK, KW_UNDO, KW_REDO, KW_BLIND, KW_LOCATE,
-    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP, KW_EXEC,
+    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP, KW_EXEC, KW_SOUND,
 ];
 
 fn all_keywords() -> Vec<&'static str> {
@@ -495,6 +497,8 @@ pub enum Stmt {
     Chase { id: u32, act: ChaseAct },
     Effect { id: u32, on: bool },
     Exec { id: u32, act: ExecAct },
+    Sound { file: String, vol: f32, looped: bool },
+    SoundStop(Option<String>),
     MacroRun(u32),
     MacroStop(Option<u32>),
     Timeline { id: u32, act: TlAct },
@@ -560,6 +564,21 @@ impl<'a> P<'a> {
     /// A number that ends the statement right after an attribute word (`colorwheel 100`): accepted as the value.
     fn value_shorthand(&self) -> bool {
         matches!(self.peek(), Some(Tok { t: T::Num(_), .. })) && matches!(self.peek_n(1), None | Some(Tok { t: T::Sep, .. }))
+    }
+    /// A sound file name: quoted (`"gong.wav"`) or a bare word without dots (`gong`).
+    fn sound_name(&mut self) -> R<String> {
+        match self.peek().map(|t| t.t.clone()) {
+            Some(T::Str(s)) if !s.trim().is_empty() => {
+                self.i += 1;
+                Ok(s.trim().to_string())
+            }
+            Some(T::Word(_)) => {
+                let t = self.toks[self.i].clone();
+                self.i += 1;
+                Ok(self.raw(&t))
+            }
+            _ => Err(self.here("expected a sound file name in quotes, e.g. sound \"gong.wav\"")),
+        }
     }
     fn eat_at(&mut self) -> bool {
         if self.is_at() {
@@ -836,6 +855,31 @@ impl<'a> P<'a> {
             let on = !(self.eat_kw(KW_OFF) || self.eat_kw(KW_OUT));
             self.eat_kw(KW_ON);
             return Ok(Stmt::Effect { id, on });
+        }
+        if is(w, KW_SOUND) {
+            self.i += 1;
+            if self.eat_kw(KW_STOP) || self.eat_kw(KW_OFF) {
+                let name = if self.at_end() { None } else { Some(self.sound_name()?) };
+                return Ok(Stmt::SoundStop(name));
+            }
+            let file = self.sound_name()?;
+            let (mut vol, mut looped) = (1.0f32, false);
+            while !self.at_end() {
+                if self.eat_at() {
+                    vol = match self.val()? {
+                        Val::Pct(p) => (p / 100.0).clamp(0.0, 4.0),
+                        Val::Full => 1.0,
+                        Val::Half => 0.5,
+                        Val::Out => 0.0,
+                        _ => return Err(self.here("sound level must be 0-100")),
+                    };
+                } else if self.eat_kw(KW_LOOP) {
+                    looped = true;
+                } else {
+                    return Err(self.here("expected 'at <level>' or 'loop'"));
+                }
+            }
+            return Ok(Stmt::Sound { file, vol, looped });
         }
         if is(w, KW_EXEC) {
             self.i += 1;
@@ -1868,6 +1912,8 @@ pub fn resolve(stmt: &Stmt, ctx: &Ctx, sess: &mut Session) -> R<Compiled> {
             };
             one(cmd, format!("chase {id} {what}"))
         }
+        Stmt::Sound { file, vol, looped } => one(Command::SoundPlay { file: file.clone(), volume: *vol, looped: *looped }, format!("sound {file}{}", if *looped { " (loop)" } else { "" })),
+        Stmt::SoundStop(f) => one(Command::SoundStop { file: f.clone() }, match f { Some(f) => format!("sound {f} stopped"), None => "sounds stopped".into() }),
         Stmt::Effect { id, on } => one(Command::EffectToggle { id: *id, on: *on }, format!("effect {id} {}", if *on { "on" } else { "off" })),
         Stmt::Exec { id, act } => {
             let (cmd, what) = match act {
@@ -2026,6 +2072,7 @@ pub fn help_json() -> serde_json::Value {
         ("chase", "chase N [on|off|tap|bpm V|next|prev]", "Chases", &["chase 1 on", "chase 2 bpm 128"]),
         ("effect", "effect N [on|off]", "Start/stop a saved effect (pool item N)", &["effect 5 on", "effect 2 off"]),
         ("executor", "exec|executor N go|back|flash [on|off]|at V", "Playback executor N: GO, BACK, FLASH (held) or fader level 0-100", &["exec 5 go", "exec 2 at 80", "exec 3 flash on"]),
+        ("sound", "sound \"file.wav\" [at V] [loop] | sound stop [\"file\"]", "Play a sound from the media folder on the sounds bus (level 0-100, loop); stop one or all", &["sound \"gong.wav\"", "sound \"ambiente.mp3\" at 60 loop", "sound stop"]),
         ("macro", "macro N | macro stop [N]", "Macros", &["macro 3"]),
         ("timeline", "timeline N [run [from T]|stop|seek T]", "Timelines", &["timeline 1 run", "timeline 1 seek 30"]),
         ("script", "script|guion [N] go|back|reset|follow [on|off]|goto <block> [mark]|fire <block> <mark>", "Running order (Guion): go fires the next cue mark, back re-arms the previous one, follow makes the reader track cues started anywhere", &["script 1 go", "guion 1 atras", "script 1 goto 12", "script follow on"]),
@@ -2044,7 +2091,7 @@ pub fn help_json() -> serde_json::Value {
         ("half", KW_HALF), ("home", KW_HOME), ("colour", KW_COLOUR), ("record", KW_RECORD), ("update", KW_UPDATE),
         ("delete", KW_DELETE), ("apply", KW_APPLY), ("go", KW_GO), ("back", KW_BACK), ("pause", KW_PAUSE),
         ("release", KW_RELEASE), ("goto", KW_GOTO), ("cue", KW_CUE), ("cuelist", KW_CUELIST), ("scene", KW_SCENE),
-        ("chase", KW_CHASE), ("effect", KW_EFFECT), ("exec", KW_EXEC), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
+        ("chase", KW_CHASE), ("effect", KW_EFFECT), ("exec", KW_EXEC), ("sound", KW_SOUND), ("loop", KW_LOOP), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
         ("clear", KW_CLEAR), ("park", KW_PARK), ("unpark", KW_UNPARK), ("undo", KW_UNDO), ("redo", KW_REDO),
         ("blind", KW_BLIND), ("locate", KW_LOCATE),
     ];
@@ -2428,6 +2475,17 @@ mod tests {
         assert!(err_of("red").contains("expected 'at <value>' after 'red'"));
         assert!(run("fixture 1; record cue 4 cuelist 1 \"EfectoColor\"").is_ok());
         assert!(run("fixture 1; record cue 4 1 EfectoColor").is_ok());
+    }
+
+    #[test]
+    fn sound_statements() {
+        assert!(matches!(&run("sound \"gong.wav\"").unwrap()[0], Command::SoundPlay { file, volume, looped: false } if file == "gong.wav" && *volume == 1.0));
+        assert!(matches!(&run("sonido 'a b.mp3' at 60 loop").unwrap()[0], Command::SoundPlay { file, volume, looped: true } if file == "a b.mp3" && (*volume - 0.6).abs() < 1e-6));
+        assert!(matches!(&run("sound gong at 50").unwrap()[0], Command::SoundPlay { file, .. } if file == "gong"));
+        assert!(matches!(&run("sound stop").unwrap()[0], Command::SoundStop { file: None }));
+        assert!(matches!(&run("sound stop \"gong.wav\"").unwrap()[0], Command::SoundStop { file: Some(f) } if f == "gong.wav"));
+        assert!(err_of("sound").contains("sound file name"));
+        assert!(err_of("sound \"x.wav\" fast").contains("loop"));
     }
 
     #[test]
