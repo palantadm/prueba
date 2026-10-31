@@ -247,7 +247,7 @@ impl Accum {
                         Ok(v) if v.is_object() => v,
                         _ => json!({ super::agent::INVALID_JSON_KEY: json }),
                     };
-                    blocks.push(Block::ToolUse { id, name, input });
+                    blocks.push(Block::ToolUse { id, name: super::tools::clean_tool_name(&name), input });
                 }
                 Acc::Raw(v) => blocks.push(Block::Raw { origin: self.origin.clone(), value: v }),
             }

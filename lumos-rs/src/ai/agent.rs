@@ -274,6 +274,8 @@ fn event_args(args: &Value) -> String {
 
 #[allow(clippy::too_many_arguments)]
 async fn run_tool(inner: &Arc<Inner>, sid: &str, sess: &Arc<Session>, h: &crate::engine::Handle, mode: AiMode, call: &str, name: &str, args: &Value, cancel: &mut Cancel) -> (String, bool) {
+    let cleaned = tools::clean_tool_name(name);
+    let name = cleaned.as_str();
     let known = tools::definitions().iter().any(|d| d.name == name);
     let summary = if known { tools::summary(name, args) } else { format!("Herramienta desconocida: {name}") };
     let emit_tool = |state: AiToolState, risk: AiRisk, result: &str| {

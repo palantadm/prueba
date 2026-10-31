@@ -302,7 +302,7 @@ impl Accum {
         }
         let mut seen: Vec<String> = Vec::new();
         for t in self.tools {
-            if t.name.is_empty() {
+            if super::tools::clean_tool_name(&t.name).is_empty() {
                 continue;
             }
             let mut id = t.id;
@@ -315,7 +315,7 @@ impl Accum {
                 Ok(v) if v.is_object() => v,
                 _ => json!({ super::agent::INVALID_JSON_KEY: t.args }),
             };
-            blocks.push(Block::ToolUse { id, name: t.name, input });
+            blocks.push(Block::ToolUse { id, name: super::tools::clean_tool_name(&t.name), input });
         }
         let has_tools = blocks.iter().any(|b| matches!(b, Block::ToolUse { .. }));
         let stop = if has_tools {

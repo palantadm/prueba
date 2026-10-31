@@ -258,6 +258,21 @@ pub fn definitions() -> Vec<ToolDef> {
     ]
 }
 
+/// Tool names as emitted by some local models carry chat-template debris (`get_show<|channel|>`,
+/// `functions.get_show`, quotes…). Reduce them to a known tool name when that is unambiguous; otherwise return them trimmed.
+pub fn clean_tool_name(raw: &str) -> String {
+    let mut s = raw.split("<|").next().unwrap_or("").trim();
+    s = s.trim_matches(|c: char| c == '`' || c == '"' || c == '\'' || c.is_whitespace());
+    for p in ["functions.", "functions:", "function.", "tools.", "tool.", "default_api.", "api."] {
+        if let Some(r) = s.strip_prefix(p) {
+            s = r;
+        }
+    }
+    let end = s.find(|c: char| !(c.is_ascii_alphanumeric() || c == '_' || c == '-')).unwrap_or(s.len());
+    let core = &s[..end];
+    definitions().iter().find(|d| d.name.eq_ignore_ascii_case(core)).map(|d| d.name.clone()).unwrap_or_else(|| s.to_string())
+}
+
 pub const READ_TOOLS: &[&str] = &["get_show", "get_runtime", "get_fixture_state", "get_dmx", "diagnose_outputs", "search_library", "get_profile", "get_help", "ask_user", "wait"];
 
 // ───────────────────────────── risk ─────────────────────────────
@@ -816,6 +831,14 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tool_names_are_cleaned() {
+        for (raw, want) in [("get_show<|channel|>", "get_show"), ("functions.get_runtime", "get_runtime"), (" `Console_Command` ", "console_command"), ("get_show<|channel|>commentary", "get_show"), ("diagnose_outputs\n", "diagnose_outputs")] {
+            assert_eq!(clean_tool_name(raw), want, "{raw}");
+        }
+        assert_eq!(clean_tool_name("nope<|x|>"), "nope");
+    }
 
     #[test]
     fn catalog_covers_every_command_variant() {
