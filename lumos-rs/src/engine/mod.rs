@@ -23,6 +23,22 @@ mod xfade;
 
 pub use cmdline::{complete as cmdline_complete, help_json as cmdline_help};
 
+/// Syntax-only check of command-line text (every statement parses); `Err` carries the rendered message with the column.
+pub fn cmdline_check(text: &str) -> Result<usize, String> {
+    cmdline::parse(text).map(|v| v.len()).map_err(|e| e.render(text))
+}
+
+/// Compact grammar for the assistant, generated from the interpreter's own help table so it can never drift from the parser.
+pub fn cmdline_grammar() -> String {
+    let h = cmdline::help_json();
+    let mut out = String::new();
+    for st in h["statements"].as_array().into_iter().flatten() {
+        let ex: Vec<&str> = st["examples"].as_array().into_iter().flatten().filter_map(|e| e.as_str()).collect();
+        out.push_str(&format!("- {} — {} e.g. `{}`\n", st["syntax"].as_str().unwrap_or(""), st["description"].as_str().unwrap_or(""), ex.join("` | `")));
+    }
+    out
+}
+
 use crate::io::{IoEvent, IoHub, MtcDecoder};
 use crate::library;
 use crate::model::*;

@@ -199,8 +199,12 @@ pub fn definitions() -> Vec<ToolDef> {
     vec![
         tool(
             "console_command",
-            "Run console command-line text (the same language as the command bar), e.g. `fixture 1 thru 4 at 70; red at 100`, `record scene 3 Amanecer`, `go`, `scene 2 on`, `gm 80`. \
-             It selects, sets values, records and plays; it does NOT patch fixtures or edit universes/outputs/settings (use send_command: fixture_add, universe_save…). Statements are separated by `;` or newlines and share a selection. Returns one result line per statement. See get_help topic `linea-de-comandos` for the grammar.",
+            &format!(
+                "Run console command-line text (the same language as the command bar). It selects, sets values, records, plays and sends OSC/MIDI/HTTP; it does NOT patch fixtures or edit universes/outputs/settings/profiles (use send_command: fixture_add, universe_save…). \
+                 Statements are separated by `;` or newlines and share one selection; `#` starts a comment; values are percentages 0-100; Spanish or English keywords. An error stops the text and reports the column; nothing after it runs. \
+                 Returns one result line per statement. Grammar (exact; do not invent other words):\n{}Attributes: dimmer pan tilt red green blue white amber uv lime cto colorwheel gobo gobo_rot prism prism_rot frost zoom focus iris shutter speed effect control. More in get_help `linea-de-comandos`.",
+                crate::engine::cmdline_grammar()
+            ),
             json!({ "text": { "type": "string", "description": "Command text. Spanish or English keywords." } }),
             &["text"],
         ),
@@ -777,22 +781,30 @@ pub fn get_profile(st: &AiState, input: &Value) -> Result<String, String> {
     Ok(cap(json!({ "id": p.id, "manufacturer": p.manufacturer, "model": p.model, "category": p.category, "beam_angle": p.beam_angle, "pan_range": p.pan_range, "tilt_range": p.tilt_range, "power_w": p.power_w, "modes": modes }).to_string(), MAX_RESULT))
 }
 
+/// Console errors that look like an attempt to patch/configure get a pointer to the right tool.
+fn with_console_hint(mut m: String) -> String {
+    let low = m.to_lowercase();
+    if ["profile", "universe", "address", "patch", "mode"].iter().any(|k| low.contains(k)) {
+        m.push_str("\nPista: la línea de comandos no parchea ni configura salidas; usa send_command (fixture_add, universe_save…). Gramática exacta en la descripción de console_command.");
+    } else {
+        m.push_str("\nPista: usa solo la gramática de la descripción de console_command; selecciona aparatos antes de dar valores.");
+    }
+    m
+}
+
 /// Execute a read/command tool. `ask_user` and `wait` are handled by the agent loop.
 pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, String> {
     match name {
         "console_command" => {
             let text = input.get("text").and_then(|t| t.as_str()).ok_or("Falta `text`")?.to_string();
             let n = text.split([';', '\n']).filter(|s| !s.trim().is_empty() && !s.trim().starts_with('#')).count().clamp(1, 30);
-            h.command(Command::CommandLine { text }).await?;
+            if let Err(e) = h.command(Command::CommandLine { text }).await {
+                return Err(cap(with_console_hint(e), MAX_RESULT));
+            }
             let st = h.ai_state().await.ok_or("Motor detenido")?;
             let lines: Vec<String> = st.rt.cmd_log.iter().rev().take(n).rev().map(|l| format!("{} {} → {}", if l.ok { "OK " } else { "ERR" }, l.text, l.msg)).collect();
             if lines.iter().any(|l| l.starts_with("ERR")) {
-                let mut m = lines.join("\n");
-                let low = m.to_lowercase();
-                if ["profile", "universe ", "address", "patch"].iter().any(|k| low.contains(k)) {
-                    m.push_str("\nPista: la línea de comandos no parchea ni configura salidas; usa send_command (fixture_add, universe_save…).");
-                }
-                Err(cap(m, MAX_RESULT))
+                Err(cap(with_console_hint(lines.join("\n")), MAX_RESULT))
             } else {
                 Ok(cap(lines.join("\n"), MAX_RESULT))
             }

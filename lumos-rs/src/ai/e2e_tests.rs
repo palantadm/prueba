@@ -542,3 +542,68 @@ async fn diagnose_outputs_reads_a_real_engine() {
         assert_eq!(super::tools::tool_risk("send_command", &json!({ "command": c }), false), AiRisk::Edit, "{t}");
     }
 }
+
+/// Every console example the assistant is taught (docs, tool description, prompt) must parse, and the
+/// `send_command` recipes of the prompt must really run on the engine.
+#[tokio::test]
+async fn taught_examples_actually_work() {
+    use crate::engine::cmdline_check;
+    // 1. ```cmd blocks of the help corpus
+    let mut n = 0;
+    for (id, _, md) in super::help::TOPICS {
+        let mut inside = false;
+        for line in md.lines() {
+            if line.trim_start().starts_with("```") {
+                inside = line.trim() == "```cmd" && !inside;
+                continue;
+            }
+            if !inside {
+                continue;
+            }
+            // `a ; b   # comment` — the interpreter strips comments itself
+            let t = line.trim();
+            if t.is_empty() || t.starts_with('#') {
+                continue;
+            }
+            cmdline_check(t).unwrap_or_else(|e| panic!("help `{id}`: «{t}» → {e}"));
+            n += 1;
+        }
+    }
+    assert!(n >= 25, "docs examples seen: {n}");
+    // 2. grammar examples shown in the console_command description come from the interpreter table
+    let g = crate::engine::cmdline_grammar();
+    assert!(g.contains("osc <host>") && g.contains("script|guion"), "{g}");
+    let desc = super::tools::definitions().into_iter().find(|d| d.name == "console_command").unwrap().description;
+    assert!(desc.contains("does NOT patch") && desc.contains("fixture 1 thru 4 at 50"));
+    // 3. examples quoted in the prompt
+    for ex in ["fixture 1 thru 8 at 50; red at 100; green at 0; blue at 0; record scene 1 Rojo", "fixture 1 thru 4 at 70; red at 100", "record cue 3 name Entrada", "go", "scene 2 on", "gm 80", "blackout on", "undo", "clear"] {
+        cmdline_check(ex).unwrap_or_else(|e| panic!("prompt example «{ex}» → {e}"));
+    }
+    // the exact patch syntax the model tried must be rejected with a useful hint
+    assert!(cmdline_check("fixture 4 profile \"generic/rgb-par\" mode \"7ch\" universe 1 address 1 name \"PAR1\"").is_err());
+
+    // 4. prompt recipes run for real
+    let r = rig("recipes").await;
+    let recipes = [
+        json!({"type":"fixture_add","profile":"generic/rgb-par","mode":"3ch","count":2,"universe":1,"address":null,"name":"PAR"}),
+        json!({"type":"universe_save","universe":{"id":1,"name":"Frente","outputs":[{"enabled":true,"kind":{"type":"art_net","host":"192.168.1.50","port":6454,"net":0,"subnet":0,"universe":0}}]}}),
+        json!({"type":"universe_save","universe":{"id":2,"name":"Sala","outputs":[{"enabled":false,"kind":{"type":"sacn","universe":1,"priority":100,"unicast":null}},{"enabled":false,"kind":{"type":"serial","driver":"enttec_pro","port":"COM3"}}]}}),
+        json!({"type":"group_save","group":{"id":0,"name":"Frontales","fixtures":[1,2]}}),
+        json!({"type":"output_test","mode":{"type":"level","universe":1,"level":30}}),
+        json!({"type":"output_test","mode":{"type":"off"}}),
+        json!({"type":"dmx_set","universe":1,"channel":5,"value":255}),
+        json!({"type":"dmx_set","universe":1,"channel":5,"value":null}),
+    ];
+    for c in recipes {
+        let out = super::tools::execute(&r.h, "send_command", &json!({ "command": c.clone() })).await;
+        assert!(out.is_ok(), "{c} → {out:?}");
+    }
+    let sh = r.show().await;
+    assert!(sh.fixtures.len() >= 6 && sh.groups.iter().any(|g| g.name == "Frontales"));
+    assert!(matches!(sh.universes.iter().find(|u| u.id == 1).unwrap().outputs[0].kind, OutputKind::ArtNet { .. }));
+    // and a console statement end-to-end with the explained error hint
+    let e = super::tools::execute(&r.h, "console_command", &json!({"text":"fixture 4 profile x universe 1 address 1"})).await.unwrap_err();
+    assert!(e.contains("no parchea"), "{e}");
+    let ok = super::tools::execute(&r.h, "console_command", &json!({"text":"fixture 1 thru 2 at 50; red at 100; record group 9 Test"})).await;
+    assert!(ok.is_ok(), "{ok:?}");
+}

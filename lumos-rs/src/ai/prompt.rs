@@ -34,6 +34,13 @@ const SYSTEM: &str = r#"Eres el asistente integrado de Lumos, una consola profes
 - **MSC / MIDI / OSC / Art-Net in** (ajustes y bindings) controlan la consola desde fuera; los errores de puertos aparecen en `get_runtime` → `inputs`. La app de escritorio puede abrir ventanas extra (p. ej. Visualizador en el segundo monitor): eso lo hace el usuario desde el menú Ventana, tú no puedes.
 - La **consola virtual** se pulsa con `vc_press {widget, down}`, `vc_value {widget, value}` y `vc_xy` (ids de widget en `get_show` sección `vconsole`); `midi_enable` activa o desactiva puertos MIDI. Son acciones en directo.
 - La línea de comandos **no parchea**: para añadir aparatos usa SIEMPRE `send_command` con `fixture_add` (`profile`, `mode`, `count`, `universe`, `address`, `name`), tras buscar el perfil con `search_library` y ver sus modos con `get_profile`. Lo mismo para universos y salidas (`universe_save`).
+- **Recetas exactas de `send_command`** (copia la forma; `type` en snake_case; ids de aparato/grupo/cue de `get_show`, nunca inventados):
+  - Añadir aparatos: `{"type":"fixture_add","profile":"<id de search_library>","mode":"<modo de get_profile>","count":4,"universe":1,"address":null,"name":"PAR"}` (`address: null` = primer hueco libre).
+  - Universo + salida Art-Net: `{"type":"universe_save","universe":{"id":1,"name":"Frente","outputs":[{"enabled":true,"kind":{"type":"art_net","host":"192.168.1.50","port":6454,"net":0,"subnet":0,"universe":0}}]}}` (`host` vacío = broadcast; ojo: el tipo es `art_net`, no `artnet`). sACN: `{"type":"sacn","universe":1,"priority":100,"unicast":null}`. Serie: `{"type":"serial","driver":"enttec_pro","port":"COM3"}`. `universe_save` REEMPLAZA las salidas del universo: lee antes con `get_show` (`universes`) y reenvía las que no cambian.
+  - Grupo: `{"type":"group_save","group":{"id":0,"name":"Frontales","fixtures":[1,2,3,4]}}` (`id` 0 = nuevo).
+  - Probar una salida: `{"type":"output_test","mode":{"type":"level","universe":1,"level":30}}`; apagar: `{"type":"output_test","mode":{"type":"off"}}`.
+  - Aparcar/liberar un canal DMX: `{"type":"dmx_set","universe":1,"channel":5,"value":255}` / `"value":null`.
+  Si un comando falla por campos, lee el mensaje de error (indica el campo) y corrige; no insistas con lo mismo.
 - `send_command` acepta cualquier comando estructurado del protocolo (lista en su descripción). Úsalo para lo que la línea de comandos no cubre (parchear con direcciones, guardar objetos completos, ajustes, salidas…).
 
 # Cómo trabajar

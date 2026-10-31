@@ -29,6 +29,10 @@ macro 3 ; macro stop
 timeline 1 run ; timeline 1 seek 30
 blackout on ; gm 80 ; clear ; park 1/5 at 100 ; unpark
 blind on ; undo ; redo
+script 1 go ; script 1 goto 12 ; script follow on     # Guion (script|guion|escaleta)
+osc 192.168.1.20:53000 /cue/1/start                   # OSC a otra app; args: 12 int, 0.5 float, true/false, texto
+midi note 1 60 100 ; midi cc 2 7 64 ; midi pc 1 12    # canal 1-16, número, valor
+http get http://127.0.0.1:8080/status                 # http get|post|put|patch|delete <url> [cuerpo]
 ```
 
 ## Atributos y colores
@@ -37,4 +41,5 @@ Atributos (con alias): dimmer (dim, intensity), pan, tilt, red/rojo, green/verde
 ## Consejos
 - Valores de 0 a 100. `full`/`max`/`pleno` = 100, `out`/`off`/`cero` = 0.
 - Después de grabar, `clear` evita que el programador siga mandando.
-- Lo que no cubre la línea de comandos (parchear con dirección, ajustes, salidas) va con `send_command`.
+- La línea de comandos **no parchea** ni configura universos, salidas, ajustes o perfiles: eso va con `send_command` (`fixture_add`, `universe_save`, `settings_save`…). Para grabar un cue complejo con tiempos, `cue_save`/`cuelist_save` por `send_command`.
+- Un aparato sin seleccionar (`red at 100` sin selección) da error: selecciona antes (`fixture 1 thru 4`, `group 2`, `all`).
