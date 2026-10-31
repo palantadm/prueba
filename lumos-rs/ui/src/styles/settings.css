@@ -172,3 +172,11 @@
 .patch-card .page-head .row { gap: 8px; }
 .mapbar { height: 44px; border-radius: 10px; }
 .mapbar > .blk { font-size: 13px; line-height: 44px; font-weight: 700; padding-left: 6px; min-width: 6px; }
+
+.uni-bar { display: flex; align-items: center; gap: 8px; padding: 0 16px 12px; flex: none; }
+.uni-card .page-head > .grow { flex: 1 1 160px; min-width: 0; }
+.uni-card .page-head h2 { white-space: normal; }
+.uni-ed .hd .grow-t { flex: 1; min-width: 0; }
+.uni-ed .hd .cap { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.set-rail { gap: 4px; padding: 10px; }
+.set-lang { padding: 10px; }

@@ -39,14 +39,16 @@ function UniverseEditor(props: { u: UniverseCfg; status: OutputStatus[]; open: b
   return (
     <aside class={`uni-ed ${props.open ? "open" : ""}`} aria-label={t("Edit universe")}>
       <div class="hd">
-        <div>
+        <div class="grow-t">
           <div class="cap">{t("Universe {id}", { id: u.id })} · {props.u.name}</div>
           <div class="ttl">{n ? t("Output {i} of {n}", { i: i + 1, n }) : t("No output")}</div>
         </div>
+        <button class="btn" disabled={!dirty} aria-label={t("Revert changes")} title={t("Revert changes")} onClick={() => setU(structuredClone(props.u))}>↺</button>
+        <button class="btn primary" disabled={!dirty} onClick={save}>{t("Save")}</button>
         <button class="btn ghost icon close" aria-label={t("Close")} onClick={props.onClose}>✕</button>
       </div>
       <div class="bd">
-        <TextField label={t("Name")} value={u.name} onChange={(name) => setU({ ...u, name })} />
+        <TextField label={t("Name")} class="bare" value={u.name} onChange={(name) => setU({ ...u, name })} />
         {n > 1 && (
           <div class="outtabs" role="tablist" aria-label={t("Outputs")}>
             {u.outputs.map((_, j) => <button key={j} role="tab" aria-selected={j === i} class={j === i ? "on" : ""} onClick={() => setOi(j)}>{j + 1}</button>)}
@@ -67,10 +69,6 @@ function UniverseEditor(props: { u: UniverseCfg; status: OutputStatus[]; open: b
         </>}
       </div>
       <div class="ft">
-        <div class="two">
-          <button class="btn" disabled={!dirty} onClick={() => setU(structuredClone(props.u))}>{t("Revert changes")}</button>
-          <button class="btn primary" disabled={!dirty} onClick={save}>{t("Save universe")}</button>
-        </div>
         <div class="two">
           <button class="btn danger" disabled={!o} onClick={() => { setU({ ...u, outputs: u.outputs.filter((_, j) => j !== i) }); setOi(Math.max(0, i - 1)); }}>{t("Remove output")}</button>
           <button class="btn" onClick={() => { setU({ ...u, outputs: [...u.outputs, defaultOutput("art_net")] }); setOi(n); }}>{t("+ Another output")}</button>
@@ -199,17 +197,23 @@ export function UniversesPage() {
       <div class="uni-left">
         <section class="uni-card grow">
           <PageHead title={t("Universes & outputs")} sub={t("{n} universes · each can drive any number of outputs", { n: universes.length })}>
-            <input class="input" style={{ width: 160 }} placeholder={t("Filter…")} aria-label={t("Filter universes")} value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />
-            <button class="btn" disabled={selIds.length < 2} onClick={() => setDlg("copy")} title={t("Copy outputs of the lowest selected universe to the others")}>{t("Copy to selected")}</button>
-            <button class="btn danger" disabled={!selIds.length} onClick={async () => {
-              if (!(await confirmDialog(t("Remove universes"), t("Remove {n} universe(s)? Fixtures patched to them stay in the show.", { n: selIds.length }), { danger: true, ok: t("Remove") }))) return;
-              for (const id of selIds) await send({ type: "universe_remove", id }, { quiet: true }).catch(() => {});
-              setSel(new Set());
-            }}>{t("Remove")}{selIds.length ? ` (${selIds.length})` : ""}</button>
             <button class="btn" onClick={() => setDlg("bulk")} title={t("Assign a protocol to a range of universes")}>{t("Bulk assign…")}</button>
             <button class={`btn ${showTest || rt.value?.testing ? "sel" : ""}`} aria-pressed={showTest} onClick={() => setShowTest(!showTest)}>{t("Output test")}</button>
             <button class="btn cyan" onClick={() => setDlg("add")}>{t("+ Add")}</button>
           </PageHead>
+          {(selIds.length > 0 || universes.length > 6) && (
+            <div class="uni-bar">
+              {universes.length > 6 && <input class="input" style={{ width: 200 }} placeholder={t("Filter…")} aria-label={t("Filter universes")} value={filter} onInput={(e) => setFilter((e.target as HTMLInputElement).value)} />}
+              <span class="sp" />
+              {selIds.length > 0 && <span class="dim">{selIds.length} ✓</span>}
+              <button class="btn" disabled={selIds.length < 2} onClick={() => setDlg("copy")} title={t("Copy outputs of the lowest selected universe to the others")}>{t("Copy to selected")}</button>
+              <button class="btn danger" disabled={!selIds.length} onClick={async () => {
+                if (!(await confirmDialog(t("Remove universes"), t("Remove {n} universe(s)? Fixtures patched to them stay in the show.", { n: selIds.length }), { danger: true, ok: t("Remove") }))) return;
+                for (const id of selIds) await send({ type: "universe_remove", id }, { quiet: true }).catch(() => {});
+                setSel(new Set());
+              }}>{t("Remove")}{selIds.length ? ` (${selIds.length})` : ""}</button>
+            </div>
+          )}
           {(showTest || rt.value?.testing) && <TestPanel />}
           <div class="uni-cols">
             <label class="pick" style={{ display: "grid", placeItems: "center", width: 40, height: 40 }}>

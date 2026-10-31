@@ -74,7 +74,7 @@ export function Patch() {
       {view === "map" ? <div class="grow scroll"><UniverseMap fixtures={fixtures} /></div> : <>
         <div class="vrow patch-cols">
           <span style={cell(48)}>ID</span><span style={cell(190)}>{t("Name")}</span><span class="grow hide-narrow">{t("Profile")}</span><span class="grow-narrow" style={cell(150)}>{t("Mode")}</span><span style={cell(88)}>{t("Univ")}</span><span style={cell(96)}>{t("Addr")}</span><span class="hide-narrow" style={cell(44)}>{t("Ch")}</span><span style={cell(56)}>{t("End")}</span><span style={cell(56)} title={t("Identify")}>◎</span>
-          <span class="hide-narrow" style={cell(76)}>X</span><span class="hide-narrow" style={cell(76)}>Y</span><span class="hide-narrow" style={cell(76)}>Z</span>
+          <span class="hide-narrow" style={cell(88)}>X</span><span class="hide-narrow" style={cell(88)}>Y</span><span class="hide-narrow" style={cell(88)}>Z</span>
         </div>
         {rows.length === 0 ? <EmptyState icon="⌖" title={fixtures.length ? t("No fixtures match the filter") : t("Nothing patched yet")} hint={t("Add fixtures from the library, choose a universe and DMX address.")} >
           {!fixtures.length && <button class="btn primary tall" onClick={() => setAdding(true)}>{t("+ Add fixtures")}</button>}</EmptyState> :
@@ -95,7 +95,7 @@ export function Patch() {
                   <button class={`btn icon ${identifying.has(x.id) ? "on" : ""}`} aria-pressed={identifying.has(x.id)} aria-label={t("Identify fixture {id}", { id: x.id })}
                     title={t("Identify (locate)")} onClick={() => send({ type: "identify", fixture: x.id, on: !identifying.has(x.id) }, { quiet: true }).catch(() => {})}>◎</button>
                 </span>
-                {[0, 1, 2].map((i) => <span key={i} class="hide-narrow" style={cell(76)} onClick={(e) => e.stopPropagation()}>
+                {[0, 1, 2].map((i) => <span key={i} class="hide-narrow" style={cell(88)} onClick={(e) => e.stopPropagation()}>
                   <NumberField float class="bare" label={"XYZ"[i]} value={x.pos[i]} step={0.5} onChange={(v) => { const pos = [...x.pos] as [number, number, number]; pos[i] = v; upd(x, { pos }); }} /></span>)}
               </div>
             );
