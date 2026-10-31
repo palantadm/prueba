@@ -17,6 +17,7 @@ pub mod client;
 pub mod config;
 pub mod help;
 pub mod netdiag;
+pub mod patchcheck;
 pub mod openai;
 pub mod prompt;
 pub mod sse;

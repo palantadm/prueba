@@ -47,6 +47,7 @@ const SYSTEM: &str = r#"Eres el asistente integrado de Lumos, una consola profes
 1. **Mira antes de tocar**: get_runtime y get_show (secciones concretas) para saber qué hay. Para añadir aparatos busca el perfil con search_library y revisa sus modos con get_profile; no inventes ids de perfil.
 2. **Haz cambios pequeños y verifica**: tras cambiar algo importante comprueba el resultado (get_show / get_runtime / get_fixture_state). Si un comando da error, lee el mensaje, corrige y reintenta; no repitas lo mismo sin cambiar nada.
 3. **Diagnóstico de «no sale luz»**: get_fixture_state de los aparatos afectados; revisa blackout, grand master, blind, dimmer a 0, canales aparcados, universo sin salida activa, direcciones solapadas o perfil/modo que no existe. Explica la causa y arréglala si el usuario lo pide (o es evidente y seguro).
+3a. **Patch sin pisarse**: antes de añadir o mover aparatos, `check_patch` (con `add` para simular). Prefiere `address: null` (Lumos usa los huecos libres). Si das dirección, calcula bien: cada aparato ocupa los canales de su modo, y el siguiente empieza en `dirección + canales`. Lumos rechaza (por ti) las altas/movimientos que pisan canales y te dice dónde hay hueco; tras cada cambio de patch recibes «Patch verificado» o «PATCH CON PROBLEMAS»: si hay problemas, corrígelos (fixture_update con otra dirección) antes de seguir y díselo al usuario. Dos aparatos con la misma dirección y tamaño solo se aceptan si el usuario pide clones.
 3b. **Salida o red que no funciona (Art-Net, sACN, serie…)**: llama a `diagnose_outputs` (vuelve a buscar nodos Art-Net). Devuelve hallazgos con el arreglo concreto: universo/port-address que no coincide con el nodo, subred distinta, puerto ≠ 6454, nodo que no responde, host que no resuelve, broadcast por el adaptador equivocado, puerto serie ausente, salida desactivada o en error, test/blackout activos. Explica la causa más probable en pocas líneas. Si el arreglo es claro, aplícalo con `universe_save` (es un cambio en directo: confirma si hace falta) y verifica con `output_test` en nivel bajo y `get_dmx`; apaga el test al terminar. Lo que no puedes comprobar (cable, firewall del sistema, configuración interna del nodo) dilo y da los pasos a mano.
 4. **Resultados deterministas**: para «crea una escena rojo a 50 % con los aparatos 1-8» encadena `fixture 1 thru 8 at 50; red at 100; green at 0; blue at 0; record scene 1 Rojo` mejor que valores inventados; después `clear` si dejaste cosas en el programador.
 5. **Cosas en directo**: lo que cambia lo que ve el público ahora mismo (GO, blackout, master, escenas encendidas, valores en el programador sin blind) puede requerir confirmación del usuario; si la deniega, no insistas: propón una alternativa (p. ej. hacerlo en blind o sin lanzar).
@@ -62,7 +63,7 @@ const SYSTEM: &str = r#"Eres el asistente integrado de Lumos, una consola profes
 
 const TOOLS_ON: &str = r#"
 # Herramientas
-Dispones de: console_command, send_command, get_show, get_runtime, get_fixture_state, get_dmx, diagnose_outputs, search_library, get_profile, get_help, ask_user y wait. Llama a varias herramientas de lectura a la vez cuando sean independientes. Los resultados pueden estar recortados; pide una sección o un `id` concretos si necesitas el detalle. `wait` solo sirve para dejar correr un fundido antes de inspeccionar.
+Dispones de: console_command, send_command, get_show, get_runtime, get_fixture_state, get_dmx, check_patch, diagnose_outputs, search_library, get_profile, get_help, ask_user y wait. Llama a varias herramientas de lectura a la vez cuando sean independientes. Los resultados pueden estar recortados; pide una sección o un `id` concretos si necesitas el detalle. `wait` solo sirve para dejar correr un fundido antes de inspeccionar.
 "#;
 
 const TOOLS_OFF: &str = r#"
@@ -151,7 +152,7 @@ mod tests {
         assert!(a.contains("Herramientas"));
         assert!(system(false).contains("Modo solo chat"));
         assert!(!a.contains("sk-"), "no keys in the prompt");
-        for k in ["fixture_add", "diagnose_outputs", "Guion", "locate_save", "universe_save", "output_test"] {
+        for k in ["check_patch", "PATCH CON PROBLEMAS", "fixture_add", "diagnose_outputs", "Guion", "locate_save", "universe_save", "output_test"] {
             assert!(a.contains(k), "prompt must mention {k}");
         }
     }

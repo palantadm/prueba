@@ -607,3 +607,41 @@ async fn taught_examples_actually_work() {
     let ok = super::tools::execute(&r.h, "console_command", &json!({"text":"fixture 1 thru 2 at 50; red at 100; record group 9 Test"})).await;
     assert!(ok.is_ok(), "{ok:?}");
 }
+
+/// The assistant must never stack fixtures on top of each other: overlapping adds/moves are refused with a free slot,
+/// `address: null` always lands in free space, and every patch edit reports a verdict.
+#[tokio::test]
+async fn patch_guard_prevents_overlaps() {
+    let r = rig("patchguard").await; // 4 × rgb-par 3ch at U1: channels 1-12
+    let exec = |c: Value| {
+        let h = r.h.clone();
+        async move { super::tools::execute(&h, "send_command", &json!({ "command": c })).await }
+    };
+    // explicit address inside the used block → refused, nothing added
+    let e = exec(json!({"type":"fixture_add","profile":"generic/rgb-par","mode":"3ch","count":2,"universe":1,"address":10,"name":"X"})).await.unwrap_err();
+    assert!(e.contains("se pisarían") && e.contains("dirección 13"), "{e}");
+    assert_eq!(r.show().await.fixtures.len(), 4);
+    // free address → accepted, with a verdict
+    let ok = exec(json!({"type":"fixture_add","profile":"generic/rgb-par","mode":"3ch","count":2,"universe":1,"address":13,"name":"Y"})).await.unwrap();
+    assert!(ok.contains("Patch verificado: 6 aparatos"), "{ok}");
+    // address null packs after the existing ones, no overlap
+    let ok2 = exec(json!({"type":"fixture_add","profile":"generic/rgb-par","mode":"3ch","count":3,"universe":1,"address":null,"name":"Z"})).await.unwrap();
+    assert!(ok2.contains("sin solapes"), "{ok2}");
+    // moving a fixture on top of another is refused
+    let mut fx = r.show().await.fixtures[0].clone();
+    fx.address = 2;
+    let e2 = exec(json!({"type":"fixture_update","fixture": fx})).await.unwrap_err();
+    assert!(e2.contains("se pisarían"), "{e2}");
+    // dry run tool
+    let rep = super::tools::execute(&r.h, "check_patch", &json!({"add":{"profile":"generic/rgb-par","mode":"3ch","count":2,"universe":1,"address":5}})).await.unwrap();
+    let v: Value = serde_json::from_str(&rep).unwrap();
+    assert_eq!(v["ok"], true);
+    assert!(!v["simulacion"]["conflictos"].as_array().unwrap().is_empty(), "{v}");
+    assert!(v["universos"][0]["free_ranges"].as_array().unwrap().iter().any(|x| x.as_str().unwrap().ends_with("-512")));
+    // spill over the end of a universe goes to the next one without overlapping
+    let big = exec(json!({"type":"fixture_add","profile":"generic/rgb-par","mode":"3ch","count":4,"universe":1,"address":505,"name":"W"})).await;
+    assert!(big.is_ok(), "{big:?}");
+    let sh = r.show().await;
+    let rp = super::tools::execute(&r.h, "check_patch", &json!({})).await.unwrap();
+    assert!(serde_json::from_str::<Value>(&rp).unwrap()["ok"] == true, "{rp} {:?}", sh.fixtures.iter().map(|f| (f.universe, f.address)).collect::<Vec<_>>());
+}

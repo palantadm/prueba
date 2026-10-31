@@ -234,6 +234,17 @@ pub fn definitions() -> Vec<ToolDef> {
             &["universe"],
         ),
         tool(
+            "check_patch",
+            "Check the patch for DMX channel overlaps (fixtures stepping on each other), addresses outside 1-512 and unknown profiles/modes; lists the free channel ranges per universe. \
+             Pass `add` {profile, mode, count, universe, address?} to dry-run an addition and get the exact addresses it would use plus a suggested free block. \
+             ALWAYS run it (or rely on the verdict appended to patch commands) before and after adding or moving fixtures.",
+            json!({
+                "universe": { "type": "integer", "description": "Only this universe." },
+                "add": { "type": "object", "description": "Dry run of fixture_add: {profile, mode, count, universe, address (optional)}." }
+            }),
+            &[],
+        ),
+        tool(
             "diagnose_outputs",
             "Diagnose the DMX output chain and network: per universe/output config (Art-Net, sACN, OSC, serial, USB), live status and frame counters, Art-Net nodes that answer ArtPoll (re-scans first, ~3 s), \
              this machine's IP addresses, serial ports, universe/port-address mismatches, subnet problems, blackout/test/park overrides. Returns findings with a concrete fix each. \
@@ -277,7 +288,7 @@ pub fn clean_tool_name(raw: &str) -> String {
     definitions().iter().find(|d| d.name.eq_ignore_ascii_case(core)).map(|d| d.name.clone()).unwrap_or_else(|| s.to_string())
 }
 
-pub const READ_TOOLS: &[&str] = &["get_show", "get_runtime", "get_fixture_state", "get_dmx", "diagnose_outputs", "search_library", "get_profile", "get_help", "ask_user", "wait"];
+pub const READ_TOOLS: &[&str] = &["get_show", "get_runtime", "get_fixture_state", "get_dmx", "check_patch", "diagnose_outputs", "search_library", "get_profile", "get_help", "ask_user", "wait"];
 
 // ───────────────────────────── risk ─────────────────────────────
 
@@ -486,6 +497,7 @@ pub fn summary(name: &str, input: &Value) -> String {
         "get_runtime" => "Consultar el estado en vivo".into(),
         "get_fixture_state" => "Diagnosticar aparatos".into(),
         "diagnose_outputs" => "Diagnosticar salidas y red".into(),
+        "check_patch" => "Comprobar solapes del patch".into(),
         "get_dmx" => format!("Leer DMX del universo {}", input.get("universe").and_then(|u| u.as_u64()).unwrap_or(0)),
         "search_library" => format!("Buscar en la librería: «{}»", short(input.get("query").and_then(|s| s.as_str()).unwrap_or(""), 50)),
         "get_profile" => format!("Ver perfil {}", short(input.get("id").and_then(|s| s.as_str()).unwrap_or(""), 60)),
@@ -816,8 +828,37 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
                 return Err("Ese comando no está permitido para el asistente.".into());
             }
             let cmd: Command = serde_json::from_value(raw).map_err(|e| format!("Comando no válido: {e}. Revisa los campos del tipo `{ty}`."))?;
+            // Patch guard: never stack fixtures on top of each other without saying so.
+            match &cmd {
+                Command::FixtureAdd { profile, mode, count, universe, address: Some(a), .. } => {
+                    let st = h.ai_state().await.ok_or("Motor detenido")?;
+                    let plan = super::patchcheck::plan_add(&st, profile, mode, *count, *universe, *a)?;
+                    if !plan.conflicts.is_empty() {
+                        return Err(cap(format!("No se ha añadido nada: los canales DMX se pisarían. {}. {}", plan.conflicts.join("; "), plan.suggestion.unwrap_or_default()), MAX_RESULT));
+                    }
+                }
+                Command::FixtureUpdate { fixture } => {
+                    let st = h.ai_state().await.ok_or("Motor detenido")?;
+                    let c = super::patchcheck::check_update(&st, fixture);
+                    if !c.is_empty() {
+                        let sp = super::patchcheck::spans(&st);
+                        let fp = super::patchcheck::footprint(&st, &fixture.profile, &fixture.mode).unwrap_or(1);
+                        let hint = super::patchcheck::first_fit(&sp.into_iter().filter(|s| s.id != fixture.id).collect::<Vec<_>>(), fixture.universe, fp).map(|(u, a)| format!(" Hueco libre para {fp} canales: U{u} dirección {a}.")).unwrap_or_default();
+                        return Err(cap(format!("No se ha modificado nada: los canales DMX se pisarían. {}.{hint}", c.join("; ")), MAX_RESULT));
+                    }
+                }
+                _ => {}
+            }
+            let patch_touch = matches!(cmd, Command::FixtureAdd { .. } | Command::FixtureUpdate { .. } | Command::FixtureRemove { .. } | Command::FixtureMorph { .. } | Command::LibraryImportOfl { .. });
             h.command(cmd).await?;
-            Ok(format!("OK ({ty}). Usa get_show/get_runtime para ver el resultado."))
+            let mut msg = format!("OK ({ty}). Usa get_show/get_runtime para ver el resultado.");
+            if patch_touch {
+                if let Some(st) = h.ai_state().await {
+                    msg.push('\n');
+                    msg.push_str(&super::patchcheck::verdict(&st));
+                }
+            }
+            Ok(msg)
         }
         "get_show" | "get_runtime" | "get_fixture_state" | "get_dmx" | "search_library" | "get_profile" => {
             let st = h.ai_state().await.ok_or("Motor detenido")?;
@@ -829,6 +870,27 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
                 "search_library" => Ok(search_library(&st, input)),
                 _ => get_profile(&st, input),
             }
+        }
+        "check_patch" => {
+            let st = h.ai_state().await.ok_or("Motor detenido")?;
+            let u = num(input, "universe").map(|u| u as u16);
+            let mut r = super::patchcheck::report(&st, u);
+            if let Some(a) = input.get("add").filter(|a| a.is_object()) {
+                let s = |k: &str| a.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let (profile, mode) = (s("profile"), s("mode"));
+                let count = num(a, "count").unwrap_or(1).clamp(1, 1024) as u32;
+                let universe = num(a, "universe").unwrap_or(1).max(1) as u16;
+                let fp = super::patchcheck::footprint(&st, &profile, &mode).ok_or_else(|| format!("Perfil «{profile}» o modo «{mode}» no encontrado (search_library / get_profile)."))?;
+                let spans = super::patchcheck::spans(&st);
+                r["simulacion"] = match num(a, "address") {
+                    Some(addr) => {
+                        let p = super::patchcheck::plan_add(&st, &profile, &mode, count, universe, addr.clamp(1, 512) as u16)?;
+                        json!({ "canales_por_aparato": fp, "colocacion": p.placements.iter().map(|(u, a)| format!("U{u}:{a}")).collect::<Vec<_>>(), "conflictos": p.conflicts, "sugerencia": p.suggestion })
+                    }
+                    None => json!({ "canales_por_aparato": fp, "total_canales": fp as u32 * count, "primer_bloque_libre": super::patchcheck::first_fit(&spans, universe, (fp as u32 * count).min(512) as u16).map(|(u, a)| format!("U{u}:{a}")), "nota": "Con address:null Lumos coloca cada aparato en el primer hueco libre (puede repartir por varios universos)." }),
+                };
+            }
+            Ok(cap(r.to_string(), MAX_RESULT))
         }
         "diagnose_outputs" => {
             if input.get("scan").and_then(|v| v.as_bool()).unwrap_or(true) {
@@ -890,7 +952,7 @@ mod tests {
                 assert!(!s.contains(bad), "{} uses {bad}", t.name);
             }
         }
-        assert_eq!(definitions().len(), 12);
+        assert_eq!(definitions().len(), 13);
     }
 
     #[test]

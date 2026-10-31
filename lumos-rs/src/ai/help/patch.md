@@ -5,6 +5,9 @@ El **patch** asigna a cada aparato un perfil (qué canales tiene), un modo (cuá
 - Mediante el asistente: `search_library` para encontrar el perfil, `get_profile` para ver sus modos y después el comando `fixture_add` con `profile`, `mode`, `count`, `universe`, `address` y `name`.
 - Importación masiva: CSV y MVR (Patch → Importar).
 
+## Que no se pisen
+Cada aparato ocupa `dirección … dirección + canales − 1`. Si dos rangos se cruzan en el mismo universo, ambos reciben los mismos canales y se comportan mal. `check_patch` lista los solapes, direcciones fuera de 1–512, perfiles desconocidos y los huecos libres de cada universo; con `add` simula un alta. Con `address: null` Lumos usa siempre huecos libres. Las altas y movimientos del asistente que pisarían canales se rechazan con una sugerencia de hueco libre. Dos aparatos con la misma dirección y tamaño (clones) son legítimos si se hacen a propósito.
+
 ## Reglas
 - Cada aparato ocupa tantos canales como indique su modo (`channels`). Dos aparatos pueden solaparse en direcciones (se mezcla por HTP por canal), pero casi siempre es un error: el diagnóstico lo avisa.
 - Un **universo** es lógico (`id`, nombre, salidas). Los aparatos referencian el id; hace falta que el universo exista y tenga una salida activa para que algo salga por cable.
