@@ -147,6 +147,8 @@ const KW_FIRE: &[&str] = &["fire", "disparar", "lanzar"];
 const KW_OSC: &[&str] = &["osc"];
 const KW_MIDI: &[&str] = &["midi"];
 const KW_HTTP: &[&str] = &["http", "web"];
+const KW_EXEC: &[&str] = &["exec", "executor", "ejecutor"];
+const KW_FLASH: &[&str] = &["flash", "destello"];
 
 const KW_INTENSITY: &[&str] = &["intensity", "intensidad"];
 const KW_POSITION: &[&str] = &["position", "posicion"];
@@ -215,7 +217,7 @@ const VERB_GROUPS: &[&[&str]] = &[
     KW_FIXTURE, KW_GROUP, KW_ALL, KW_NONE, KW_ODD, KW_EVEN, KW_NEXT, KW_PREV, KW_AT, KW_COLOUR, KW_RECORD, KW_UPDATE,
     KW_DELETE, KW_APPLY, KW_GO, KW_BACK, KW_PAUSE, KW_RELEASE, KW_GOTO, KW_CUELIST, KW_SCENE, KW_CHASE, KW_MACRO,
     KW_TIMELINE, KW_BLACKOUT, KW_GM, KW_CLEAR, KW_PARK, KW_UNPARK, KW_UNDO, KW_REDO, KW_BLIND, KW_LOCATE,
-    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP,
+    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP, KW_EXEC,
 ];
 
 fn all_keywords() -> Vec<&'static str> {
@@ -435,6 +437,14 @@ pub enum SceneAct {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum ExecAct {
+    Go,
+    Back,
+    Flash(bool),
+    Level(f32),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum ChaseAct {
     On,
     Off,
@@ -483,6 +493,8 @@ pub enum Stmt {
     Scene { id: u32, act: SceneAct },
     ScenesRelease,
     Chase { id: u32, act: ChaseAct },
+    Effect { id: u32, on: bool },
+    Exec { id: u32, act: ExecAct },
     MacroRun(u32),
     MacroStop(Option<u32>),
     Timeline { id: u32, act: TlAct },
@@ -811,6 +823,41 @@ impl<'a> P<'a> {
         if is(w, KW_CHASE) {
             self.i += 1;
             return self.chase();
+        }
+        // `effect 5 [on|off]` (but `effect 5 at 50` stays "attribute effect on fixture 5")
+        if is(w, KW_EFFECT) && matches!(self.peek_n(1), Some(Tok { t: T::Num(_), .. })) && match self.peek_n(2) {
+            None => true,
+            Some(Tok { t: T::Sep, .. }) => true,
+            Some(Tok { t: T::Word(x), .. }) => is(x, KW_ON) || is(x, KW_OFF) || is(x, KW_OUT),
+            _ => false,
+        } {
+            self.i += 1;
+            let id = self.uint("an effect number")?;
+            let on = !(self.eat_kw(KW_OFF) || self.eat_kw(KW_OUT));
+            self.eat_kw(KW_ON);
+            return Ok(Stmt::Effect { id, on });
+        }
+        if is(w, KW_EXEC) {
+            self.i += 1;
+            let id = self.uint("an executor number")?;
+            let act = if self.at_end() || self.eat_kw(KW_GO) {
+                ExecAct::Go
+            } else if self.eat_kw(KW_BACK) {
+                ExecAct::Back
+            } else if self.eat_kw(KW_FLASH) {
+                { let off = self.eat_kw(KW_OFF) || self.eat_kw(KW_OUT); self.eat_kw(KW_ON); ExecAct::Flash(!off) }
+            } else if self.eat_at() {
+                match self.val()? {
+                    Val::Pct(p) => ExecAct::Level((p / 100.0).clamp(0.0, 1.0)),
+                    Val::Full => ExecAct::Level(1.0),
+                    Val::Out => ExecAct::Level(0.0),
+                    Val::Half => ExecAct::Level(0.5),
+                    _ => return Err(self.here("executor level must be 0-100")),
+                }
+            } else {
+                return Err(self.here("expected go, back, flash [on|off] or 'at <level>'"));
+            };
+            return Ok(Stmt::Exec { id, act });
         }
         if is(w, KW_MACRO) {
             self.i += 1;
@@ -1821,6 +1868,16 @@ pub fn resolve(stmt: &Stmt, ctx: &Ctx, sess: &mut Session) -> R<Compiled> {
             };
             one(cmd, format!("chase {id} {what}"))
         }
+        Stmt::Effect { id, on } => one(Command::EffectToggle { id: *id, on: *on }, format!("effect {id} {}", if *on { "on" } else { "off" })),
+        Stmt::Exec { id, act } => {
+            let (cmd, what) = match act {
+                ExecAct::Go => (Command::ExecGo { id: *id }, "go".to_string()),
+                ExecAct::Back => (Command::ExecBack { id: *id }, "back".to_string()),
+                ExecAct::Flash(down) => (Command::ExecFlash { id: *id, down: *down }, format!("flash {}", if *down { "on" } else { "off" })),
+                ExecAct::Level(l) => (Command::ExecLevel { id: *id, level: *l }, format!("level {:.0}%", l * 100.0)),
+            };
+            one(cmd, format!("executor {id} {what}"))
+        }
         Stmt::MacroRun(id) => one(Command::MacroRun { id: *id }, format!("macro {id} started")),
         Stmt::MacroStop(id) => one(Command::MacroStop { id: *id }, "macro stopped".into()),
         Stmt::Timeline { id, act } => {
@@ -1967,6 +2024,8 @@ pub fn help_json() -> serde_json::Value {
         ("playback", "go|back|pause|release [cuelist L | L] | goto [cue] N [cuelist L] | cuelist L | release all", "Cuelist playback", &["go", "go cuelist 2", "cuelist 2; go; go", "goto cue 10"]),
         ("scene", "scene N [on|off|solo|toggle|at V] | scene solo N | scenes release", "Scenes", &["scene 1 on", "escena 3 at 60"]),
         ("chase", "chase N [on|off|tap|bpm V|next|prev]", "Chases", &["chase 1 on", "chase 2 bpm 128"]),
+        ("effect", "effect N [on|off]", "Start/stop a saved effect (pool item N)", &["effect 5 on", "effect 2 off"]),
+        ("executor", "exec|executor N go|back|flash [on|off]|at V", "Playback executor N: GO, BACK, FLASH (held) or fader level 0-100", &["exec 5 go", "exec 2 at 80", "exec 3 flash on"]),
         ("macro", "macro N | macro stop [N]", "Macros", &["macro 3"]),
         ("timeline", "timeline N [run [from T]|stop|seek T]", "Timelines", &["timeline 1 run", "timeline 1 seek 30"]),
         ("script", "script|guion [N] go|back|reset|follow [on|off]|goto <block> [mark]|fire <block> <mark>", "Running order (Guion): go fires the next cue mark, back re-arms the previous one, follow makes the reader track cues started anywhere", &["script 1 go", "guion 1 atras", "script 1 goto 12", "script follow on"]),
@@ -1985,7 +2044,7 @@ pub fn help_json() -> serde_json::Value {
         ("half", KW_HALF), ("home", KW_HOME), ("colour", KW_COLOUR), ("record", KW_RECORD), ("update", KW_UPDATE),
         ("delete", KW_DELETE), ("apply", KW_APPLY), ("go", KW_GO), ("back", KW_BACK), ("pause", KW_PAUSE),
         ("release", KW_RELEASE), ("goto", KW_GOTO), ("cue", KW_CUE), ("cuelist", KW_CUELIST), ("scene", KW_SCENE),
-        ("chase", KW_CHASE), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
+        ("chase", KW_CHASE), ("effect", KW_EFFECT), ("exec", KW_EXEC), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
         ("clear", KW_CLEAR), ("park", KW_PARK), ("unpark", KW_UNPARK), ("undo", KW_UNDO), ("redo", KW_REDO),
         ("blind", KW_BLIND), ("locate", KW_LOCATE),
     ];
@@ -2369,6 +2428,24 @@ mod tests {
         assert!(err_of("red").contains("expected 'at <value>' after 'red'"));
         assert!(run("fixture 1; record cue 4 cuelist 1 \"EfectoColor\"").is_ok());
         assert!(run("fixture 1; record cue 4 1 EfectoColor").is_ok());
+    }
+
+    #[test]
+    fn effect_and_executor_statements() {
+        assert!(matches!(run("effect 5 on").unwrap()[0], Command::EffectToggle { id: 5, on: true }));
+        assert!(matches!(run("effect 5").unwrap()[0], Command::EffectToggle { id: 5, on: true }));
+        assert!(matches!(run("efecto 2 off").unwrap()[0], Command::EffectToggle { id: 2, on: false }));
+        assert!(matches!(run("exec 5 go").unwrap()[0], Command::ExecGo { id: 5 }));
+        assert!(matches!(run("exec 5").unwrap()[0], Command::ExecGo { id: 5 }));
+        assert!(matches!(run("executor 3 back").unwrap()[0], Command::ExecBack { id: 3 }));
+        assert!(matches!(run("exec 3 flash on").unwrap()[0], Command::ExecFlash { id: 3, down: true }));
+        assert!(matches!(run("exec 3 flash off").unwrap()[0], Command::ExecFlash { id: 3, down: false }));
+        assert!(matches!(&run("exec 2 at 80").unwrap()[0], Command::ExecLevel { id: 2, level } if (*level - 0.8).abs() < 1e-6));
+        // `effect` as an attribute still works
+        let c = run("fixture 5; effect at 50").unwrap();
+        assert_eq!(progset(&c[0]).1["effect"], 0.5);
+        let c = run("fixture 5; effect 5 at 50").unwrap();
+        assert_eq!(progset(&c[0]).0, vec![5]);
     }
 
     #[test]

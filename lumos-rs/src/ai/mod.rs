@@ -14,6 +14,7 @@
 pub mod agent;
 pub mod anthropic;
 pub mod client;
+pub mod cmdref;
 pub mod config;
 pub mod help;
 pub mod netdiag;

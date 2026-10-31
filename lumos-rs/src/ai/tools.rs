@@ -158,8 +158,11 @@ fn send_command_description() -> String {
          Attribute values are 0..1 floats; a PerFixture map is `{\"<fixture id>\": {\"dimmer\": 1, \"red\": 0.5}}`. \
          Prefer `console_command` for simple operations (selection/at/record/go) and use this for structured edits \
          (saving cuelists, palettes, scenes, effects, chases, macros, timelines, universes, patch, vconsole). \
-         Look up ids with get_show first; never invent ids. Command types:\n",
+         Look up ids with get_show first; never invent ids. If a type is unfamiliar, call get_help `comando <tipo>` (or `comandos <grupo>`) for its function and an exact working example BEFORE sending it. \
+         Types by function:\n",
     );
+    s.push_str(&super::cmdref::index());
+    s.push_str("Fields of each type:\n");
     for (n, f) in command_catalog() {
         if skip.iter().any(|k| n.starts_with(k)) {
             continue;
@@ -827,7 +830,16 @@ pub fn get_profile(st: &AiState, input: &Value) -> Result<String, String> {
 }
 
 /// Console errors that look like an attempt to patch/configure get a pointer to the right tool.
-fn with_console_hint(mut m: String) -> String {
+fn with_console_hint(mut m: String, text: &str) -> String {
+    // the model used a send_command type (`exec_go 5`, `effect_run 5`) as console text
+    let first = text.split([';', '\n']).map(|s| s.trim()).find(|s| !s.is_empty() && !s.starts_with('#')).and_then(|s| s.split_whitespace().next()).unwrap_or("").to_lowercase();
+    if first.contains('_') {
+        let x = super::cmdref::find(&first).or_else(|| super::cmdref::nearest(&first, 1).into_iter().next());
+        if let Some(x) = x {
+            m.push_str(&format!("\n`{first}` NO es una palabra de consola: es un comando de send_command.\n{}", super::cmdref::card(x)));
+            return m;
+        }
+    }
     let low = m.to_lowercase();
     if ["profile", "universe", "address", "patch", "mode"].iter().any(|k| low.contains(k)) {
         m.push_str("\nPista: la línea de comandos no parchea ni configura salidas; usa send_command (fixture_add, universe_save…). Gramática exacta en la descripción de console_command.");
@@ -843,13 +855,13 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
         "console_command" => {
             let text = input.get("text").and_then(|t| t.as_str()).ok_or("Falta `text`")?.to_string();
             let n = text.split([';', '\n']).filter(|s| !s.trim().is_empty() && !s.trim().starts_with('#')).count().clamp(1, 30);
-            if let Err(e) = h.command(Command::CommandLine { text }).await {
-                return Err(cap(with_console_hint(e), MAX_RESULT));
+            if let Err(e) = h.command(Command::CommandLine { text: text.clone() }).await {
+                return Err(cap(with_console_hint(e, &text), MAX_RESULT));
             }
             let st = h.ai_state().await.ok_or("Motor detenido")?;
             let lines: Vec<String> = st.rt.cmd_log.iter().rev().take(n).rev().map(|l| format!("{} {} → {}", if l.ok { "OK " } else { "ERR" }, l.text, l.msg)).collect();
             if lines.iter().any(|l| l.starts_with("ERR")) {
-                Err(cap(with_console_hint(lines.join("\n")), MAX_RESULT))
+                Err(cap(with_console_hint(lines.join("\n"), &text), MAX_RESULT))
             } else {
                 Ok(cap(lines.join("\n"), MAX_RESULT))
             }
@@ -867,6 +879,11 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
                 return Err("Ese comando no está permitido para el asistente.".into());
             }
             let mut raw = raw;
+            if !ty.is_empty() && !ty.starts_with("ai_") && super::cmdref::find(&ty).is_none() {
+                let near = super::cmdref::nearest(&ty, 3).into_iter().map(super::cmdref::card).collect::<Vec<_>>().join("\n");
+                let console = if matches!(ty.as_str(), "command_line") { " Para texto de consola usa la herramienta console_command." } else if ty.contains(' ') { " Eso parece sintaxis de CONSOLA: úsala con la herramienta console_command, no como `type`." } else { "" };
+                return Err(cap(format!("`{ty}` no es un comando de send_command.{console} Los más parecidos:\n{near}\nLista completa por grupos: get_help `comandos`."), MAX_RESULT));
+            }
             if ty.is_empty() {
                 return Err("Falta `type` en el comando. Forma: send_command {\"command\": {\"type\": \"<tipo>\", ...campos}}. Tipos habituales: fixture_add, fixture_update, fixture_remove, group_save, palette_save, scene_record, cuelist_save, chase_save, chase_run, universe_save, output_test, grand_master, blackout, go. La lista completa con sus campos está en la descripción de send_command.".into());
             }
@@ -884,7 +901,8 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
             }
             let cmd: Command = serde_json::from_value(raw).map_err(|e| {
                 let shape = command_catalog().iter().find(|(n, _)| *n == ty).map(|(n, f)| format!(" Forma esperada: {n} {f}")).unwrap_or_default();
-                format!("Comando no válido: {e}. Revisa los campos del tipo `{ty}`.{shape}")
+                let card = super::cmdref::find(&ty).map(|x| format!("\nEjemplo correcto:\n{}", super::cmdref::card(x))).unwrap_or_default();
+                format!("Comando no válido: {e}. Revisa los campos del tipo `{ty}`.{shape}{card}")
             })?;
             // Patch guard: never stack fixtures on top of each other without saying so.
             match &cmd {

@@ -45,6 +45,7 @@ fn index() -> String {
     for (id, title, _) in TOPICS {
         s.push_str(&format!("- `{id}` — {title}\n"));
     }
+    s.push_str("- `comandos` — Función y formato EXACTO de cada comando de send_command, por grupos (`comandos escenas`, `comandos salidas`…) o uno solo (`comando fixture_add`)\n");
     s
 }
 
@@ -60,11 +61,48 @@ fn cap(mut s: String) -> String {
     s
 }
 
+/// `comandos` (index of groups), `comandos <group words>` (all cards of a group) and `comando <type>` (one card).
+fn commands_topic(q: &str) -> Option<String> {
+    use super::cmdref as r;
+    let rest = q.strip_prefix("comandos").or_else(|| q.strip_prefix("comando")).or_else(|| q.strip_prefix("commands")).or_else(|| q.strip_prefix("command"))?.trim();
+    if !(q.starts_with("comando") || q.starts_with("command")) {
+        return None;
+    }
+    if rest.is_empty() {
+        let mut s = String::from("# Comandos de send_command\nLlamada: `send_command {\"command\": {\"type\": \"<tipo>\", ...}}`. Pide el grupo con `get_help comandos <grupo>` o un comando con `get_help comando <tipo>`; cada ficha trae qué hace, el JSON exacto y la forma de consola si existe.\n\n");
+        s.push_str(&r::index());
+        return Some(s);
+    }
+    let t = rest.replace([' ', '-'], "_");
+    if let Some(x) = r::find(&t) {
+        return Some(r::card(x));
+    }
+    let words: Vec<String> = rest.split_whitespace().map(norm).collect();
+    for (g, tys) in r::GROUPS {
+        let gn = norm(g);
+        if words.iter().all(|w| gn.contains(w.as_str())) {
+            let mut s = format!("# {g}\n");
+            for ty in *tys {
+                if let Some(x) = r::find(ty) {
+                    s.push_str(&r::card(x));
+                    s.push('\n');
+                }
+            }
+            return Some(cap(s));
+        }
+    }
+    let near = r::nearest(&t, 3);
+    Some(format!("No hay un comando «{rest}». Los más parecidos:\n{}", near.iter().map(|x| r::card(x)).collect::<Vec<_>>().join("\n")))
+}
+
 /// Look a topic up by id, or search all topics by words. Empty → the index.
 pub fn lookup(topic: &str) -> String {
     let q = norm(topic.trim());
     if q.is_empty() || q == "indice" || q == "index" {
         return index();
+    }
+    if let Some(c) = commands_topic(&q) {
+        return c;
     }
     let slug = q.replace([' ', '_'], "-");
     if let Some((_, title, body)) = TOPICS.iter().find(|(id, _, _)| *id == slug) {
@@ -109,6 +147,15 @@ mod tests {
         for (id, _, _) in TOPICS {
             assert!(i.contains(&format!("`{id}`")));
         }
+    }
+
+    #[test]
+    fn command_cards_by_type_and_group() {
+        assert!(lookup("comando fixture_add").contains("\"type\":\"fixture_add\""));
+        assert!(lookup("comandos escenas").contains("scene_go"));
+        assert!(lookup("comandos").contains("Grupos, paletas y efectos"));
+        assert!(lookup("comando effect_run").contains("effect_toggle"));
+        assert!(lookup("").contains("`comandos`"));
     }
 
     #[test]

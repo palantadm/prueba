@@ -704,3 +704,36 @@ async fn command_without_type_gets_a_useful_error() {
     let e = super::tools::execute(&r.h, "send_command", &json!({"command":{"fixtures":[1]}})).await.unwrap_err();
     assert!(e.contains("Falta `type`") && e.contains("fixture_add"), "{e}");
 }
+
+/// Every documented example is accepted by the real tool path (never "invalid command"); wrong channels/types are
+/// answered with the correct card so the model can fix it in one step.
+#[tokio::test]
+async fn every_documented_command_is_accepted_and_mistakes_get_the_right_card() {
+    use super::cmdref::{example_value, REF};
+    let r = rig("allcmds").await;
+    let skip_last = ["show_new", "show_load", "backup_restore"];
+    for x in REF.iter().filter(|x| !skip_last.contains(&x.ty)) {
+        let out = super::tools::execute(&r.h, "send_command", &json!({ "command": example_value(x) })).await;
+        if let Err(e) = out {
+            assert!(!e.contains("Comando no válido") && !e.contains("no es un comando") && !e.contains("Falta `type`"), "{} rejected as malformed: {e}", x.ty);
+        }
+    }
+    // console text that is really a send_command type → card of the right command
+    let e = super::tools::execute(&r.h, "console_command", &json!({"text":"exec_go 5"})).await.unwrap_err();
+    assert!(e.contains("NO es una palabra de consola") && e.contains("\"type\":\"exec_go\""), "{e}");
+    let e = super::tools::execute(&r.h, "console_command", &json!({"text":"effect_run 5"})).await.unwrap_err();
+    assert!(e.contains("effect_toggle"), "{e}");
+    // a console phrase used as `type`
+    let e = super::tools::execute(&r.h, "send_command", &json!({"command":{"type":"effect 5 on"}})).await.unwrap_err();
+    assert!(e.contains("sintaxis de CONSOLA") && e.contains("effect_toggle"), "{e}");
+    // an invented type → nearest cards
+    let e = super::tools::execute(&r.h, "send_command", &json!({"command":{"type":"add_fixture","profile":"x"}})).await.unwrap_err();
+    assert!(e.contains("fixture_add") && e.contains("\"count\":4"), "{e}");
+    // wrong fields of a real type → the working example
+    let e = super::tools::execute(&r.h, "send_command", &json!({"command":{"type":"scene_go","scene":2}})).await.unwrap_err();
+    assert!(e.contains("Ejemplo correcto") && e.contains("\"type\":\"scene_go\""), "{e}");
+    // tool description carries the function index
+    let d = super::tools::definitions().into_iter().find(|d| d.name == "send_command").unwrap().description;
+    assert!(d.contains("Types by function") && d.contains("get_help `comando <tipo>`"), "{}", &d[..300.min(d.len())]);
+    assert!(d.len() < 40_000, "send_command description is {} bytes", d.len());
+}
