@@ -200,7 +200,7 @@ pub fn definitions() -> Vec<ToolDef> {
         tool(
             "console_command",
             "Run console command-line text (the same language as the command bar), e.g. `fixture 1 thru 4 at 70; red at 100`, `record scene 3 Amanecer`, `go`, `scene 2 on`, `gm 80`. \
-             Statements are separated by `;` or newlines and share a selection. Returns one result line per statement. See get_help topic `linea-de-comandos` for the grammar.",
+             It selects, sets values, records and plays; it does NOT patch fixtures or edit universes/outputs/settings (use send_command: fixture_add, universe_save…). Statements are separated by `;` or newlines and share a selection. Returns one result line per statement. See get_help topic `linea-de-comandos` for the grammar.",
             json!({ "text": { "type": "string", "description": "Command text. Spanish or English keywords." } }),
             &["text"],
         ),
@@ -787,7 +787,12 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
             let st = h.ai_state().await.ok_or("Motor detenido")?;
             let lines: Vec<String> = st.rt.cmd_log.iter().rev().take(n).rev().map(|l| format!("{} {} → {}", if l.ok { "OK " } else { "ERR" }, l.text, l.msg)).collect();
             if lines.iter().any(|l| l.starts_with("ERR")) {
-                Err(cap(lines.join("\n"), MAX_RESULT))
+                let mut m = lines.join("\n");
+                let low = m.to_lowercase();
+                if ["profile", "universe ", "address", "patch"].iter().any(|k| low.contains(k)) {
+                    m.push_str("\nPista: la línea de comandos no parchea ni configura salidas; usa send_command (fixture_add, universe_save…).");
+                }
+                Err(cap(m, MAX_RESULT))
             } else {
                 Ok(cap(lines.join("\n"), MAX_RESULT))
             }
