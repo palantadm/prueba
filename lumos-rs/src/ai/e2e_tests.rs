@@ -697,3 +697,10 @@ async fn partial_fixture_update_and_shape_hint() {
     let e = ex(json!({"command":{"type":"group_save","group":{"name":"sin id"}}})).await.unwrap_err();
     assert!(e.contains("Forma esperada: group_save"), "{e}");
 }
+
+#[tokio::test]
+async fn command_without_type_gets_a_useful_error() {
+    let r = rig("notype").await;
+    let e = super::tools::execute(&r.h, "send_command", &json!({"command":{"fixtures":[1]}})).await.unwrap_err();
+    assert!(e.contains("Falta `type`") && e.contains("fixture_add"), "{e}");
+}

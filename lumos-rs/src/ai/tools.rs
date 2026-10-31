@@ -867,6 +867,9 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
                 return Err("Ese comando no está permitido para el asistente.".into());
             }
             let mut raw = raw;
+            if ty.is_empty() {
+                return Err("Falta `type` en el comando. Forma: send_command {\"command\": {\"type\": \"<tipo>\", ...campos}}. Tipos habituales: fixture_add, fixture_update, fixture_remove, group_save, palette_save, scene_record, cuelist_save, chase_save, chase_run, universe_save, output_test, grand_master, blackout, go. La lista completa con sus campos está en la descripción de send_command.".into());
+            }
             // `fixture_update` may carry just `id` + the changed fields: complete the rest from the patched fixture
             if ty == "fixture_update" {
                 if let Some(fid) = raw.pointer("/fixture/id").and_then(|v| v.as_u64()) {
