@@ -18,6 +18,7 @@ mod scenes;
 mod script;
 mod speed;
 mod timeline;
+mod aim;
 mod audio;
 mod vconsole;
 mod voice;
@@ -966,6 +967,7 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            Aim { fixtures, target, height } => self.aim(fixtures, target, height)?,
             c @ (AudioConfigure { .. } | AudioRun { .. } | SoundPlay { .. } | SoundStop { .. }) => self.audio_command(c)?,
             c @ (SpeechConfigure { .. } | SpeechListen { .. } | SpeechModelGet { .. } | SpeechModelRemove { .. }) => self.voice_command(c)?,
             // be-ai

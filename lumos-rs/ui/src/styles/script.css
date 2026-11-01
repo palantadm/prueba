@@ -152,3 +152,9 @@ button.sc-action-title { display: flex; align-items: center; gap: var(--s-2); fl
 .hc-type { font-family: var(--mono, monospace); color: var(--cyan); }
 .hc-code { font-family: var(--mono, monospace); font-size: var(--fs-sm); background: var(--ink-0); padding: 6px 8px; border-radius: 6px; white-space: pre-wrap; word-break: break-word; margin: 0; }
 @media (max-width: 800px) { .hc { grid-template-columns: 1fr; max-height: none; } .hc-nav { border-right: 0; border-bottom: 1px solid var(--line); max-height: 30vh; } }
+
+/* aim dialog */
+.aim-pad { position: relative; width: 100%; aspect-ratio: 3 / 2; border: 1px solid var(--line); border-radius: 12px; background: repeating-linear-gradient(0deg, transparent 0 39px, var(--ink-3) 39px 40px), repeating-linear-gradient(90deg, transparent 0 39px, var(--ink-3) 39px 40px), var(--ink-1); touch-action: none; cursor: crosshair; overflow: hidden; }
+.aim-dot { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px rgba(255, 180, 60, .25); pointer-events: none; }
+.aim-obj { position: absolute; background: rgba(120, 140, 170, .25); border: 1px solid rgba(120, 140, 170, .5); pointer-events: none; }
+.aim-aud { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; color: var(--mute); font-size: var(--fs-xs, 12px); pointer-events: none; }

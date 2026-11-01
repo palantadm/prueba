@@ -119,7 +119,9 @@ mod tests {
     fn tmp() -> PathBuf {
         use std::sync::atomic::{AtomicU32, Ordering};
         static N: AtomicU32 = AtomicU32::new(0);
-        std::env::temp_dir().join(format!("lumos-bk-{}-{}", std::process::id(), N.fetch_add(1, Ordering::SeqCst)))
+        // a reused pid must not find a previous run's leftovers
+        let ns = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or(0);
+        std::env::temp_dir().join(format!("lumos-bk-{}-{ns}-{}", std::process::id(), N.fetch_add(1, Ordering::SeqCst)))
     }
 
     fn show(name: &str) -> Show {

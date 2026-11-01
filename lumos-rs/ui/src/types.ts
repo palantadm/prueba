@@ -1,3 +1,4 @@
+export type { AimTarget } from "./gen/AimTarget";
 export type { AudioBand } from "./gen/AudioBand";
 export type { AudioCfg } from "./gen/AudioCfg";
 export type { AudioDevice } from "./gen/AudioDevice";

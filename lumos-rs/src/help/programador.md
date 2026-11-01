@@ -19,3 +19,7 @@ El **programador** es el área de trabajo manual: guarda los valores que pones a
 
 ## Masters
 El programador se mezcla antes del grand master y del blackout: si todo está a oscuras, mira esos dos primero (`diagnostico`).
+
+## Apuntar a un punto
+Con cabezas móviles seleccionadas, en **Live → Posición → «Apuntar a…»** eliges un punto del escenario (arrastrando sobre el plano visto desde arriba, o con X/Z en metros), un objeto del escenario u otro aparato, y la altura del punto (un actor: 1,4 m el pecho). Las cabezas calculan su pan/tilt y los dejan en el programador; al arrastrar es un seguidor manual (follow-spot). También: herramienta «Apuntar» del 3D/2D (clic en el escenario) y la consola: `aim 1.5 0 2 height 1.4`, `fixture 1 thru 4 aim object 3`.
+<!--ai-->Por protocolo: `aim {fixtures, target:{type:"point",x,y,z}|{type:"object",id}|{type:"fixture",id}, height}`.<!--/ai-->

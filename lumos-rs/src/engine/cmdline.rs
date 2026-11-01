@@ -147,6 +147,10 @@ const KW_FIRE: &[&str] = &["fire", "disparar", "lanzar"];
 const KW_OSC: &[&str] = &["osc"];
 const KW_MIDI: &[&str] = &["midi"];
 const KW_HTTP: &[&str] = &["http", "web"];
+const KW_AIM: &[&str] = &["aim", "apuntar", "point"];
+const KW_OBJECT: &[&str] = &["object", "objeto", "obj"];
+const KW_HEIGHT: &[&str] = &["height", "altura", "h"];
+const KW_TO: &[&str] = &["to", "a", "hacia"];
 const KW_SOUND: &[&str] = &["sound", "sonido", "audio"];
 const KW_LOOP: &[&str] = &["loop", "bucle", "repetir"];
 const KW_EXEC: &[&str] = &["exec", "executor", "ejecutor"];
@@ -219,7 +223,7 @@ const VERB_GROUPS: &[&[&str]] = &[
     KW_FIXTURE, KW_GROUP, KW_ALL, KW_NONE, KW_ODD, KW_EVEN, KW_NEXT, KW_PREV, KW_AT, KW_COLOUR, KW_RECORD, KW_UPDATE,
     KW_DELETE, KW_APPLY, KW_GO, KW_BACK, KW_PAUSE, KW_RELEASE, KW_GOTO, KW_CUELIST, KW_SCENE, KW_CHASE, KW_MACRO,
     KW_TIMELINE, KW_BLACKOUT, KW_GM, KW_CLEAR, KW_PARK, KW_UNPARK, KW_UNDO, KW_REDO, KW_BLIND, KW_LOCATE,
-    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP, KW_EXEC, KW_SOUND,
+    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP, KW_EXEC, KW_SOUND, KW_AIM,
 ];
 
 fn all_keywords() -> Vec<&'static str> {
@@ -497,6 +501,7 @@ pub enum Stmt {
     Chase { id: u32, act: ChaseAct },
     Effect { id: u32, on: bool },
     Exec { id: u32, act: ExecAct },
+    Aim { sel: Option<Sel>, target: AimTarget, height: f32 },
     Sound { file: String, vol: f32, looped: bool },
     SoundStop(Option<String>),
     MacroRun(u32),
@@ -565,6 +570,38 @@ impl<'a> P<'a> {
     fn value_shorthand(&self) -> bool {
         matches!(self.peek(), Some(Tok { t: T::Num(_), .. })) && matches!(self.peek_n(1), None | Some(Tok { t: T::Sep, .. }))
     }
+    /// A signed coordinate (`-2.5`).
+    fn coord(&mut self, what: &str) -> R<f32> {
+        let neg = matches!(self.peek(), Some(Tok { t: T::Minus, .. }));
+        if neg {
+            self.i += 1;
+        }
+        let n = self.num(what)? as f32;
+        Ok(if neg { -n } else { n })
+    }
+
+    /// `[to] <x> <y> <z> | object N | fixture N` then optional `height H`.
+    fn aim_tail(&mut self, sel: Option<Sel>) -> R<Stmt> {
+        self.eat_kw(KW_TO);
+        self.eat_at();
+        let target = if self.eat_kw(KW_OBJECT) {
+            AimTarget::Object { id: self.uint("an object number")? }
+        } else if self.eat_kw(KW_FIXTURE) {
+            AimTarget::Fixture { id: self.uint("a fixture number")? }
+        } else {
+            let (x, y, z) = (self.coord("x (metres)")?, self.coord("y (metres, up)")?, self.coord("z (metres, towards the audience)")?);
+            AimTarget::Point { x, y, z }
+        };
+        let mut height = 0.0;
+        if self.eat_kw(KW_HEIGHT) {
+            height = self.coord("a height in metres")?;
+        }
+        if !self.at_end() {
+            return Err(self.unexpected());
+        }
+        Ok(Stmt::Aim { sel, target, height })
+    }
+
     /// A sound file name: quoted (`"gong.wav"`) or a bare word without dots (`gong`).
     fn sound_name(&mut self) -> R<String> {
         match self.peek().map(|t| t.t.clone()) {
@@ -856,6 +893,10 @@ impl<'a> P<'a> {
             self.eat_kw(KW_ON);
             return Ok(Stmt::Effect { id, on });
         }
+        if is(w, KW_AIM) {
+            self.i += 1;
+            return self.aim_tail(None);
+        }
         if is(w, KW_SOUND) {
             self.i += 1;
             if self.eat_kw(KW_STOP) || self.eat_kw(KW_OFF) {
@@ -1062,6 +1103,10 @@ impl<'a> P<'a> {
             let on = !(self.eat_kw(KW_OFF) || self.eat_kw(KW_OUT));
             self.eat_kw(KW_ON);
             return Ok(Stmt::Locate { sel: Some(sel), on });
+        }
+        if self.word_in(KW_AIM) {
+            self.i += 1;
+            return self.aim_tail(Some(sel));
         }
         if self.word_in(KW_APPLY) {
             self.i += 1;
@@ -1912,6 +1957,11 @@ pub fn resolve(stmt: &Stmt, ctx: &Ctx, sess: &mut Session) -> R<Compiled> {
             };
             one(cmd, format!("chase {id} {what}"))
         }
+        Stmt::Aim { sel, target, height } => {
+            let fx = selection_for(sel, ctx, sess)?;
+            let n = fx.len();
+            one(Command::Aim { fixtures: fx, target: target.clone(), height: *height }, format!("aim {}", plural(n, "fixture", "fixtures")))
+        }
         Stmt::Sound { file, vol, looped } => one(Command::SoundPlay { file: file.clone(), volume: *vol, looped: *looped }, format!("sound {file}{}", if *looped { " (loop)" } else { "" })),
         Stmt::SoundStop(f) => one(Command::SoundStop { file: f.clone() }, match f { Some(f) => format!("sound {f} stopped"), None => "sounds stopped".into() }),
         Stmt::Effect { id, on } => one(Command::EffectToggle { id: *id, on: *on }, format!("effect {id} {}", if *on { "on" } else { "off" })),
@@ -2072,6 +2122,7 @@ pub fn help_json() -> serde_json::Value {
         ("chase", "chase N [on|off|tap|bpm V|next|prev]", "Chases", &["chase 1 on", "chase 2 bpm 128"]),
         ("effect", "effect N [on|off]", "Start/stop a saved effect (pool item N)", &["effect 5 on", "effect 2 off"]),
         ("executor", "exec|executor N go|back|flash [on|off]|at V", "Playback executor N: GO, BACK, FLASH (held) or fader level 0-100", &["exec 5 go", "exec 2 at 80", "exec 3 flash on"]),
+        ("aim", "aim <x> <y> <z> [height H] | aim object N | aim fixture N  (or <sel> aim …)", "Point the selected moving heads at a point of the room in metres (x = stage right, y = up, z = towards the audience), at a stage object or at another fixture; height raises the aim point (a performer's chest)", &["aim 0 0 2", "fixture 1 thru 4 aim 1.5 0 -3 height 1.6", "aim object 3"]),
         ("sound", "sound \"file.wav\" [at V] [loop] | sound stop [\"file\"]", "Play a sound from the media folder on the sounds bus (level 0-100, loop); stop one or all", &["sound \"gong.wav\"", "sound \"ambiente.mp3\" at 60 loop", "sound stop"]),
         ("macro", "macro N | macro stop [N]", "Macros", &["macro 3"]),
         ("timeline", "timeline N [run [from T]|stop|seek T]", "Timelines", &["timeline 1 run", "timeline 1 seek 30"]),
@@ -2091,7 +2142,7 @@ pub fn help_json() -> serde_json::Value {
         ("half", KW_HALF), ("home", KW_HOME), ("colour", KW_COLOUR), ("record", KW_RECORD), ("update", KW_UPDATE),
         ("delete", KW_DELETE), ("apply", KW_APPLY), ("go", KW_GO), ("back", KW_BACK), ("pause", KW_PAUSE),
         ("release", KW_RELEASE), ("goto", KW_GOTO), ("cue", KW_CUE), ("cuelist", KW_CUELIST), ("scene", KW_SCENE),
-        ("chase", KW_CHASE), ("effect", KW_EFFECT), ("exec", KW_EXEC), ("sound", KW_SOUND), ("loop", KW_LOOP), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
+        ("chase", KW_CHASE), ("effect", KW_EFFECT), ("exec", KW_EXEC), ("sound", KW_SOUND), ("loop", KW_LOOP), ("aim", KW_AIM), ("object", KW_OBJECT), ("height", KW_HEIGHT), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
         ("clear", KW_CLEAR), ("park", KW_PARK), ("unpark", KW_UNPARK), ("undo", KW_UNDO), ("redo", KW_REDO),
         ("blind", KW_BLIND), ("locate", KW_LOCATE),
     ];
@@ -2475,6 +2526,18 @@ mod tests {
         assert!(err_of("red").contains("expected 'at <value>' after 'red'"));
         assert!(run("fixture 1; record cue 4 cuelist 1 \"EfectoColor\"").is_ok());
         assert!(run("fixture 1; record cue 4 1 EfectoColor").is_ok());
+    }
+
+    #[test]
+    fn aim_statements() {
+        let c = run("fixture 1 thru 2; aim 1.5 0 -3 height 1.6").unwrap();
+        assert!(matches!(&c[0], Command::Aim { fixtures, target: AimTarget::Point { x, y, z }, height } if fixtures == &vec![1, 2] && *x == 1.5 && *y == 0.0 && *z == -3.0 && (*height - 1.6).abs() < 1e-6), "{c:?}");
+        assert!(matches!(&run("fixture 3 aim object 4").unwrap()[0], Command::Aim { fixtures, target: AimTarget::Object { id: 4 }, .. } if fixtures == &vec![3]));
+        assert!(matches!(&run("fixture 3 aim to fixture 7").unwrap()[0], Command::Aim { target: AimTarget::Fixture { id: 7 }, .. }));
+        assert!(matches!(&run("group 1 apuntar -2 0 1").unwrap()[0], Command::Aim { target: AimTarget::Point { x, .. }, .. } if *x == -2.0));
+        assert!(err_of("aim 1 2").contains("z"));
+        assert!(err_of("aim 1 2 3 extra").contains("unexpected"));
+        assert!(err_of("aim 0 0 0").contains("no fixtures selected"));
     }
 
     #[test]

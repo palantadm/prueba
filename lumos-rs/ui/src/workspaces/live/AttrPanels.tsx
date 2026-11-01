@@ -11,6 +11,7 @@ import { useDmxTick } from "../../lib/hooks";
 import { ColorWheel, Fader, Knob, XYPad } from "../../widgets";
 import { t } from "../../i18n";
 import { FanDialog } from "./FanDialog";
+import { AimDialog } from "./AimDialog";
 import { Sheet } from "./Sheet";
 import { ViewSwitch } from "./ViewSwitch";
 
@@ -148,6 +149,7 @@ function IntensityCard({ fxs, held, onRelease }: { fxs: Fixture[]; held: boolean
 function PositionCard({ fxs, attrs, held, onRelease }: { fxs: Fixture[]; attrs: string[]; held: boolean; onRelease: () => void }) {
   const pan = attrState(fxs, "pan"), tilt = attrState(fxs, "tilt");
   const [fan, setFan] = useState(0.3);
+  const [aimOpen, setAimOpen] = useState(false);
   const ids = selection.value;
   const nudge = (a: "pan" | "tilt", d: number) => setAttrs(ids, { [a]: Math.max(0, Math.min(1, (a === "pan" ? pan.value : tilt.value) + d)) });
   const doFan = () => {
@@ -184,6 +186,8 @@ function PositionCard({ fxs, attrs, held, onRelease }: { fxs: Fixture[]; attrs: 
             <button class="btn" aria-label={t("Tilt down")} onClick={() => nudge("tilt", -0.002)}>▼</button>
             <span />
           </div>
+          <button class="btn" disabled={ids.length === 0} onClick={() => setAimOpen(true)}>⌖ {t("Aim at…")}</button>
+          {aimOpen && <AimDialog onClose={() => setAimOpen(false)} />}
           <div class="label" style={{ marginTop: 6 }}>{t("Fan across selection")}</div>
           <Fader horizontal width="100%" height={48} value={fan} onChange={setFan} color="var(--attr-position)" ariaLabel={t("Fan width")} />
           <button class="btn" disabled={ids.length < 2} onClick={doFan}>{t("Fan pan ({n}%)", { n: Math.round(fan * 200) })}</button>

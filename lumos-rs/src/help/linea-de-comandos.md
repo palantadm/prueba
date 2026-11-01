@@ -25,6 +25,7 @@ cuelist 2 ; go
 goto cue 10
 scene 1 on ; scene 3 at 60 ; scene solo 2 ; scenes release
 chase 1 on ; chase 2 bpm 128
+aim 1.5 0 2 height 1.4 ; fixture 1 thru 4 aim object 3   # apuntar cabezas móviles (x, y, z en metros)
 effect 5 on ; effect 5 off                        # efectos guardados
 exec 5 go ; exec 5 back ; exec 5 flash on ; exec 5 at 80   # executors
 macro 3 ; macro stop

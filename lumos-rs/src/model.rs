@@ -1263,6 +1263,19 @@ pub struct SpeechRt {
     pub error: String,
 }
 
+/// Where `aim` points the beams.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum AimTarget {
+    /// World point in metres (x = stage right, y = up, z = downstage).
+    Point { x: f32, y: f32, z: f32 },
+    /// Another fixture's position.
+    Fixture { id: u32 },
+    /// The middle of the top of a stage object.
+    Object { id: u32 },
+}
+
 /// Result of `POST /api/script/import` (multipart: .pdf .txt .md .fountain .docx? text) — a draft, not saved.
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -1876,6 +1889,9 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── aim / follow-spot ──
+    /// Aim moving heads (pan/tilt into the programmer) at a point, fixture or stage object. `height` raises the aim point (a performer's chest, a face…).
+    Aim { fixtures: Vec<u32>, target: AimTarget, #[serde(default)] height: f32 },
     // ── audio I/O ──
     /// Save the audio setup (devices, input roles, output matrix). Restarts the devices if they are open.
     AudioConfigure { cfg: AudioCfg },
