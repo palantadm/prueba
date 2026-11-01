@@ -6,6 +6,7 @@ import { collisions, footprint, modeOf, profileById } from "../lib/fixtures";
 import { AddDialog } from "./patch/AddDialog";
 import { ImportDialog } from "./patch/ImportDialog";
 import { MorphDialog } from "./patch/MorphDialog";
+import { ProfileEditorDialog } from "./patch/ProfileEditor";
 import { LocateDialog } from "./patch/LocateDialog";
 import { UniverseMap } from "./patch/UniverseMap";
 import { t, tp } from "../i18n";
@@ -25,6 +26,7 @@ export function Patch() {
   const [view, setView] = useState<"table" | "map">("table");
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
   const [morphing, setMorphing] = useState(false);
   const [locating, setLocating] = useState(false);
   const [q, setQ] = useState("");
@@ -61,6 +63,7 @@ export function Patch() {
       <PageHead title={t("Patch")} sub={`${tp(fixtures.length, "{n} fixture", "{n} fixtures")} · ${bad.size ? t("{n} with address conflicts", { n: bad.size }) : t("no conflicts")}`}>
         <input class="input" style={{ width: 168 }} placeholder={t("Filter…")} aria-label={t("Filter fixtures")} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
         <Segmented size="lg" value={view} onChange={setView} label={t("View")} options={[{ value: "table", label: t("Table") }, { value: "map", label: t("Universe map") }]} />
+        <button class="btn tall" onClick={() => setEditingProfile(true)} title={t("Create or correct a fixture profile by hand")}>{t("Profile editor…")}</button>
         <button class="btn tall" onClick={() => setImporting(true)} title={t("Import GDTF, QLC+ (.qxf) or Open Fixture Library (.json) fixture files")}>{t("Import fixtures…")}</button>
         <button class={`btn tall ${selIdentOn ? "on" : ""}`} disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={identifySel}
           title={t("Locate the selected fixtures: full light, open shutter, home position, lamp on")}>{selIdentOn ? t("Stop identifying") : t("Identify selection")}</button>
@@ -103,6 +106,7 @@ export function Patch() {
       </>}
       {adding && <AddDialog onClose={() => setAdding(false)} />}
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
+      {editingProfile && <ProfileEditorDialog onClose={() => setEditingProfile(false)} />}
       {morphing && <MorphDialog ids={selection.value} onClose={() => setMorphing(false)} />}
       {locating && (() => { const fx = fixtures.find((x) => selection.value.includes(x.id)); return fx ? <LocateDialog fixture={fx} onClose={() => setLocating(false)} /> : null; })()}
     </div></div></div>

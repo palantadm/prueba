@@ -39,3 +39,26 @@ fn preview_reports_without_changing_anything_and_unknown_shows_fail() {
     assert!(e.show.cuelists.is_empty(), "a preview never writes");
     assert!(e.handle(Command::ShowMerge { name: "No existe".into(), parts: vec![MergePart::Groups] }).is_err());
 }
+
+#[test]
+fn a_custom_profile_can_be_saved_patched_and_edited_safely() {
+    let mut e = engine();
+    let ch = |a: &str, o: u16| serde_json::json!({"attr": a, "offset": o, "fine": null, "default": 0.0, "invert": false, "capabilities": []});
+    let prof = |modes: Vec<serde_json::Value>| -> FixtureProfile {
+        serde_json::from_value(serde_json::json!({"id": "acme/par-led", "manufacturer": "Acme", "model": "Par LED", "category": "par", "modes": modes, "beam_angle": [25.0, 25.0], "pan_range": 0.0, "tilt_range": 0.0, "power_w": 60.0})).unwrap()
+    };
+    let m4 = serde_json::json!({"name": "4ch", "channels": [ch("dimmer", 0), ch("red", 1), ch("green", 2), ch("blue", 3)]});
+    let m3 = serde_json::json!({"name": "3ch", "channels": [ch("red", 0), ch("green", 1), ch("blue", 2)]});
+    e.handle(Command::ProfileSave { profile: prof(vec![m4.clone(), m3.clone()]) }).unwrap();
+    assert_eq!(e.show.profiles[0].source.as_deref(), Some("custom"));
+    e.handle(Command::FixtureAdd { profile: "acme/par-led".into(), mode: "4ch".into(), count: 2, universe: 1, address: None, name: Some("P".into()) }).unwrap();
+    assert_eq!(e.show.fixtures[1].address, 5, "4 channels each");
+    // dropping the mode in use is refused; dropping an unused one is fine; editing replaces in place
+    assert!(e.handle(Command::ProfileSave { profile: prof(vec![m3.clone()]) }).unwrap_err().contains("usa el modo"));
+    e.handle(Command::ProfileSave { profile: prof(vec![m4.clone()]) }).unwrap();
+    assert_eq!(e.show.profiles.len(), 1);
+    // the built-in library is read-only
+    let mut p = prof(vec![m4]);
+    p.id = "generic/rgb-par".into();
+    assert!(e.handle(Command::ProfileSave { profile: p }).unwrap_err().contains("biblioteca de Lumos"));
+}

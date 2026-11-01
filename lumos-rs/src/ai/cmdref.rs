@@ -21,7 +21,7 @@ const fn e(ty: &'static str, what: &'static str, example: &'static str, console:
 
 pub const GROUPS: &[(&str, &[&str])] = &[
     ("Programador", &["prog_set", "prog_release", "prog_apply_palette", "prog_record_palette", "prog_record_cue", "cue_load", "cue_update", "blind_set", "undo", "redo", "unpark", "dmx_set"]),
-    ("Patch y librería", &["fixture_add", "fixture_update", "fixture_remove", "fixture_morph", "library_import_ofl", "library_remove"]),
+    ("Patch y librería", &["profile_save", "fixture_add", "fixture_update", "fixture_remove", "fixture_morph", "library_import_ofl", "library_remove"]),
     ("Grupos, paletas y efectos", &["group_save", "group_remove", "palette_save", "palette_remove", "effect_save", "effect_remove", "effect_toggle"]),
     ("Escenas", &["scene_record", "scene_save", "scene_remove", "scene_go", "scene_solo", "scene_level", "scene_morph", "scenes_release"]),
     ("Cuelists y cues", &["cuelist_save", "cuelist_remove", "cue_save", "cue_remove", "go", "back", "go_to", "pause", "release_cuelist", "cuelist_manual"]),
@@ -55,6 +55,7 @@ pub const REF: &[Entry] = &[
     e("fixture_update", "Modifica un aparato: basta `id` + los campos que cambian (name, pos [x,y,z] m, rot grados, universe, address, mode, profile). Lumos completa el resto y rechaza si pisa canales.", r#"{"type":"fixture_update","fixture":{"id":3,"name":"Frente 3","pos":[1.5,5.0,0.5]}}"#, None),
     e("fixture_remove", "Elimina aparatos por id (también de grupos, cues y escenas).", r#"{"type":"fixture_remove","ids":[9,10]}"#, None),
     e("fixture_morph", "Cambia el modelo/modo de aparatos conservando sus valores (previsualiza antes con /api/morph/preview). repack: recoloca direcciones.", r#"{"type":"fixture_morph","ids":[1,2],"profile":"generic/rgbw-par","mode":"4ch","repack":true}"#, None),
+    e("profile_save", "Crea o corrige un perfil de aparato escrito a mano (editor de perfiles). id en minúsculas tipo «fabricante/modelo»; modes[].channels[] con attr (dimmer, red, pan…), offset (0 = canal 1), fine (offset del canal fino o null), default 0..1, invert y capabilities para ruedas (min,max,label). No sobrescribe la biblioteca de Lumos y no deja quitar un modo en uso. Después se parchea con fixture_add.", r#"{"type":"profile_save","profile":{"id":"acme/par-led","manufacturer":"Acme","model":"Par LED","category":"par","modes":[{"name":"4ch","channels":[{"attr":"dimmer","offset":0,"fine":null,"default":0,"invert":false,"capabilities":[]},{"attr":"red","offset":1,"fine":null,"default":0,"invert":false,"capabilities":[]},{"attr":"green","offset":2,"fine":null,"default":0,"invert":false,"capabilities":[]},{"attr":"blue","offset":3,"fine":null,"default":0,"invert":false,"capabilities":[]}]}],"beam_angle":[25,25],"pan_range":0,"tilt_range":0,"power_w":60}}"#, None),
     e("library_import_ofl", "Importa un perfil desde el JSON del Open Fixture Library (texto completo).", r#"{"type":"library_import_ofl","json":"{...JSON de OFL...}"}"#, None),
     e("library_remove", "Quita un perfil importado de la biblioteca (no puede estar en uso).", r#"{"type":"library_remove","id":"acme/par-led"}"#, None),
     // ── pools ──

@@ -707,6 +707,29 @@ impl Engine {
                 self.library_dirty = true;
                 self.touch_patch();
             }
+            ProfileSave { mut profile } => {
+                library::validate_profile(&profile)?;
+                if self.builtin.iter().any(|b| b.id == profile.id) {
+                    return Err(format!("«{}» es un perfil de la biblioteca de Lumos y no se puede sobrescribir: usa otro id", profile.id));
+                }
+                // modes still in use by patched fixtures must survive the edit
+                for f in self.show.fixtures.iter().filter(|f| f.profile == profile.id) {
+                    if !profile.modes.iter().any(|m| m.name == f.mode) {
+                        return Err(format!("El aparato {} («{}») usa el modo «{}»: no se puede quitar mientras esté parcheado", f.id, f.name, f.mode));
+                    }
+                }
+                if profile.source.is_none() {
+                    profile.source = Some("custom".into());
+                }
+                // usable at once (the derived tables are otherwise rebuilt on the next tick)
+                self.profiles.insert(profile.id.clone(), profile.clone());
+                match self.show.profiles.iter_mut().find(|x| x.id == profile.id) {
+                    Some(x) => *x = profile,
+                    None => self.show.profiles.push(profile),
+                }
+                self.library_dirty = true;
+                self.touch_patch();
+            }
             LibraryRemove { id } => {
                 if self.show.fixtures.iter().any(|f| f.profile == id) {
                     return Err(format!("Profile '{id}' is used by patched fixtures"));

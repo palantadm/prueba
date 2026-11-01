@@ -72,6 +72,70 @@ fn prof(
 }
 
 /// Number of DMX channels a mode occupies.
+/// Validate a profile written by hand (the in-app editor / the assistant). Returns a clear Spanish message.
+pub fn validate_profile(p: &FixtureProfile) -> Result<(), String> {
+    let ident = |s: &str| !s.is_empty() && s.len() <= 80 && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '_' | '-' | '/'));
+    if !(3..=80).contains(&p.id.len()) || !ident(&p.id) || p.id.starts_with('/') || p.id.contains("..") {
+        return Err("El id del perfil debe tener 3–80 caracteres: minúsculas, números, «.», «_», «-» o «/» (p. ej. «acme/par-led»)".into());
+    }
+    if p.manufacturer.trim().is_empty() || p.model.trim().is_empty() || p.manufacturer.len() > 60 || p.model.len() > 60 {
+        return Err("Indica fabricante y modelo (máximo 60 caracteres)".into());
+    }
+    if p.modes.is_empty() || p.modes.len() > 32 {
+        return Err("Un perfil necesita entre 1 y 32 modos".into());
+    }
+    if !(0.0..=1440.0).contains(&p.pan_range) || !(0.0..=1440.0).contains(&p.tilt_range) {
+        return Err("Pan y tilt: rango de 0 a 1440°".into());
+    }
+    let [lo, hi] = p.beam_angle;
+    if !(lo > 0.0 && lo <= hi && hi <= 180.0) {
+        return Err("Ángulo del haz: mínimo > 0, máximo ≥ mínimo y ≤ 180°".into());
+    }
+    if !(0.0..=20000.0).contains(&p.power_w) {
+        return Err("Potencia entre 0 y 20000 W".into());
+    }
+    let mut names = std::collections::BTreeSet::new();
+    for m in &p.modes {
+        let name = m.name.trim();
+        if name.is_empty() || name.len() > 40 || !names.insert(name.to_lowercase()) {
+            return Err(format!("Nombre de modo vacío, demasiado largo o repetido: «{}»", m.name));
+        }
+        if m.channels.is_empty() || m.channels.len() > 512 {
+            return Err(format!("El modo «{}» necesita entre 1 y 512 canales", m.name));
+        }
+        let mut used = std::collections::BTreeSet::new();
+        let mut attrs = std::collections::BTreeSet::new();
+        for c in &m.channels {
+            if !ident(&c.attr) || c.attr.contains('/') {
+                return Err(format!("Atributo no válido «{}» en el modo «{}» (minúsculas, números y «_»)", c.attr, m.name));
+            }
+            if !attrs.insert(c.attr.clone()) {
+                return Err(format!("El atributo «{}» está repetido en el modo «{}»", c.attr, m.name));
+            }
+            if c.offset >= 512 || !used.insert(c.offset) {
+                return Err(format!("Canal {} repetido o fuera de rango (0–511) en el modo «{}»", c.offset + 1, m.name));
+            }
+            if let Some(f) = c.fine {
+                if f >= 512 || !used.insert(f) {
+                    return Err(format!("El canal fino {} de «{}» está repetido o fuera de rango en el modo «{}»", f + 1, c.attr, m.name));
+                }
+            }
+            if !(0.0..=1.0).contains(&c.default) || !c.default.is_finite() {
+                return Err(format!("El valor por defecto de «{}» debe estar entre 0 y 1", c.attr));
+            }
+            if c.capabilities.len() > 128 {
+                return Err(format!("Demasiadas capacidades en «{}» (máximo 128)", c.attr));
+            }
+            for k in &c.capabilities {
+                if k.min > k.max || k.label.len() > 60 {
+                    return Err(format!("Rango DMX no válido en «{}»: {}–{} «{}»", c.attr, k.min, k.max, k.label));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn mode_footprint(m: &Mode) -> u16 {
     m.channels
         .iter()
@@ -888,6 +952,43 @@ pub fn import_ofl(json: &str) -> Result<FixtureProfile, String> {
         source: Some("ofl".into()),
         model3d: None,
     })
+}
+
+#[cfg(test)]
+mod profile_tests {
+    use super::*;
+
+    fn ch(attr: &str, off: u16) -> ChannelDef {
+        ChannelDef { attr: attr.into(), offset: off, fine: None, default: 0.0, invert: false, capabilities: vec![] }
+    }
+    fn prof() -> FixtureProfile {
+        FixtureProfile { id: "acme/par-led".into(), manufacturer: "Acme".into(), model: "Par LED".into(), category: "par".into(), modes: vec![Mode { name: "4ch".into(), channels: vec![ch("dimmer", 0), ch("red", 1), ch("green", 2), ch("blue", 3)] }], beam_angle: [25.0, 25.0], pan_range: 0.0, tilt_range: 0.0, power_w: 60.0, source: None, model3d: None }
+    }
+
+    #[test]
+    fn a_hand_written_profile_validates_and_reports_each_mistake() {
+        assert!(validate_profile(&prof()).is_ok());
+        let bad = |f: &dyn Fn(&mut FixtureProfile)| { let mut p = prof(); f(&mut p); validate_profile(&p).unwrap_err() };
+        assert!(bad(&|p| p.id = "Mal Id".into()).contains("id del perfil"));
+        assert!(bad(&|p| p.id = "../x".into()).contains("id del perfil"));
+        assert!(bad(&|p| p.model = " ".into()).contains("fabricante y modelo"));
+        assert!(bad(&|p| p.modes.clear()).contains("al menos") || bad(&|p| p.modes.clear()).contains("entre 1 y 32"));
+        assert!(bad(&|p| p.modes[0].channels[1].offset = 0).contains("repetido"));
+        assert!(bad(&|p| p.modes[0].channels[1].attr = "dimmer".into()).contains("repetido"));
+        assert!(bad(&|p| p.modes[0].channels[0].attr = "Dimmer!".into()).contains("Atributo no válido"));
+        assert!(bad(&|p| p.modes[0].channels[0].fine = Some(1)).contains("repetido"));
+        assert!(bad(&|p| p.modes[0].channels[0].default = 1.5).contains("por defecto"));
+        assert!(bad(&|p| p.modes[0].channels[0].capabilities = vec![Capability { min: 9, max: 3, label: "x".into(), color: None, image: None, wheel: None, slot: None }]).contains("Rango DMX"));
+        assert!(bad(&|p| p.beam_angle = [0.0, 10.0]).contains("haz"));
+        assert!(bad(&|p| p.pan_range = 5000.0).contains("Pan y tilt"));
+        let mut two = prof();
+        two.modes.push(two.modes[0].clone());
+        assert!(validate_profile(&two).unwrap_err().contains("repetido"));
+        let mut fine = prof();
+        fine.modes[0].channels[0].fine = Some(4);
+        assert!(validate_profile(&fine).is_ok());
+        assert_eq!(mode_footprint(&fine.modes[0]), 5, "a fine channel extends the footprint");
+    }
 }
 
 #[cfg(test)]

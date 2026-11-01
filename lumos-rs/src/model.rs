@@ -2091,6 +2091,8 @@ pub enum Command {
     VcXy { widget: u32, x: f32, y: f32 },
     /// Remove an imported/custom profile from the show library.
     LibraryRemove { id: String },
+    /// Create or replace a custom fixture profile written by hand (in-app editor). The built-in library cannot be overwritten.
+    ProfileSave { profile: FixtureProfile },
     // ── AI assistant (be-ai) ──
     /// Send a user message to the assistant. Streams `ServerMsg::AiEvent` for `session`.
     AiSend { session: String, text: String, images: Vec<AiImage>, context: AiContext },
