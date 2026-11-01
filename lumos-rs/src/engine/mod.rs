@@ -18,6 +18,7 @@ mod merge_tests;
 mod prog_tests;
 mod refs;
 mod scenes;
+mod sched;
 mod script;
 mod speed;
 mod timeline;
@@ -255,6 +256,7 @@ struct Engine {
     voice: voice::Voice,
     audio: audio::AudioState,
     pixels_on: BTreeSet<u32>,
+    sched: sched::Sched,
     /// Script reader pointers and follow flags (see script.rs).
     script: script::ScriptState,
 }
@@ -292,6 +294,7 @@ impl Engine {
             voice: voice::Voice::load(&store),
             audio: audio::AudioState::load(&store),
             pixels_on: BTreeSet::new(),
+            sched: Default::default(),
             script: Default::default(),
             store,
             t0: now,
@@ -1021,6 +1024,8 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            ScheduleSave { rule } => self.schedule_save(rule)?,
+            ScheduleRemove { id } => self.schedule_remove(id),
             PixelSave { map } => self.pixel_save(map)?,
             PixelRemove { id } => self.pixel_remove(id),
             PixelRun { id, on } => self.pixel_run(id, on)?,
@@ -1953,6 +1958,7 @@ impl Engine {
         self.update_playback(now);
         self.data_tick();
         self.audio_tick();
+        self.schedule_tick();
 
         let before = self.ext_dmx.len();
         self.ext_dmx.retain(|_, (t, _)| t.elapsed() < Duration::from_secs(3));
@@ -2159,6 +2165,7 @@ impl Engine {
             speed: self.speed_rt(),
             timelines: self.timelines_rt(),
             pixels_running: self.pixels_on.iter().copied().collect(),
+            schedule: self.schedule_rt(),
             macros_running: self.macros_running_ids(),
             testing: self.data.test.is_some(),
             identifying: self.data.identifying.iter().copied().collect(),

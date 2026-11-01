@@ -92,6 +92,8 @@ pub fn history_key(cmd: &Command) -> Option<(String, bool)> {
         ScriptSave { script } => ("script_save", script.id as u64, true),
         ShowMerge { .. } => ("show_merge", 0, false),
         ProfileSave { profile } => ("profile_save", profile.id.len() as u64, true),
+        ScheduleSave { rule } => ("schedule_save", rule.id as u64, true),
+        ScheduleRemove { id } => ("schedule_remove", *id as u64, false),
         PixelSave { map } => ("pixel_save", map.id as u64, true),
         PixelRemove { id } => ("pixel_remove", *id as u64, false),
         ScriptRemove { .. } => ("script_remove", 0, false),

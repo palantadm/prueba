@@ -1,3 +1,8 @@
+export type { ScheduleRt } from "./gen/ScheduleRt";
+export type { ScheduleNext } from "./gen/ScheduleNext";
+export type { ScheduleWhen } from "./gen/ScheduleWhen";
+export type { ScheduleRule } from "./gen/ScheduleRule";
+export type { GeoPos } from "./gen/GeoPos";
 export type { ResponseCurve } from "./gen/ResponseCurve";
 export type { PixelMap } from "./gen/PixelMap";
 export type { PixelKind } from "./gen/PixelKind";

@@ -8,6 +8,7 @@ import type { InputStatus } from "./InputStatus";
 import type { OutputStatus } from "./OutputStatus";
 import type { ParkedChannel } from "./ParkedChannel";
 import type { SceneRt } from "./SceneRt";
+import type { ScheduleRt } from "./ScheduleRt";
 import type { ScriptRt } from "./ScriptRt";
 import type { SpeechRt } from "./SpeechRt";
 import type { SpeedRt } from "./SpeedRt";
@@ -60,6 +61,10 @@ audio: AudioRt, macros_running: Array<number>,
  * Pixel maps that are running.
  */
 pixels_running: Array<number>, 
+/**
+ * Calendar / astronomical clock.
+ */
+schedule: ScheduleRt, 
 /**
  * Output test pattern running.
  */

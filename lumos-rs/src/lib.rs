@@ -19,6 +19,7 @@ pub mod pdf;
 pub mod persist;
 pub mod qxf;
 pub mod reports;
+pub mod schedule;
 pub mod script_import;
 pub mod showmerge;
 

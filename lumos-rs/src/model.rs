@@ -744,6 +744,9 @@ pub struct Settings {
     /// Start with blackout engaged (safe default for rehearsal PCs on a live rig).
     #[serde(default)]
     pub start_blackout: bool,
+    /// Venue position for sunrise / sunset rules.
+    #[serde(default)]
+    pub location: Option<GeoPos>,
 }
 
 /// MIDI Show Control (theatre standard): lighting commands received as SysEx.
@@ -781,6 +784,7 @@ impl Default for Settings {
             osc_feedback: OscFeedbackCfg { enabled: false, host: "127.0.0.1".into(), port: 9000 },
             msc: MscCfg::default(),
             start_blackout: false,
+            location: None,
         }
     }
 }
@@ -1284,6 +1288,68 @@ pub struct SpeechRt {
     pub error: String,
 }
 
+/// When a schedule rule fires.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(tag = "type", rename_all = "snake_case")]
+#[ts(export)]
+pub enum ScheduleWhen {
+    /// A time of day (local time).
+    Time { hour: u8, minute: u8 },
+    /// Sunrise ± minutes (needs the location in Settings).
+    Sunrise { offset_min: i32 },
+    /// Sunset ± minutes.
+    Sunset { offset_min: i32 },
+}
+
+/// Run a console line at a time of day / sunrise / sunset on chosen weekdays (architectural lighting, house lights at doors).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ScheduleRule {
+    pub id: u32,
+    pub name: String,
+    #[serde(default = "d_true")]
+    pub enabled: bool,
+    pub when: ScheduleWhen,
+    /// Weekdays as bits: Monday = 1 … Sunday = 64 (127 = every day).
+    #[serde(default = "d_all_days")]
+    pub days: u8,
+    /// Console line to run (`scene 1 on`, `go cuelist 2`, `macro 3`…).
+    pub action: String,
+}
+
+fn d_all_days() -> u8 {
+    0x7F
+}
+
+/// Where the venue is (for sunrise / sunset).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct GeoPos {
+    pub lat: f64,
+    pub lon: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ScheduleNext {
+    pub rule: u32,
+    /// `HH:MM` local time of the next run.
+    pub at: String,
+    /// 0 = today, 1 = tomorrow…
+    pub days_ahead: u32,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct ScheduleRt {
+    pub next: Vec<ScheduleNext>,
+    /// Today's sunrise / sunset (`HH:MM` local), when a location is set and the sun rises.
+    pub sunrise: Option<String>,
+    pub sunset: Option<String>,
+    /// Local clock `HH:MM`.
+    pub now: String,
+}
+
 /// Pattern of a pixel map.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -1452,6 +1518,9 @@ pub struct Show {
     /// Pixel maps (patterns across rows / grids of fixtures).
     #[serde(default)]
     pub pixelmaps: Vec<PixelMap>,
+    /// Calendar / astronomical rules.
+    #[serde(default)]
+    pub schedule: Vec<ScheduleRule>,
     #[serde(default)]
     pub scripts: Vec<Script>,
     #[serde(default)]
@@ -1486,6 +1555,7 @@ impl Default for Show {
             macros: vec![],
             locate: BTreeMap::new(),
             pixelmaps: Vec::new(),
+            schedule: Vec::new(),
             scripts: vec![],
             timelines: vec![],
             cuelists: vec![],
@@ -1856,6 +1926,9 @@ pub struct Runtime {
     /// Pixel maps that are running.
     #[serde(default)]
     pub pixels_running: Vec<u32>,
+    /// Calendar / astronomical clock.
+    #[serde(default)]
+    pub schedule: ScheduleRt,
     /// Output test pattern running.
     #[serde(default)]
     pub testing: bool,
@@ -2019,6 +2092,9 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── schedule ──
+    ScheduleSave { rule: ScheduleRule },
+    ScheduleRemove { id: u32 },
     // ── pixel maps ──
     PixelSave { map: PixelMap },
     PixelRemove { id: u32 },

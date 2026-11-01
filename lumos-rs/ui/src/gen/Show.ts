@@ -11,6 +11,7 @@ import type { Macro } from "./Macro";
 import type { Palette } from "./Palette";
 import type { PixelMap } from "./PixelMap";
 import type { Scene } from "./Scene";
+import type { ScheduleRule } from "./ScheduleRule";
 import type { Script } from "./Script";
 import type { Settings } from "./Settings";
 import type { SpeedMaster } from "./SpeedMaster";
@@ -28,7 +29,11 @@ locate: { [key in string]?: { [key in string]?: number } },
 /**
  * Pixel maps (patterns across rows / grids of fixtures).
  */
-pixelmaps: Array<PixelMap>, scripts: Array<Script>, timelines: Array<Timeline>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
+pixelmaps: Array<PixelMap>, 
+/**
+ * Calendar / astronomical rules.
+ */
+schedule: Array<ScheduleRule>, scripts: Array<Script>, timelines: Array<Timeline>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
 /**
  * Profiles imported into / customised in this show (merged over the built-in library).
  */
