@@ -84,11 +84,11 @@ impl Engine {
 
     fn exec_is_active(&self, id: u32) -> bool {
         let Some(e) = self.show.executors.iter().find(|e| e.id == id) else { return false };
-        let st = self.exec.get(&id).copied().unwrap_or(ExecState { level: 1.0, flash: false });
+        let st = self.exec_state_of(id);
         match &e.kind {
             ExecKind::Cuelist { cuelist } => self.runs.get(cuelist).map_or(false, |r| r.state != PlayState::Idle),
             ExecKind::Effect { effect } => self.effects_on.contains(effect) || self.effect_flash.contains(effect),
-            ExecKind::Group { .. } => st.level > 0.0,
+            ExecKind::Group { .. } | ExecKind::Channel { .. } => st.level > 0.0 || st.flash,
             ExecKind::Master { .. } => true,
             ExecKind::Scene { scene } => self.scenes.is_active(*scene),
             ExecKind::Chase { chase } => self.chases.is_running(*chase),

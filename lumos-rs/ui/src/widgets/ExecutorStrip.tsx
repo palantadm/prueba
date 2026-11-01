@@ -7,7 +7,7 @@ import { t } from "../i18n";
 /** Accent per executor kind (matches the Cues board): cuelist green, scene cyan, chase/effect violet, speed amber, group intensity. */
 export const KIND_COLOR: Record<string, string> = {
   cuelist: "var(--green)", x_fade: "var(--green)", scene: "var(--cyan)", chase: "var(--violet)", effect: "var(--violet)",
-  speed: "var(--amber)", group: "var(--attr-intensity)", master: "var(--amber)",
+  speed: "var(--amber)", group: "var(--attr-intensity)", channel: "var(--attr-color)", master: "var(--amber)",
 };
 
 /** One executor slot: header (assign), vertical fader, GO + FLASH. `empty` renders an assignable placeholder. */

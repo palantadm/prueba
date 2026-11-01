@@ -119,6 +119,8 @@ export const live: Record<string, string> = {
   "Group": "Grupo",
   "Grand master": "Master general",
   "Group (dimmer master)": "Grupo (master de dimmer)",
+  "Channel group": "Grupo de canales",
+  "The fader sets this attribute on every fixture of the group at once. At 0 it releases; the FLASH button forces it to full.": "El fader sube este atributo en todos los aparatos del grupo a la vez. A 0 se suelta; el botón FLASH lo fuerza al máximo.",
   "(auto)": "(auto)",
   "— none available —": "— ninguno disponible —",
   "+ Assign": "+ Asignar",

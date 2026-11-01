@@ -466,6 +466,9 @@ pub enum ExecKind {
     Cuelist { cuelist: u32 },
     /// Fader = dimmer master for the group's fixtures.
     Group { group: u32 },
+    /// Channel group: the fader sets one attribute (`red`, `zoom`, `pan`…) of every fixture of the group at once.
+    /// Active while the fader is above 0; the button (flash) pushes it to full.
+    Channel { group: u32, attr: String },
     /// Fader = scene level, button toggles the scene with its fade times.
     Scene { scene: u32 },
     /// Button runs/stops the chase; fader = chase size/level.
@@ -1459,6 +1462,59 @@ pub struct MergeReport {
     pub warnings: Vec<String>,
 }
 
+/// State of an RDM device.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum RdmStatus {
+    /// Still asking it questions.
+    Loading,
+    Ok,
+    /// Stopped answering.
+    Lost,
+}
+
+/// A fixture found on the DMX line through RDM (ANSI E1.20).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct RdmDevice {
+    /// `MMMM:DDDDDDDD` (manufacturer id : device id, hex).
+    pub uid: String,
+    /// Art-Net node it was found through, and the port-address of that line.
+    pub node: String,
+    pub port_address: u16,
+    pub manufacturer: String,
+    pub model: String,
+    pub label: String,
+    pub software: String,
+    /// DMX channels it uses in its current personality.
+    pub footprint: u16,
+    /// DMX start address (0 = none / not reported).
+    pub address: u16,
+    pub personality: u8,
+    pub personalities: u8,
+    /// RDM product category code (0x0100 fixture, 0x0101 fixed, 0x0102 moving head…).
+    pub category: u16,
+    pub identify: bool,
+    pub device_hours: Option<u32>,
+    pub lamp_hours: Option<u32>,
+    pub status: RdmStatus,
+    pub error: String,
+    /// Seconds since last heard (5 s steps).
+    pub seen_s: u32,
+    /// Patched fixture that sits at the same universe and address, if any.
+    pub fixture: Option<u32>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct RdmRt {
+    /// Waiting for nodes or devices to answer.
+    pub busy: bool,
+    pub devices: Vec<RdmDevice>,
+    pub error: String,
+}
+
 /// Where `aim` points the beams.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -1939,6 +1995,9 @@ pub struct Runtime {
     /// Console lock state.
     #[serde(default)]
     pub lock: LockRt,
+    /// RDM devices found on the DMX lines.
+    #[serde(default)]
+    pub rdm: RdmRt,
     /// Output test pattern running.
     #[serde(default)]
     pub testing: bool,
@@ -2102,6 +2161,18 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── RDM ──
+    /// Ask the Art-Net nodes for the devices on their DMX lines (`flush`: make the nodes run discovery again first).
+    RdmScan { flush: bool },
+    RdmRefresh { uid: String },
+    /// Make a device flash (or stop) so you can find it on the rig.
+    RdmIdentify { uid: String, on: bool },
+    /// Change the DMX start address of a device (1–512).
+    RdmSetAddress { uid: String, address: u16 },
+    RdmSetLabel { uid: String, label: String },
+    RdmSetPersonality { uid: String, personality: u8 },
+    /// Forget the devices found so far.
+    RdmClear,
     // ── console lock ──
     /// Freeze the console for everyone until the PIN is entered (needs a PIN: see `LockSet`). Emergency blackout stays available.
     Lock,

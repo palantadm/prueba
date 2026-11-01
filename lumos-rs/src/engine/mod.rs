@@ -12,6 +12,7 @@ mod morph;
 mod msc;
 mod patch;
 mod pixelmap;
+mod rdm;
 mod playback;
 #[cfg(test)]
 mod merge_tests;
@@ -259,6 +260,7 @@ struct Engine {
     pixels_on: BTreeSet<u32>,
     sched: sched::Sched,
     lock: lock::LockState,
+    rdm: rdm::RdmHub,
     /// Script reader pointers and follow flags (see script.rs).
     script: script::ScriptState,
 }
@@ -298,6 +300,7 @@ impl Engine {
             pixels_on: BTreeSet::new(),
             sched: Default::default(),
             lock: lock::LockState::load(&store),
+            rdm: Default::default(),
             script: Default::default(),
             store,
             t0: now,
@@ -496,6 +499,7 @@ impl Engine {
                 let j = self.midi_ports_json();
                 let _ = self.out.send(Out::Json(Arc::from(j)));
             }
+            IoEvent::Rdm { from, data } => self.on_rdm_packet(from, data),
             ev @ (IoEvent::AudioBands { .. } | IoEvent::AudioLtc { .. } | IoEvent::AudioStatus { .. } | IoEvent::AudioError { .. }) => self.on_audio_event(ev),
             ev @ (IoEvent::Speech { .. } | IoEvent::SpeechStatus { .. } | IoEvent::SpeechDownloaded { .. }) => self.on_voice_event(ev),
             IoEvent::ExternalDmx { universe, data } => {
@@ -864,6 +868,9 @@ impl Engine {
                     executor.id = next_id(self.show.executors.iter().map(|g| g.id));
                 }
                 let (id, page, slot) = (executor.id, executor.page, executor.slot);
+                if matches!(executor.kind, ExecKind::Channel { .. }) {
+                    self.exec.remove(&id);
+                }
                 self.show.executors.retain(|e| e.id == id || !(e.page == page && e.slot == slot));
                 match self.show.executors.iter_mut().find(|g| g.id == id) {
                     Some(g) => *g = executor,
@@ -1036,6 +1043,7 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            c @ (RdmScan { .. } | RdmRefresh { .. } | RdmIdentify { .. } | RdmSetAddress { .. } | RdmSetLabel { .. } | RdmSetPersonality { .. } | RdmClear) => self.rdm_command(c)?,
             c @ (Lock | Unlock { .. } | LockSet { .. }) => self.lock_command(c)?,
             ScheduleSave { rule } => self.schedule_save(rule)?,
             ScheduleRemove { id } => self.schedule_remove(id),
@@ -1512,6 +1520,14 @@ impl Engine {
 
     // ───────────── executors ─────────────
 
+    /// Fader/flash state; an executor never touched starts at full, except a channel group (nothing is forced until its fader moves).
+    fn exec_state_of(&self, id: u32) -> ExecState {
+        self.exec.get(&id).copied().unwrap_or_else(|| {
+            let channel = self.show.executors.iter().any(|e| e.id == id && matches!(e.kind, ExecKind::Channel { .. }));
+            ExecState { level: if channel { 0.0 } else { 1.0 }, flash: false }
+        })
+    }
+
     fn exec_kind(&self, id: u32) -> Result<ExecKind, String> {
         self.show.executors.iter().find(|e| e.id == id).map(|e| e.kind.clone()).ok_or_else(|| format!("Executor {id} does not exist"))
     }
@@ -1519,7 +1535,8 @@ impl Engine {
     fn set_exec_level(&mut self, id: u32, level: f32) -> Result<(), String> {
         let kind = self.exec_kind(id)?;
         let l = clamp01(level);
-        self.exec.entry(id).or_insert(ExecState { level: 1.0, flash: false }).level = l;
+        let init = self.exec_state_of(id);
+        self.exec.entry(id).or_insert(init).level = l;
         match kind {
             ExecKind::Cuelist { cuelist } => {
                 self.cl_levels.insert(cuelist, l);
@@ -1563,7 +1580,8 @@ impl Engine {
 
     fn set_flash(&mut self, id: u32, down: bool) -> Result<(), String> {
         let kind = self.exec_kind(id)?;
-        self.exec.entry(id).or_insert(ExecState { level: 1.0, flash: false }).flash = down;
+        let init = self.exec_state_of(id);
+        self.exec.entry(id).or_insert(init).flash = down;
         match kind {
             ExecKind::Effect { effect } => {
                 if down {
@@ -1584,7 +1602,7 @@ impl Engine {
         if let Some(ExecKind::Speed { master }) = self.show.executors.iter().find(|e| e.id == id).map(|e| &e.kind) {
             return self.speed_bpm(*master).map_or(0.0, speed::bpm_to_level);
         }
-        self.exec.get(&id).map_or(1.0, |e| e.level)
+        self.exec_state_of(id).level
     }
 
     // ───────────── inputs ─────────────
@@ -1852,13 +1870,27 @@ impl Engine {
                 morph::emulate(pf, a);
             }
         }
+        // 3a. channel groups: one attribute of every fixture of a group follows its fader
+        for e in &self.show.executors {
+            if let ExecKind::Channel { group, attr } = &e.kind {
+                let st = self.exec_state_of(e.id);
+                let v = if st.flash { 1.0 } else { st.level };
+                if v <= 0.0 {
+                    continue;
+                }
+                let Some(g) = self.show.groups.iter().find(|g| g.id == *group) else { continue };
+                for pf in self.patch.fixtures.iter().filter(|pf| g.fixtures.contains(&pf.id) && pf.has_attr(attr)) {
+                    merged.entry(pf.id).or_default().insert(attr.clone(), v.clamp(0.0, 1.0));
+                }
+            }
+        }
         // 3b. inhibitive submasters cap the dimmer of their fixtures (before the masters)
         self.apply_inhibit(&mut merged);
         // 4. masters
         let mut factor: HashMap<u32, f32> = HashMap::new();
         for e in &self.show.executors {
             if let ExecKind::Group { group } = e.kind {
-                let st = self.exec.get(&e.id).copied().unwrap_or(ExecState { level: 1.0, flash: false });
+                let st = self.exec_state_of(e.id);
                 if let Some(g) = self.show.groups.iter().find(|g| g.id == group) {
                     for f in &g.fixtures {
                         if st.flash {
@@ -1972,6 +2004,7 @@ impl Engine {
         self.data_tick();
         self.audio_tick();
         self.schedule_tick();
+        self.rdm_tick();
 
         let before = self.ext_dmx.len();
         self.ext_dmx.retain(|_, (t, _)| t.elapsed() < Duration::from_secs(3));
@@ -2104,11 +2137,11 @@ impl Engine {
             .executors
             .iter()
             .map(|e| {
-                let st = self.exec.get(&e.id).copied().unwrap_or(ExecState { level: 1.0, flash: false });
+                let st = self.exec_state_of(e.id);
                 let active = match &e.kind {
                     ExecKind::Cuelist { cuelist } => self.runs.get(cuelist).map_or(false, |r| r.state != PlayState::Idle),
                     ExecKind::Effect { effect } => self.effects_on.contains(effect) || self.effect_flash.contains(effect),
-                    ExecKind::Group { .. } => st.level > 0.0,
+                    ExecKind::Group { .. } | ExecKind::Channel { .. } => st.level > 0.0 || st.flash,
                     ExecKind::Master { .. } => true,
                     ExecKind::Scene { scene } => self.scenes.is_active(*scene),
                     ExecKind::Chase { chase } => self.chases.is_running(*chase),
@@ -2180,6 +2213,7 @@ impl Engine {
             pixels_running: self.pixels_on.iter().copied().collect(),
             schedule: self.schedule_rt(),
             lock: self.lock_rt(),
+            rdm: self.rdm_rt(),
             macros_running: self.macros_running_ids(),
             testing: self.data.test.is_some(),
             identifying: self.data.identifying.iter().copied().collect(),
@@ -2446,6 +2480,31 @@ mod tests {
         assert!(snap.iter().any(|j| j.contains("\"midi_ports\"")), "{snap:?}");
         // enabling a port without native MIDI is a clean error, not a panic
         assert!(e.handle(Command::MidiEnable { output: false, name: "x".into(), enabled: true }).is_err());
+    }
+
+    #[test]
+    fn channel_group_fader_drives_one_attribute_of_every_fixture_in_the_group() {
+        let mut e = engine();
+        add(&mut e, "generic/rgb-par", "3ch", 3);
+        e.handle(Command::GroupSave { group: Group { id: 0, name: "pares".into(), fixtures: vec![1, 3] } }).unwrap();
+        e.handle(Command::ExecSave { executor: Executor { id: 0, page: 0, slot: 0, label: "Rojo".into(), kind: ExecKind::Channel { group: 1, attr: "red".into() } } }).unwrap();
+        let id = e.show.executors[0].id;
+        // never touched: nothing is forced
+        let f = frame(&mut e);
+        assert_eq!((f[0], f[6]), (0, 0));
+        e.handle(Command::ExecLevel { id, level: 0.5 }).unwrap();
+        let f = frame(&mut e);
+        let half = f[0];
+        assert!(half > 100 && half < 150, "{half}");
+        assert_eq!((f[0], f[6]), (half, half), "both group fixtures");
+        assert_eq!(f[3], 0, "fixture 2 is not in the group");
+        // flash goes to full, releasing it returns to the fader
+        e.handle(Command::ExecFlash { id, down: true }).unwrap();
+        assert_eq!(frame(&mut e)[0], 255);
+        e.handle(Command::ExecFlash { id, down: false }).unwrap();
+        assert_eq!(frame(&mut e)[0], half);
+        e.handle(Command::ExecLevel { id, level: 0.0 }).unwrap();
+        assert_eq!(frame(&mut e)[0], 0);
     }
 
     #[test]

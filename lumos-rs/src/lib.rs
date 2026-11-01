@@ -18,6 +18,7 @@ pub mod mvr;
 pub mod pdf;
 pub mod persist;
 pub mod qxf;
+pub mod rdm;
 pub mod reports;
 pub mod schedule;
 pub mod script_import;

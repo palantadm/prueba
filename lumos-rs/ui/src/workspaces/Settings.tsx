@@ -8,6 +8,7 @@ import { MscPage } from "./settings/Msc";
 import { AiPage } from "./settings/Ai";
 import { AudioPage } from "./settings/Audio";
 import { SchedulePage } from "./settings/Schedule";
+import { RdmPage } from "./settings/Rdm";
 import { Icon } from "../ui/Icon";
 import { lang, setLang, t } from "../i18n";
 
@@ -20,6 +21,7 @@ const cats = [
   { id: "artnet", icon: "M4 12h12M12 6l6 6-6 6", label: "Art-Net input", c: ArtNetInPage },
   { id: "timecode", icon: "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z", label: "Timecode", c: TimecodePage },
   { id: "schedule", icon: "M7 3v3M17 3v3M4 8h16M5 5h14v15H5zM9 13h2v2H9z", label: "Schedule", c: SchedulePage },
+  { id: "rdm", icon: "M4 6h16M4 12h10M4 18h16M18 10l3 2-3 2", label: "RDM", c: RdmPage },
   { id: "msc", icon: "M5 4h14v16H5zM9 9h6M9 13h6", label: "Show Control (MSC)", c: MscPage },
   { id: "network", icon: "M3 12a9 9 0 0018 0 9 9 0 00-18 0zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18", label: "Network", c: NetworkPage },
   { id: "ai", icon: "M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8zM18 16l.8 2.2L21 19l-2.2.8L18 22l-.8-2.2L15 19l2.2-.8z", label: "Assistant", c: AiPage },

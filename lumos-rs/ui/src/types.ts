@@ -139,3 +139,6 @@ export type { VcState } from "./gen/VcState";
 export type { VcWidget } from "./gen/VcWidget";
 export type { Wheel } from "./gen/Wheel";
 export type { WheelSlot } from "./gen/WheelSlot";
+export type { RdmDevice } from "./gen/RdmDevice";
+export type { RdmRt } from "./gen/RdmRt";
+export type { RdmStatus } from "./gen/RdmStatus";

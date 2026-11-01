@@ -13,6 +13,11 @@
 
 mod artnet;
 pub use artnet::{port_address, ARTNET_PORT};
+
+/// A UDP socket sharing the Art-Net port (broadcast replies reach every listener).
+pub fn bind_shared_port(port: u16) -> std::io::Result<std::net::UdpSocket> {
+    artnet::bind_shared(port)
+}
 mod inputs;
 mod mtc;
 mod nodes;
@@ -50,6 +55,8 @@ pub enum IoEvent {
     SpeechStatus { listening: bool, error: String },
     /// A model download finished (`error` empty = ok).
     SpeechDownloaded { id: String, error: String },
+    /// An Art-Net RDM packet (ArtTodData / ArtRdm) received on the network.
+    Rdm { from: std::net::SocketAddr, data: Vec<u8> },
     /// Audio-reactive values from an input channel (level, bass, mid, treble), whether a beat fell in the window, tempo.
     AudioBands { bands: [f32; 4], beat: bool, bpm: f32 },
     /// An LTC frame decoded from an audio input (`frames` = total frames at `fps`).

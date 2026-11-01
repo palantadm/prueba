@@ -8,6 +8,7 @@ import type { InputStatus } from "./InputStatus";
 import type { LockRt } from "./LockRt";
 import type { OutputStatus } from "./OutputStatus";
 import type { ParkedChannel } from "./ParkedChannel";
+import type { RdmRt } from "./RdmRt";
 import type { SceneRt } from "./SceneRt";
 import type { ScheduleRt } from "./ScheduleRt";
 import type { ScriptRt } from "./ScriptRt";
@@ -70,6 +71,10 @@ schedule: ScheduleRt,
  * Console lock state.
  */
 lock: LockRt, 
+/**
+ * RDM devices found on the DMX lines.
+ */
+rdm: RdmRt, 
 /**
  * Output test pattern running.
  */

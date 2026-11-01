@@ -4,15 +4,17 @@ import type { ExecKind, Executor } from "../../types";
 import { Modal } from "../../ui";
 import { ExecutorStrip } from "../../widgets";
 import { t } from "../../i18n";
+import { ATTRS } from "../../lib/shell-attrs";
 
 const SLOTS = 10;
-const TYPE_LABEL = { cuelist: "Cuelist", group: "Group", effect: "Effect", scene: "Scene", x_fade: "Manual crossfade", chase: "Chase", speed: "Speed master", master: "Grand master" } as const;
+const TYPE_LABEL = { cuelist: "Cuelist", group: "Group", channel: "Channel group", effect: "Effect", scene: "Scene", x_fade: "Manual crossfade", chase: "Chase", speed: "Speed master", master: "Grand master" } as const;
 
 function kindLabel(k: ExecKind): string {
   const s = show.value;
   switch (k.type) {
     case "cuelist": return s?.cuelists.find((c) => c.id === k.cuelist)?.name ?? `CL ${k.cuelist}`;
     case "group": return s?.groups.find((g) => g.id === k.group)?.name ?? `Grp ${k.group}`;
+    case "channel": return `${s?.groups.find((g) => g.id === k.group)?.name ?? `Grp ${k.group}`} · ${ATTRS.find((a) => a.name === k.attr)?.label ?? k.attr}`;
     case "effect": return s?.effects.find((e) => e.id === k.effect)?.name ?? `FX ${k.effect}`;
     case "scene": return s?.scenes?.find((x) => x.id === k.scene)?.name ?? `${t("Scene")} ${k.scene}`;
     case "chase": return s?.chases?.find((c) => c.id === k.chase)?.name ?? `Chase ${k.chase}`;
@@ -63,6 +65,8 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
   const [type, setType] = useState<ExecKind["type"]>(k && k.type !== "empty" ? k.type : "cuelist");
   const [cuelist, setCuelist] = useState(k?.type === "cuelist" || k?.type === "x_fade" ? k.cuelist : s.cuelists[0]?.id ?? 0);
   const [group, setGroup] = useState(k?.type === "group" ? k.group : s.groups[0]?.id ?? 0);
+  const [chGroup, setChGroup] = useState(k?.type === "channel" ? k.group : s.groups[0]?.id ?? 0);
+  const [attr, setAttr] = useState(k?.type === "channel" ? k.attr : "red");
   const [effect, setEffect] = useState(k?.type === "effect" ? k.effect : s.effects[0]?.id ?? 0);
   const scenes = s.scenes ?? [];
   const [scene, setScene] = useState(k?.type === "scene" ? k.scene : scenes[0]?.id ?? 0);
@@ -72,8 +76,8 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
   const [master, setMaster] = useState(k?.type === "speed" ? k.master : masters[0]?.id ?? 0);
   const [label, setLabel] = useState(exec?.label ?? "");
   const kind = (): ExecKind =>
-    type === "cuelist" ? { type, cuelist } : type === "group" ? { type, group } : type === "effect" ? { type, effect } : type === "scene" ? { type, scene } : type === "x_fade" ? { type, cuelist } : type === "chase" ? { type, chase } : type === "speed" ? { type, master } : { type: "master", master: "grand" };
-  const valid = type === "master" || ((type === "cuelist" || type === "x_fade") && cuelist) || (type === "group" && group) || (type === "effect" && effect) || (type === "scene" && scene) || (type === "chase" && chase) || (type === "speed" && master);
+    type === "cuelist" ? { type, cuelist } : type === "group" ? { type, group } : type === "channel" ? { type, group: chGroup, attr } : type === "effect" ? { type, effect } : type === "scene" ? { type, scene } : type === "x_fade" ? { type, cuelist } : type === "chase" ? { type, chase } : type === "speed" ? { type, master } : { type: "master", master: "grand" };
+  const valid = type === "master" || ((type === "cuelist" || type === "x_fade") && cuelist) || (type === "group" && group) || (type === "channel" && chGroup) || (type === "effect" && effect) || (type === "scene" && scene) || (type === "chase" && chase) || (type === "speed" && master);
   const save = () => {
     const id = exec?.id ?? Math.max(0, ...s.executors.map((e) => e.id)) + 1;
     send({ type: "exec_save", executor: { id, page, slot, label, kind: kind() } });
@@ -93,12 +97,21 @@ function AssignDialog({ page, slot, exec, onClose }: { page: number; slot: numbe
       <button class="btn primary" disabled={!valid} onClick={save}>{t("Assign")}</button>
     </>}>
       <div class="row wrap" role="tablist" aria-label={t("Executor type")}>
-        {(["cuelist", "x_fade", "group", "effect", "scene", "chase", "speed", "master"] as const).map((k) => (
+        {(["cuelist", "x_fade", "group", "channel", "effect", "scene", "chase", "speed", "master"] as const).map((k) => (
           <button key={k} role="tab" aria-selected={type === k} class={`btn ${type === k ? "sel" : ""}`} onClick={() => setType(k)}>{t(TYPE_LABEL[k])}</button>
         ))}
       </div>
       {(type === "cuelist" || type === "x_fade") && <div class="field"><label>{t("Cuelist")}</label>{sel(cuelist, setCuelist, s.cuelists)}</div>}
       {type === "group" && <div class="field"><label>{t("Group (dimmer master)")}</label>{sel(group, setGroup, s.groups)}</div>}
+      {type === "channel" && <>
+        <div class="field"><label>{t("Group")}</label>{sel(chGroup, setChGroup, s.groups)}</div>
+        <div class="field"><label>{t("Attribute")}</label>
+          <select class="input" value={attr} onChange={(e) => setAttr((e.target as HTMLSelectElement).value)}>
+            {ATTRS.map((a) => <option key={a.name} value={a.name}>{a.label}</option>)}
+          </select>
+        </div>
+        <p class="muted">{t("The fader sets this attribute on every fixture of the group at once. At 0 it releases; the FLASH button forces it to full.")}</p>
+      </>}
       {type === "effect" && <div class="field"><label>{t("Effect")}</label>{sel(effect, setEffect, s.effects)}</div>}
       {type === "scene" && <div class="field"><label>{t("Scene")}</label>{sel(scene, setScene, scenes)}</div>}
       {type === "chase" && <div class="field"><label>{t("Chase")}</label>{sel(chase, setChase, chases)}</div>}

@@ -29,6 +29,17 @@ Ajustes → Art-Net in: se mapea un port-address recibido a un universo de Lumos
 7. Otro programa usando el puerto 6454 (error en la entrada Art-Net o en la salida).
 <!--ai-->Arreglo: `universe_save` con la salida corregida (cambia solo lo necesario). Verificación: `output_test` (nivel fijo) + `get_dmx`, y apagar el test al final.<!--/ai--><!--ui-->Arreglo: corrige la salida en Ajustes → Universos y salidas. Verificación: Test de salida (nivel fijo) y Monitor; apaga el test al final.<!--/ui-->
 
+## RDM (configurar los aparatos desde la consola)
+RDM va por la misma línea DMX y deja hablar con los aparatos: ver quién hay, cambiar su **dirección**, su **nombre** y su **modo**, y hacerlos parpadear para localizarlos. Aquí funciona a través de nodos Art-Net con RDM.
+- Ajustes → **RDM** → **Escanear**. Aparece una tabla con cada aparato (fabricante, modelo, dirección, modo, canales) y a cuál del patch corresponde.
+- «Repetir el descubrimiento» hace que los nodos vuelvan a buscar en la línea; es más lento, úsalo si falta alguno.
+- **Identificar** hace parpadear el aparato físico; vuelve a pulsar para apagarlo.
+- Cambia la dirección o el modo escribiendo en la tabla: el valor mostrado es el que el aparato confirma tras el cambio, no el que pediste.
+- Si cambias el modo, el número de canales cambia: revisa el patch para que no se pisen.
+- Un aparato que deja de contestar se marca «Sin respuesta» tras tres intentos; el resto sigue funcionando.
+- Hace falta una salida Art-Net hacia el nodo, y que el nodo y los aparatos soporten RDM.
+<!--ai-->- Por protocolo: `rdm_scan`, `rdm_refresh`, `rdm_identify`, `rdm_set_address`, `rdm_set_label`, `rdm_set_personality`, `rdm_clear`. El resultado se lee en `get_runtime` → `rdm` (devices con uid, address, personality, footprint, fixture = id del patch que coincide, error, status). Tras `rdm_scan` espera unos segundos (`wait`) y vuelve a leer. Si cambias dirección o modo, ajusta también el patch con `fixture_update` y comprueba solapes con `check_patch`.<!--/ai-->
+
 ## sACN
 Multicast `239.255.hi.lo` necesita IGMP en el switch; en Wi-Fi suele fallar → usa unicast. Universo 1–63999, prioridad 1–200 (100 típico). Cada universo sACN solo puede lo use un universo de Lumos.
 
