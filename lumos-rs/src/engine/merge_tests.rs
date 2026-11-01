@@ -62,3 +62,30 @@ fn a_custom_profile_can_be_saved_patched_and_edited_safely() {
     p.id = "generic/rgb-par".into();
     assert!(e.handle(Command::ProfileSave { profile: p }).unwrap_err().contains("biblioteca de Lumos"));
 }
+
+#[test]
+fn the_response_curve_shapes_the_output_of_a_fixture() {
+    let mut e = engine();
+    add(&mut e, "generic/dimmer", "1ch", 2);
+    let out = |e: &mut Engine| {
+        e.rebuild_derived();
+        e.render(1.0);
+        let f = **e.frames.get(&1).unwrap();
+        (f[0], f[1])
+    };
+    set(&mut e, 1, "dimmer", 0.5);
+    set(&mut e, 2, "dimmer", 0.5);
+    assert_eq!(out(&mut e), (128, 128), "linear");
+    let mut f1 = e.show.fixtures[0].clone();
+    f1.curve = ResponseCurve::Square;
+    e.handle(Command::FixtureUpdate { fixture: f1 }).unwrap();
+    let mut f2 = e.show.fixtures[1].clone();
+    f2.curve = ResponseCurve::Switched;
+    e.handle(Command::FixtureUpdate { fixture: f2 }).unwrap();
+    let (a, b) = out(&mut e);
+    assert_eq!(a, 64, "0.5² = 0.25 → 64");
+    assert_eq!(b, 255, "switched: ≥ 50 % is full");
+    set(&mut e, 2, "dimmer", 0.4);
+    assert_eq!(out(&mut e).1, 0, "switched: below 50 % is off");
+    assert!((shape(ResponseCurve::Gamma, 0.5) - 0.2176).abs() < 1e-3 && shape(ResponseCurve::SCurve, 0.5) == 0.5);
+}

@@ -1140,6 +1140,7 @@ impl Engine {
                 address: a,
                 pos: [((k % 10) as f32 - 4.5) * 1.2, 5.0, (k / 10) as f32 * 1.5 - 1.0],
                 rot: [0.0, 0.0, 0.0],
+                curve: ResponseCurve::Linear,
             });
             next += 1;
         }
@@ -1873,6 +1874,22 @@ impl Engine {
                     if pf.has_attr(a) {
                         let v = attrs.get(*a).copied().unwrap_or(0.0);
                         attrs.insert((*a).into(), v * fct);
+                    }
+                }
+            }
+        }
+        // 4b. dimmer law: shape the intensity of fixtures with a non-linear response curve
+        for pf in self.patch.fixtures.iter().filter(|pf| pf.curve != ResponseCurve::Linear) {
+            if let Some(attrs) = merged.get_mut(&pf.id) {
+                if pf.has_dimmer {
+                    if let Some(v) = attrs.get_mut("dimmer") {
+                        *v = shape(pf.curve, *v);
+                    }
+                } else {
+                    for a in COLOR_ATTRS {
+                        if let Some(v) = attrs.get_mut(*a) {
+                            *v = shape(pf.curve, *v);
+                        }
                     }
                 }
             }

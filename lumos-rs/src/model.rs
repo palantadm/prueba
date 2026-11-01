@@ -235,6 +235,24 @@ fn default_beam() -> [f32; 2] {
 
 // ───────────────────────────── Show model ─────────────────────────────
 
+/// How a fixture's intensity response is shaped before it reaches DMX (the dimmer law of the channel).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum ResponseCurve {
+    /// 1:1.
+    #[default]
+    Linear,
+    /// Square law: slow at the bottom, like a tungsten lamp on a dimmer.
+    Square,
+    /// Soft at both ends.
+    SCurve,
+    /// γ 2.2 — makes LED fixtures dim like a lamp to the eye.
+    Gamma,
+    /// Non-dim: off below 50 %, full above (contactors, fog machines, relays).
+    Switched,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Fixture {
@@ -252,6 +270,9 @@ pub struct Fixture {
     /// Rotation in degrees (pitch about x, yaw about y, roll about z).
     #[serde(default)]
     pub rot: [f32; 3],
+    /// Intensity response (dimmer law) applied at the output.
+    #[serde(default)]
+    pub curve: ResponseCurve,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]

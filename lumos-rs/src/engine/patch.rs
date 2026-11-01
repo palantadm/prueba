@@ -13,6 +13,7 @@ pub struct PatchFixture {
     pub address: u16,
     pub chans: Vec<ChannelDef>,
     pub has_dimmer: bool,
+    pub curve: ResponseCurve,
     /// Attributes backed by a channel with named capabilities (wheels, shutter…): never cross-fade.
     pub discrete: Vec<String>,
 }
@@ -52,6 +53,7 @@ impl Patch {
                 address: f.address,
                 chans,
                 has_dimmer,
+                curve: f.curve,
                 discrete,
             });
         }
@@ -60,6 +62,24 @@ impl Patch {
 
     pub fn get(&self, id: u32) -> Option<&PatchFixture> {
         self.by_id.get(&id).map(|&i| &self.fixtures[i])
+    }
+}
+
+/// Shape an intensity (0..1) with a response curve.
+pub fn shape(c: ResponseCurve, v: f32) -> f32 {
+    let v = v.clamp(0.0, 1.0);
+    match c {
+        ResponseCurve::Linear => v,
+        ResponseCurve::Square => v * v,
+        ResponseCurve::SCurve => v * v * (3.0 - 2.0 * v),
+        ResponseCurve::Gamma => v.powf(2.2),
+        ResponseCurve::Switched => {
+            if v >= 0.5 {
+                1.0
+            } else {
+                0.0
+            }
+        }
     }
 }
 

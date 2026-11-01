@@ -684,6 +684,7 @@ mod tests {
                 address: addr,
                 pos: [i as f32 * 0.5, 5.0, 1.0],
                 rot: [0.0; 3],
+                curve: Default::default(),
             });
         }
         s

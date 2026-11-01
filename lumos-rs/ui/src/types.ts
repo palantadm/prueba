@@ -1,3 +1,4 @@
+export type { ResponseCurve } from "./gen/ResponseCurve";
 export type { PixelMap } from "./gen/PixelMap";
 export type { PixelKind } from "./gen/PixelKind";
 export type { MergeReport } from "./gen/MergeReport";

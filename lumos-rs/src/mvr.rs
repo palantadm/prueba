@@ -408,7 +408,7 @@ pub fn apply(
                 out.updated += 1;
             }
             None => {
-                show.fixtures.push(Fixture { id, name, profile: prof.id.clone(), mode: mode.name.clone(), universe, address, pos: mf.pos, rot: mf.rot });
+                show.fixtures.push(Fixture { id, name, profile: prof.id.clone(), mode: mode.name.clone(), universe, address, pos: mf.pos, rot: mf.rot, curve: Default::default() });
                 out.created += 1;
             }
         }
@@ -503,8 +503,8 @@ mod tests {
         let mh = &lib["generic/mh-spot"];
         let mut s = Show::default();
         s.name = "Rig & <test>".into();
-        s.fixtures.push(Fixture { id: 7, name: "Par \"A\"".into(), profile: par.id.clone(), mode: par.modes[0].name.clone(), universe: 1, address: 1, pos: [-2.5, 5.0, 1.5], rot: [-30.0, 10.0, 0.0] });
-        s.fixtures.push(Fixture { id: 8, name: "Mover".into(), profile: mh.id.clone(), mode: mh.modes[0].name.clone(), universe: 3, address: 130, pos: [3.0, 4.2, -1.0], rot: [0.0; 3] });
+        s.fixtures.push(Fixture { id: 7, name: "Par \"A\"".into(), profile: par.id.clone(), mode: par.modes[0].name.clone(), universe: 1, address: 1, pos: [-2.5, 5.0, 1.5], rot: [-30.0, 10.0, 0.0], curve: Default::default() });
+        s.fixtures.push(Fixture { id: 8, name: "Mover".into(), profile: mh.id.clone(), mode: mh.modes[0].name.clone(), universe: 3, address: 130, pos: [3.0, 4.2, -1.0], rot: [0.0; 3], curve: Default::default() });
         s
     }
 
@@ -587,6 +587,7 @@ mod tests {
             address: 33,
             pos: [1.0, 6.0, 2.0],
             rot: [-60.0, 0.0, 0.0],
+            curve: Default::default(),
         });
         let bytes = export(&show, &library, &dir).unwrap();
         let parsed = parse(&bytes).unwrap();
@@ -632,6 +633,7 @@ mod tests {
                 address: 1 + i as u16 * 40,
                 pos: [i as f32, 5.0, 0.5],
                 rot: [0.0; 3],
+                curve: Default::default(),
             });
         }
         let out = export(&show, &library, &dir).unwrap();

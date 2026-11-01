@@ -7,6 +7,7 @@ import { AddDialog } from "./patch/AddDialog";
 import { ImportDialog } from "./patch/ImportDialog";
 import { MorphDialog } from "./patch/MorphDialog";
 import { ProfileEditorDialog } from "./patch/ProfileEditor";
+import { CurveDialog } from "./patch/CurveDialog";
 import { LocateDialog } from "./patch/LocateDialog";
 import { UniverseMap } from "./patch/UniverseMap";
 import { t, tp } from "../i18n";
@@ -28,6 +29,7 @@ export function Patch() {
   const [importing, setImporting] = useState(false);
   const [editingProfile, setEditingProfile] = useState(false);
   const [morphing, setMorphing] = useState(false);
+  const [curving, setCurving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [q, setQ] = useState("");
   const anchor = useRef<number | null>(null);
@@ -69,6 +71,7 @@ export function Patch() {
           title={t("Locate the selected fixtures: full light, open shutter, home position, lamp on")}>{selIdentOn ? t("Stop identifying") : t("Identify selection")}</button>
         <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setLocating(true)}
           title={t("Set what “Identify” does for this fixture model (dimmer, colour, shutter, lamp on…)")}>{t("Locate look…")}</button>
+        <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setCurving(true)} title={t("Dimmer law of the selected fixtures")}>{t("Dimmer curve…")}</button>
         <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setMorphing(true)}
           title={t("Replace the selected fixtures with another model keeping cues, scenes and groups")}>{t("Swap (Morph)")}</button>
         <button class="btn tall danger" disabled={!selection.value.length} onClick={del}>{t("Delete")}{selection.value.length ? ` (${selection.value.length})` : ""}</button>
@@ -107,6 +110,7 @@ export function Patch() {
       {adding && <AddDialog onClose={() => setAdding(false)} />}
       {importing && <ImportDialog onClose={() => setImporting(false)} />}
       {editingProfile && <ProfileEditorDialog onClose={() => setEditingProfile(false)} />}
+      {curving && <CurveDialog ids={selection.value} onClose={() => setCurving(false)} />}
       {morphing && <MorphDialog ids={selection.value} onClose={() => setMorphing(false)} />}
       {locating && (() => { const fx = fixtures.find((x) => selection.value.includes(x.id)); return fx ? <LocateDialog fixture={fx} onClose={() => setLocating(false)} /> : null; })()}
     </div></div></div>

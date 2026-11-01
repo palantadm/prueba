@@ -296,6 +296,7 @@ pub fn import_patch(
                 address,
                 pos,
                 rot: [0.0; 3],
+                curve: Default::default(),
             },
             has_pos,
         });
@@ -366,6 +367,7 @@ mod tests {
                 address: 1 + i as u16 * 3,
                 pos: [i as f32 * 1.25, 5.0, -0.5],
                 rot: [0.0; 3],
+                curve: Default::default(),
             });
         }
         s
