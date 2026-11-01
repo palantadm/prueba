@@ -1263,6 +1263,43 @@ pub struct SpeechRt {
     pub error: String,
 }
 
+/// A part of a show that can be merged into another.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum MergePart {
+    Fixtures,
+    Groups,
+    Palettes,
+    Scenes,
+    Cuelists,
+    Chases,
+    Effects,
+    Macros,
+    Timelines,
+    Scripts,
+    Locate,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MergeCount {
+    pub part: MergePart,
+    pub count: u32,
+}
+
+/// Result of merging (or previewing the merge of) another show.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct MergeReport {
+    /// What the other show contains (per part).
+    #[serde(default)]
+    pub available: Vec<MergeCount>,
+    /// What was (or would be) added.
+    pub added: Vec<MergeCount>,
+    pub warnings: Vec<String>,
+}
+
 /// Where `aim` points the beams.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -1889,6 +1926,9 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── show merge ──
+    /// Add parts of another saved show to this one (undoable). Ids that clash are renumbered and references follow.
+    ShowMerge { name: String, parts: Vec<MergePart> },
     // ── aim / follow-spot ──
     /// Aim moving heads (pan/tilt into the programmer) at a point, fixture or stage object. `height` raises the aim point (a performer's chest, a face…).
     Aim { fixtures: Vec<u32>, target: AimTarget, #[serde(default)] height: f32 },

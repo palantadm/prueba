@@ -13,3 +13,11 @@
 
 ## Deshacer
 Los cambios en los datos del show (aparatos, grupos, paletas, escenas, cuelists, ajustes…) se pueden deshacer y rehacer (hasta 100 pasos). Lo que cambia el estado en directo (GO, blackout, master, valores del programador) no tiene deshacer. Cargar un show o restaurar una copia reinicia el estado de reproducción.
+
+## Fusionar partes de otro show
+**Show → Fusionar desde otro show…**: eliges un show guardado y qué traer: patch, grupos, paletas, escenas, cuelists, chases, efectos, macros, timelines, guiones o los ajustes de Localizar. Antes de fusionar ves qué se va a añadir y los avisos. Es **un solo paso de deshacer** (Ctrl+Z).
+- Los números que chocan se **renumeran** y lo que apunta a ellos los sigue: los valores de los aparatos, los enlaces a paletas, las escenas de los pasos de un chase, los master de velocidad y los enlaces de las marcas del guion a cuelists.
+- Si no fusionas el patch, solo valen los aparatos que tengan el **mismo número y el mismo perfil** en ambos shows; los demás valores se descartan (se avisa).
+- Los aparatos fusionados que caigan en direcciones ocupadas se **recolocan** en el primer hueco libre (revisa el patch).
+- **No se reescriben** las macros, timelines ni acciones del guion que llaman a cues, escenas o grupos por número (por ejemplo `go cuelist 2`): si hubo renumeraciones, se avisa para que las revises.
+<!--ai-->Por protocolo: `show_merge {name, parts[]}`.<!--/ai-->

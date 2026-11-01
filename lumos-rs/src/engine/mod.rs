@@ -12,6 +12,8 @@ mod msc;
 mod patch;
 mod playback;
 #[cfg(test)]
+mod merge_tests;
+#[cfg(test)]
 mod prog_tests;
 mod refs;
 mod scenes;
@@ -76,6 +78,8 @@ pub enum EngineIn {
     ShowEdit { f: ShowEditFn, reply: oneshot::Sender<Result<serde_json::Value, String>> },
     /// Dry-run of a fixture morph (REST `POST /api/morph/preview`).
     MorphPreview { ids: Vec<u32>, profile: String, mode: String, reply: oneshot::Sender<Result<MorphPreview, String>> },
+    /// Dry run of `ShowMerge`: what the other show offers and what would be added.
+    MergePreview { name: String, parts: Vec<MergePart>, reply: oneshot::Sender<Result<MergeReport, String>> },
     /// Read-only copy of show + runtime + library + output frames (AI assistant tools).
     AiState { reply: oneshot::Sender<crate::ai::AiState> },
 }
@@ -128,6 +132,11 @@ impl Handle {
         self.tx
             .send(EngineIn::MorphPreview { ids, profile, mode, reply: r })
             .map_err(|_| "Engine stopped".to_string())?;
+        rx.await.map_err(|_| "Engine stopped".to_string())?
+    }
+    pub async fn merge_preview(&self, name: String, parts: Vec<MergePart>) -> Result<MergeReport, String> {
+        let (r, rx) = oneshot::channel();
+        self.tx.send(EngineIn::MergePreview { name, parts, reply: r }).map_err(|_| "Engine stopped".to_string())?;
         rx.await.map_err(|_| "Engine stopped".to_string())?
     }
     /// Run `f` on the live show inside the engine task. `Err` leaves the show unchanged.
@@ -426,6 +435,9 @@ impl Engine {
                 self.set_show(*show);
                 let _ = reply.send(Ok(()));
             }
+            EngineIn::MergePreview { name, parts, reply } => {
+                let _ = reply.send(self.merge_report(&name, &parts, false));
+            }
             EngineIn::MorphPreview { ids, profile, mode, reply } => {
                 let _ = reply.send(self.morph_preview(&ids, &profile, &mode));
             }
@@ -533,6 +545,22 @@ impl Engine {
         if self.autosave_due.is_none() {
             self.autosave_due = Some(Instant::now() + Duration::from_secs(2));
         }
+    }
+
+    /// Merge (`apply`) or preview merging the saved show `name`.
+    fn merge_report(&mut self, name: &str, parts: &[MergePart], apply: bool) -> Result<MergeReport, String> {
+        let other = self.store.load(name)?;
+        let profiles: HashMap<String, FixtureProfile> = self.library_list().into_iter().chain(other.profiles.iter().cloned()).map(|p| (p.id.clone(), p)).collect();
+        let fp = |p: &str, m: &str| profiles.get(p).and_then(|p| p.modes.iter().find(|x| x.name == m)).map(library::mode_footprint).unwrap_or(1).max(1);
+        let mut target = self.show.clone();
+        let mut rep = crate::showmerge::merge(&mut target, &other, parts, &fp);
+        rep.available = crate::showmerge::available(&other);
+        if apply {
+            self.show = target;
+            self.library_dirty = true;
+            self.touch_patch();
+        }
+        Ok(rep)
     }
 
     fn touch_patch(&mut self) {
@@ -967,6 +995,9 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            ShowMerge { name, parts } => {
+                self.merge_report(&name, &parts, true)?;
+            }
             Aim { fixtures, target, height } => self.aim(fixtures, target, height)?,
             c @ (AudioConfigure { .. } | AudioRun { .. } | SoundPlay { .. } | SoundStop { .. }) => self.audio_command(c)?,
             c @ (SpeechConfigure { .. } | SpeechListen { .. } | SpeechModelGet { .. } | SpeechModelRemove { .. }) => self.voice_command(c)?,

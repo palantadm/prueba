@@ -20,6 +20,7 @@ pub mod persist;
 pub mod qxf;
 pub mod reports;
 pub mod script_import;
+pub mod showmerge;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;

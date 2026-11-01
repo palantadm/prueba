@@ -90,6 +90,7 @@ pub fn history_key(cmd: &Command) -> Option<(String, bool)> {
         TimelineSave { timeline } => ("timeline_save", timeline.id as u64, true),
         TimelineRemove { .. } => ("timeline_remove", 0, false),
         ScriptSave { script } => ("script_save", script.id as u64, true),
+        ShowMerge { .. } => ("show_merge", 0, false),
         ScriptRemove { .. } => ("script_remove", 0, false),
         _ => return None,
     };

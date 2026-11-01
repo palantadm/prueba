@@ -32,6 +32,7 @@ pub fn router(h: Handle) -> Router {
         .route("/api/media", post(upload).layer(DefaultBodyLimit::max(512 * 1024 * 1024)))
         .route("/api/show", get(get_show).put(put_show).layer(DefaultBodyLimit::max(64 * 1024 * 1024)))
         .route("/api/morph/preview", post(morph_preview))
+        .route("/api/show/merge/preview", post(merge_preview))
         .route("/api/cmdline/help", get(cmdline_help))
         .route("/api/cmdline/complete", get(cmdline_complete))
         .route("/api/library/import", post(library_import).layer(DefaultBodyLimit::max(256 * 1024 * 1024)))
@@ -78,6 +79,21 @@ struct MorphReq {
 async fn morph_preview(State(h): State<Handle>, Json(req): Json<MorphReq>) -> Response {
     match h.morph_preview(req.ids, req.profile, req.mode).await {
         Ok(p) => Json(p).into_response(),
+        Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct MergeReq {
+    name: String,
+    #[serde(default)]
+    parts: Vec<MergePart>,
+}
+
+/// Dry-run of `ShowMerge` (empty `parts` = just list what the other show contains).
+async fn merge_preview(State(h): State<Handle>, Json(req): Json<MergeReq>) -> Response {
+    match h.merge_preview(req.name, req.parts).await {
+        Ok(r) => Json(r).into_response(),
         Err(e) => (StatusCode::BAD_REQUEST, e).into_response(),
     }
 }

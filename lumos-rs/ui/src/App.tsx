@@ -22,6 +22,7 @@ import { setSettingsCat } from "./workspaces/Settings";
 import { HelpCenter } from "./help/HelpCenter";
 import { closeHelp, helpPage, openHelp } from "./help/state";
 import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
+import { MergeDialog } from "./workspaces/exchange/MergeDialog";
 
 export const current = signal(initialWorkspace());
 export function goto(id: string) {
@@ -46,7 +47,7 @@ function ShowMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
-  const [dataDlg, setDataDlg] = useState<"reports" | "csv" | "mvr" | "backups" | null>(null);
+  const [dataDlg, setDataDlg] = useState<"reports" | "csv" | "mvr" | "backups" | "merge" | null>(null);
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
@@ -91,6 +92,7 @@ function ShowMenu() {
           <hr />
           <button role="menuitem" onClick={run(() => downloadShow(name))}>{t("Download JSON")}</button>
           <button role="menuitem" onClick={() => file.current?.click()}>{t("Import JSON…")}</button>
+          <button role="menuitem" onClick={run(() => setDataDlg("merge"))}>{t("Merge from another show…")}</button>
           <hr />
           <div class="menu-label">{t("Data")}</div>
           <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("reports"))}>{t("Reports…")}</button>
@@ -103,6 +105,7 @@ function ShowMenu() {
       {dataDlg === "csv" && <CsvImportDialog onClose={() => setDataDlg(null)} />}
       {dataDlg === "mvr" && <MvrDialog onClose={() => setDataDlg(null)} />}
       {dataDlg === "backups" && <BackupsDialog onClose={() => setDataDlg(null)} />}
+      {dataDlg === "merge" && <MergeDialog onClose={() => setDataDlg(null)} />}
       <input ref={file} type="file" accept=".json,application/json" hidden onChange={async (e) => {
         const f = (e.target as HTMLInputElement).files?.[0];
         (e.target as HTMLInputElement).value = "";

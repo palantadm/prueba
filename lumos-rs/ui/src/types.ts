@@ -1,3 +1,6 @@
+export type { MergeReport } from "./gen/MergeReport";
+export type { MergeCount } from "./gen/MergeCount";
+export type { MergePart } from "./gen/MergePart";
 export type { AimTarget } from "./gen/AimTarget";
 export type { AudioBand } from "./gen/AudioBand";
 export type { AudioCfg } from "./gen/AudioCfg";
