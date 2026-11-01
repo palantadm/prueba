@@ -2415,6 +2415,8 @@ pub struct AiConfigOut {
     /// `low` | `medium` | `high`
     pub effort: String,
     pub mode: AiMode,
+    /// `normal` | `concise` | `caveman`
+    pub style: String,
     pub providers: Vec<AiProviderOut>,
     pub presets: Vec<AiPreset>,
 }
@@ -2452,6 +2454,9 @@ pub struct AiConfigIn {
     pub effort: Option<String>,
     #[serde(default)]
     pub mode: Option<AiMode>,
+    /// Reply style: `normal` | `concise` | `caveman` (fewest possible words, saves tokens).
+    #[serde(default)]
+    pub style: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]

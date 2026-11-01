@@ -169,6 +169,12 @@ export function AiPage() {
           <span class="dim">{MODE_HELP[cfg.mode]()}</span>
         </div>
         <div class="field">
+          <label>{t("Reply style")}</label>
+          <Segmented value={cfg.style} label={t("Reply style")} onChange={(v) => void run(configure({ style: v }))}
+            options={[{ value: "normal", label: t("Normal") }, { value: "concise", label: t("Concise") }, { value: "caveman", label: t("Caveman (fewest tokens)") }]} />
+          <span class="faint" style={{ fontSize: "var(--fs-xs)" }}>{t("Shorter replies use fewer tokens (cheaper and faster). Caveman drops every filler word but keeps numbers, names and commands intact.")}</span>
+        </div>
+        <div class="field">
           <label>{t("Reasoning effort")}</label>
           <Segmented value={cfg.effort} label={t("Reasoning effort")} onChange={(v) => void run(configure({ effort: v }))}
             options={[{ value: "low", label: t("Low") }, { value: "medium", label: t("Medium") }, { value: "high", label: t("High") }]} />

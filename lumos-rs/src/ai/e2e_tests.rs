@@ -223,7 +223,7 @@ fn provider_in(id: &str, kind: AiProviderKind, base: &str, key: &str) -> AiConfi
         active_provider: Some(id.into()),
         model: None,
         enabled: None,
-        effort: None,
+        effort: None, style: None,
         mode: None,
     }
 }
@@ -294,7 +294,7 @@ async fn anthropic_scene_turn_with_undo_and_no_key_leaks() {
     let mut r = rig("anth").await;
     r.cfg(provider_in("anthropic", AiProviderKind::Anthropic, &url, AKEY)).await;
     // set auto mode so nothing needs confirmation
-    r.cfg(AiConfigIn { provider: None, remove_provider: None, active_provider: None, model: None, enabled: None, effort: None, mode: Some(AiMode::Auto) }).await;
+    r.cfg(AiConfigIn { provider: None, remove_provider: None, active_provider: None, model: None, enabled: None, effort: None, style: None, mode: Some(AiMode::Auto) }).await;
     let evs = r.turn("s1", "Crea una escena roja [demo:scene]").await;
     let t = types(&evs);
     assert_eq!(t.first().map(|s| s.as_str()), Some("started"), "{t:?}");
@@ -412,11 +412,11 @@ async fn openai_wire_tool_loop_and_provider_switch_keeps_history() {
     let mut r = rig("switch").await;
     r.cfg(provider_in("anthropic", AiProviderKind::Anthropic, &url, AKEY)).await;
     r.cfg(provider_in("openai", AiProviderKind::OpenaiCompat, &url, OKEY)).await;
-    r.cfg(AiConfigIn { provider: None, remove_provider: None, active_provider: Some("anthropic".into()), model: None, enabled: None, effort: None, mode: Some(AiMode::Auto) }).await;
+    r.cfg(AiConfigIn { provider: None, remove_provider: None, active_provider: Some("anthropic".into()), model: None, enabled: None, effort: None, style: None, mode: Some(AiMode::Auto) }).await;
     let evs = r.turn("sw", "Crea una escena roja [demo:scene]").await;
     assert_eq!(evs.last().unwrap()["type"], "done", "{evs:?}");
     // switch provider mid-conversation
-    r.cfg(AiConfigIn { provider: None, remove_provider: None, active_provider: Some("openai".into()), model: None, enabled: None, effort: None, mode: None }).await;
+    r.cfg(AiConfigIn { provider: None, remove_provider: None, active_provider: Some("openai".into()), model: None, enabled: None, effort: None, style: None, mode: None }).await;
     let evs = r.turn("sw", "gracias").await;
     assert_eq!(evs.last().unwrap()["type"], "done", "{evs:?}");
     {
@@ -443,7 +443,7 @@ async fn invalid_tool_json_and_provider_errors_are_reported() {
     let (url, _rec) = mock().await;
     let mut r = rig("err").await;
     r.cfg(provider_in("anthropic", AiProviderKind::Anthropic, &url, AKEY)).await;
-    r.cfg(AiConfigIn { provider: None, remove_provider: None, active_provider: None, model: None, enabled: None, effort: None, mode: Some(AiMode::Auto) }).await;
+    r.cfg(AiConfigIn { provider: None, remove_provider: None, active_provider: None, model: None, enabled: None, effort: None, style: None, mode: Some(AiMode::Auto) }).await;
     let evs = r.turn("e", "[demo:badjson]").await;
     assert!(evs.iter().any(|e| e["type"] == "tool" && e["state"] == "error" && e["result"].as_str().unwrap().contains("JSON")), "{evs:?}");
     assert_eq!(evs.last().unwrap()["type"], "done");

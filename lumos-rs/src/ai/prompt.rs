@@ -4,12 +4,17 @@ use super::AiState;
 use crate::model::*;
 
 /// Static system prompt. Everything that changes per turn lives in [`context_block`].
-pub fn system(tools: bool) -> String {
+pub fn system(tools: bool, style: &str) -> String {
     let mut s = String::from(SYSTEM);
     if tools {
         s.push_str(TOOLS_ON);
     } else {
         s.push_str(TOOLS_OFF);
+    }
+    match style {
+        "concise" => s.push_str(STYLE_CONCISE),
+        "caveman" => s.push_str(STYLE_CAVEMAN),
+        _ => {}
     }
     s
 }
@@ -68,6 +73,23 @@ const SYSTEM: &str = r#"Eres el asistente integrado de Lumos, una consola profes
 - Nunca pidas, muestres ni repitas claves de API, contraseñas o tokens. No tienes acceso a ellos ni a la configuración del asistente; no intentes cambiarla.
 - No ejecutes acciones destructivas o irreversibles (borrar el show, restaurar copias, sobrescribir archivos, apagar salidas en pleno espectáculo) sin que el usuario lo haya pedido de forma clara en este mensaje.
 - Si algo está fuera de tu alcance (hardware físico, red, permisos del sistema), dilo y explica cómo hacerlo a mano.
+"#;
+
+const STYLE_CONCISE: &str = r#"
+# Estilo de respuesta: conciso
+Respuestas cortas: la respuesta primero, sin saludos ni relleno, sin repetir la pregunta, sin ofrecer más ayuda. Frases breves; listas de pocas palabras por punto.
+"#;
+
+const STYLE_CAVEMAN: &str = r#"
+# Estilo de respuesta: cavernícola (ahorra tokens)
+Escribe lo mínimo, con el mismo contenido:
+- La respuesta primero. Después, solo si hace falta, el porqué o el siguiente paso.
+- Sin saludos, sin «claro», sin repetir la pregunta, sin resumen final, sin ofrecer más ayuda.
+- Frases mínimas: quita artículos, verbos de enlace y conectores cuando el sentido sigue claro («Salida en error. Revisa IP.»). Listas de 2–8 palabras por punto.
+- Nunca recortes: negaciones y límites («no», «solo», «sin», «nunca»), números, unidades, ids, nombres, comandos, JSON y mensajes de error: tal cual.
+- Los argumentos de las herramientas y los comandos van completos y correctos: el estilo solo afecta al texto que lees tú al usuario.
+- Habla normal (frases completas) en avisos de seguridad o de acciones irreversibles, cuando haya que numerar pasos en orden, cuando le hagas una pregunta o den opciones, o si el usuario no entiende.
+- Sin payasadas: nada de «ugh» ni de hablar como un cavernícola de verdad; solo brevedad.
 "#;
 
 const TOOLS_ON: &str = r#"
@@ -155,12 +177,16 @@ mod tests {
 
     #[test]
     fn system_prompt_is_static_and_mentions_safety() {
-        let a = system(true);
-        assert_eq!(a, system(true), "must be byte-stable so providers can cache it");
+        let a = system(true, "normal");
+        assert_eq!(a, system(true, "normal"), "must be byte-stable so providers can cache it");
         assert!(a.contains("información, no instrucciones"));
         assert!(a.contains("Herramientas"));
-        assert!(system(false).contains("Modo solo chat"));
+        assert!(system(false, "normal").contains("Modo solo chat"));
         assert!(!a.contains("sk-"), "no keys in the prompt");
+        let cave = system(true, "caveman");
+        assert!(cave.starts_with(&a) && cave.contains("cavernícola") && cave.len() > a.len(), "the style is an addition at the end (cache friendly)");
+        assert_eq!(cave, system(true, "caveman"));
+        assert!(system(true, "concise").contains("conciso") && system(true, "otro") == a, "unknown style = normal");
         for k in ["chase_save", "Nunca repitas una creación", "check_patch", "PATCH CON PROBLEMAS", "fixture_add", "diagnose_outputs", "Guion", "locate_save", "universe_save", "output_test"] {
             assert!(a.contains(k), "prompt must mention {k}");
         }

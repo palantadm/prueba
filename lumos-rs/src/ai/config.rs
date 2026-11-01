@@ -41,6 +41,8 @@ pub struct AiFile {
     pub effort: String,
     #[serde(default = "smart")]
     pub mode: AiMode,
+    #[serde(default = "normal_style")]
+    pub style: String,
     #[serde(default)]
     pub providers: Vec<ProviderRec>,
 }
@@ -51,13 +53,16 @@ fn yes() -> bool {
 fn medium() -> String {
     "medium".into()
 }
+fn normal_style() -> String {
+    "normal".into()
+}
 fn smart() -> AiMode {
     AiMode::Smart
 }
 
 impl Default for AiFile {
     fn default() -> Self {
-        AiFile { enabled: true, active_provider: String::new(), model: String::new(), effort: medium(), mode: AiMode::Smart, providers: vec![] }
+        AiFile { enabled: true, active_provider: String::new(), model: String::new(), effort: medium(), mode: AiMode::Smart, style: normal_style(), providers: vec![] }
     }
 }
 
@@ -238,6 +243,7 @@ impl AiFile {
             model: self.model.clone(),
             effort: self.effort.clone(),
             mode: self.mode,
+            style: self.style.clone(),
             providers: self
                 .providers
                 .iter()
@@ -330,6 +336,12 @@ impl AiFile {
         if let Some(md) = c.mode {
             next.mode = md;
         }
+        if let Some(st) = c.style {
+            if !matches!(st.as_str(), "normal" | "concise" | "caveman") {
+                return Err("style debe ser normal, concise o caveman".into());
+            }
+            next.style = st;
+        }
         if let Some(en) = c.enabled {
             next.enabled = en;
         }
@@ -385,13 +397,13 @@ mod tests {
             active_provider: None,
             model: None,
             enabled: None,
-            effort: None,
+            effort: None, style: None,
             mode: None,
         }
     }
 
     fn empty() -> AiConfigIn {
-        AiConfigIn { provider: None, remove_provider: None, active_provider: None, model: None, enabled: None, effort: None, mode: None }
+        AiConfigIn { provider: None, remove_provider: None, active_provider: None, model: None, enabled: None, effort: None, style: None, mode: None }
     }
 
     #[test]

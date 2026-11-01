@@ -159,9 +159,9 @@ fn max_tokens_for(t: &Target) -> u32 {
 }
 
 async fn turn(inner: &Arc<Inner>, sid: &str, sess: &Arc<Session>, hist: &mut Vec<Msg>, input: TurnInput, cancel: &mut Cancel, totals: &mut Usage) -> End {
-    let (cfg_target, effort, mode) = {
+    let (cfg_target, effort, mode, style) = {
         let c = inner.cfg.lock();
-        (c.target(), c.effort.clone(), c.mode)
+        (c.target(), c.effort.clone(), c.mode, c.style.clone())
     };
     let mut target = match cfg_target {
         Ok(t) => t,
@@ -198,7 +198,7 @@ async fn turn(inner: &Arc<Inner>, sid: &str, sess: &Arc<Session>, hist: &mut Vec
             return End::Done;
         }
         let defs = if tools_on { tools::definitions() } else { vec![] };
-        let system = prompt::system(tools_on);
+        let system = prompt::system(tools_on, &style);
         let msgs = adapt(hist, &target.origin(), target.model.vision, tools_on);
         let req = ChatReq { system: &system, tools: &defs, msgs: &msgs, effort: &effort, max_tokens: max_tokens_for(&target) };
         let (i2, s2) = (inner.clone(), sid.to_string());

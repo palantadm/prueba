@@ -18,3 +18,6 @@ Leer el show y el estado, diagnosticar aparatos y DMX, buscar perfiles, ejecutar
 ## Privacidad
 - La clave se guarda solo en la máquina (`ai.json`, permisos 0600), nunca en el show ni en las copias, y no se envía de vuelta al navegador. También se puede usar la variable de entorno del proveedor (p. ej. `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`).
 - Al hablar con el asistente se envía al proveedor elegido el texto de la conversación, el contexto de la interfaz y los datos del show que consulte. Con un modelo local no sale nada de la máquina.
+
+## Estilo de respuesta (ahorrar tokens)
+En Ajustes → Asistente → **Estilo de respuesta**: *Normal*, *Conciso* (la respuesta primero, sin relleno) o *Cavernícola* (las frases más cortas posibles, sin relleno; conserva intactos los números, nombres, comandos, JSON y mensajes de error). Las respuestas más cortas gastan menos tokens: salen más baratas y rápidas, sobre todo con proveedores de pago o modelos locales lentos. El estilo solo afecta al texto que lees; las herramientas siguen recibiendo órdenes completas y correctas.

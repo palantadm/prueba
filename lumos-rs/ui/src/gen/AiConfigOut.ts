@@ -10,4 +10,8 @@ export type AiConfigOut = { enabled: boolean, active_provider: string, model: st
 /**
  * `low` | `medium` | `high`
  */
-effort: string, mode: AiMode, providers: Array<AiProviderOut>, presets: Array<AiPreset>, };
+effort: string, mode: AiMode, 
+/**
+ * `normal` | `concise` | `caveman`
+ */
+style: string, providers: Array<AiProviderOut>, presets: Array<AiPreset>, };

@@ -2,4 +2,8 @@
 import type { AiMode } from "./AiMode";
 import type { AiProviderIn } from "./AiProviderIn";
 
-export type AiConfigIn = { provider: AiProviderIn | null, remove_provider: string | null, active_provider: string | null, model: string | null, enabled: boolean | null, effort: string | null, mode: AiMode | null, };
+export type AiConfigIn = { provider: AiProviderIn | null, remove_provider: string | null, active_provider: string | null, model: string | null, enabled: boolean | null, effort: string | null, mode: AiMode | null, 
+/**
+ * Reply style: `normal` | `concise` | `caveman` (fewest possible words, saves tokens).
+ */
+style: string | null, };

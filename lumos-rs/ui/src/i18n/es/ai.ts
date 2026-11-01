@@ -1,5 +1,11 @@
 // Spanish for the in-app assistant (panel, settings, command-bar hooks).
 export const ai: Record<string, string> = {
+  "Reply style": "Estilo de respuesta",
+  "Normal": "Normal",
+  "Concise": "Conciso",
+  "Caveman (fewest tokens)": "Cavernícola (mínimos tokens)",
+  "Shorter replies use fewer tokens (cheaper and faster). Caveman drops every filler word but keeps numbers, names and commands intact.": "Las respuestas más cortas gastan menos tokens (más baratas y rápidas). El modo cavernícola quita todo el relleno pero conserva números, nombres y comandos intactos.",
+
   "Assistant": "Asistente",
   "Thinking…": "Pensando…",
   "Sending…": "Enviando…",

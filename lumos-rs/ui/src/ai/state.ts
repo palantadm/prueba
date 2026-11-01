@@ -40,7 +40,7 @@ export const aiReady = computed(() => {
 /** Full `AiConfigIn` with every field null except the ones given. */
 export function configure(part: Partial<AiConfigIn>): Promise<void> {
   const cfg: AiConfigIn = {
-    provider: null, remove_provider: null, active_provider: null, model: null, enabled: null, effort: null, mode: null, ...part,
+    provider: null, remove_provider: null, active_provider: null, model: null, enabled: null, effort: null, mode: null, style: null, ...part,
   };
   return send({ type: "ai_configure", cfg });
 }
