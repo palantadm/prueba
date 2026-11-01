@@ -160,3 +160,13 @@ button.sc-action-title { display: flex; align-items: center; gap: var(--s-2); fl
 .aim-aud { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; color: var(--mute); font-size: var(--fs-xs, 12px); pointer-events: none; }
 
 .px-sw { width: 56px; height: 14px; border-radius: 7px; border: 1px solid var(--line); }
+
+/* console lock */
+.lk-overlay { position: fixed; inset: 0; z-index: 9999; display: grid; place-items: center; background: rgba(6, 8, 12, .94); backdrop-filter: blur(6px); }
+.lk-box { display: flex; flex-direction: column; gap: 16px; align-items: center; padding: 24px; max-width: 360px; width: 100%; }
+.lk-title { font-size: 22px; font-weight: 700; }
+.lk-pad { display: flex; flex-direction: column; gap: 12px; align-items: center; width: 100%; }
+.lk-dots { font-size: 28px; letter-spacing: .3em; min-height: 40px; font-family: var(--mono, monospace); }
+.lk-keys { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 100%; }
+.lk-keys .btn { min-height: 64px; font-size: 22px; }
+.lk-err { color: var(--red); text-align: center; }

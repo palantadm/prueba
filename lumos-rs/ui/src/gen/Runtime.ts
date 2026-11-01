@@ -5,6 +5,7 @@ import type { CmdLogLine } from "./CmdLogLine";
 import type { CuelistRt } from "./CuelistRt";
 import type { ExecRt } from "./ExecRt";
 import type { InputStatus } from "./InputStatus";
+import type { LockRt } from "./LockRt";
 import type { OutputStatus } from "./OutputStatus";
 import type { ParkedChannel } from "./ParkedChannel";
 import type { SceneRt } from "./SceneRt";
@@ -65,6 +66,10 @@ pixels_running: Array<number>,
  * Calendar / astronomical clock.
  */
 schedule: ScheduleRt, 
+/**
+ * Console lock state.
+ */
+lock: LockRt, 
 /**
  * Output test pattern running.
  */

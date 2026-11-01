@@ -6,6 +6,7 @@ mod cmdline;
 mod data;
 mod effects;
 mod history;
+mod lock;
 mod macros;
 mod morph;
 mod msc;
@@ -257,6 +258,7 @@ struct Engine {
     audio: audio::AudioState,
     pixels_on: BTreeSet<u32>,
     sched: sched::Sched,
+    lock: lock::LockState,
     /// Script reader pointers and follow flags (see script.rs).
     script: script::ScriptState,
 }
@@ -295,6 +297,7 @@ impl Engine {
             audio: audio::AudioState::load(&store),
             pixels_on: BTreeSet::new(),
             sched: Default::default(),
+            lock: lock::LockState::load(&store),
             script: Default::default(),
             store,
             t0: now,
@@ -396,7 +399,7 @@ impl Engine {
     fn on_in(&mut self, m: EngineIn) {
         match m {
             EngineIn::Cmd { cmd, reply } => {
-                let r = self.handle(cmd);
+                let r = self.lock_guard(&cmd).and_then(|_| self.handle(cmd));
                 match reply {
                     Some(tx) => {
                         let _ = tx.send(r);
@@ -436,6 +439,15 @@ impl Engine {
             }
             EngineIn::GetShow { reply } => {
                 let _ = reply.send(self.show.clone());
+            }
+            EngineIn::ImportShow { reply, .. } if self.lock.locked => {
+                let _ = reply.send(Err("Mesa bloqueada: introduce el PIN para desbloquear".into()));
+            }
+            EngineIn::ShowEdit { reply, .. } if self.lock.locked => {
+                let _ = reply.send(Err("Mesa bloqueada: introduce el PIN para desbloquear".into()));
+            }
+            EngineIn::ImportProfiles { reply, .. } if self.lock.locked => {
+                let _ = reply.send(Err("Mesa bloqueada: introduce el PIN para desbloquear".into()));
             }
             EngineIn::ImportShow { show, reply } => {
                 self.set_show(*show);
@@ -1024,6 +1036,7 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            c @ (Lock | Unlock { .. } | LockSet { .. }) => self.lock_command(c)?,
             ScheduleSave { rule } => self.schedule_save(rule)?,
             ScheduleRemove { id } => self.schedule_remove(id),
             PixelSave { map } => self.pixel_save(map)?,
@@ -2166,6 +2179,7 @@ impl Engine {
             timelines: self.timelines_rt(),
             pixels_running: self.pixels_on.iter().copied().collect(),
             schedule: self.schedule_rt(),
+            lock: self.lock_rt(),
             macros_running: self.macros_running_ids(),
             testing: self.data.test.is_some(),
             identifying: self.data.identifying.iter().copied().collect(),

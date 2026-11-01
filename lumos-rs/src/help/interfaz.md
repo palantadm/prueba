@@ -18,3 +18,7 @@ La consola se divide en espacios de trabajo. Se cambia de espacio con el menú s
 - Hay deshacer/rehacer para los cambios del show (no para lo que se lanza en directo).
 - Los controles de alta frecuencia (faders, encoders) no esperan confirmación del servidor, por eso responden al instante.
 - La interfaz está en español; los términos de oficio (Patch, Blackout, Cue, GO, Master…) se mantienen en inglés.
+
+## Bloquear la mesa
+El botón 🔒 de la barra superior congela la mesa **en todas las pantallas** (y el asistente) hasta que se introduzca el PIN. La primera vez pide definir un PIN de 4 a 12 cifras; el clic derecho (o pulsación larga) del botón permite cambiarlo o quitarlo. Con la mesa bloqueada solo funciona el **blackout de emergencia**; tras 5 PIN incorrectos hay que esperar 30 s. El PIN se guarda cifrado (sal + SHA-256) en la carpeta de datos. Es una protección contra manos ajenas, no contra quien tenga acceso al ordenador.
+<!--ai-->El asistente no puede desbloquear ni cambiar el PIN. `lock` bloquea.<!--/ai-->

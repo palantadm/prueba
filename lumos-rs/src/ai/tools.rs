@@ -152,7 +152,7 @@ pub fn type_def(name: &str) -> Option<String> {
 }
 
 fn send_command_description() -> String {
-    let skip = ["command_line", "midi_in", "subscribe_dmx", "learn_start", "learn_stop", "ai_"];
+    let skip = ["command_line", "midi_in", "subscribe_dmx", "learn_start", "learn_stop", "unlock", "lock_set", "ai_"];
     let mut s = String::from(
         "Send ONE raw Lumos command as a JSON object `{\"type\": \"<name>\", ...fields}` (fields marked `?` are optional). \
          Attribute values are 0..1 floats; a PerFixture map is `{\"<fixture id>\": {\"dimmer\": 1, \"red\": 0.5}}`. \
@@ -927,6 +927,9 @@ pub async fn execute(h: &Handle, name: &str, input: &Value) -> Result<String, St
                 Err(e) => return Err(e),
             };
             let ty = raw.get("type").and_then(|t| t.as_str()).unwrap_or("").to_string();
+            if matches!(ty.as_str(), "unlock" | "lock_set") {
+                return Err("El PIN de la mesa solo lo gestiona el usuario: no está permitido para el asistente.".into());
+            }
             if ty.starts_with("ai_") {
                 return Err("Ese comando no está permitido para el asistente.".into());
             }

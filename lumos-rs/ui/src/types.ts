@@ -1,3 +1,4 @@
+export type { LockRt } from "./gen/LockRt";
 export type { ScheduleRt } from "./gen/ScheduleRt";
 export type { ScheduleNext } from "./gen/ScheduleNext";
 export type { ScheduleWhen } from "./gen/ScheduleWhen";

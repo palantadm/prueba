@@ -1288,6 +1288,13 @@ pub struct SpeechRt {
     pub error: String,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LockRt {
+    pub locked: bool,
+    pub pin_set: bool,
+}
+
 /// When a schedule rule fires.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, TS)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -1929,6 +1936,9 @@ pub struct Runtime {
     /// Calendar / astronomical clock.
     #[serde(default)]
     pub schedule: ScheduleRt,
+    /// Console lock state.
+    #[serde(default)]
+    pub lock: LockRt,
     /// Output test pattern running.
     #[serde(default)]
     pub testing: bool,
@@ -2092,6 +2102,12 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── console lock ──
+    /// Freeze the console for everyone until the PIN is entered (needs a PIN: see `LockSet`). Emergency blackout stays available.
+    Lock,
+    Unlock { pin: String },
+    /// Set (4–12 digits), change or remove (`new_pin` empty) the lock PIN; `pin` = the current one when there is one.
+    LockSet { pin: String, new_pin: String },
     // ── schedule ──
     ScheduleSave { rule: ScheduleRule },
     ScheduleRemove { id: u32 },

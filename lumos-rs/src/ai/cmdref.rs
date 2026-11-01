@@ -33,7 +33,7 @@ pub const GROUPS: &[(&str, &[&str])] = &[
     ("Guion", &["script_save", "script_remove", "script_go", "script_back", "script_goto", "script_fire", "script_follow", "script_reset", "speech_configure", "speech_listen", "speech_model_get", "speech_model_remove"]),
     ("Salidas, red y ajustes", &["universe_save", "universe_remove", "output_test", "nodes_scan", "settings_save", "binding_save", "binding_remove", "midi_enable"]),
     ("Localizar y copias", &["identify", "locate_save", "locate_capture", "backup_create", "backup_restore", "backup_delete"]),
-    ("Escenario, consola virtual y shows", &["show_merge", "stage_save", "vc_save", "vc_press", "vc_value", "vc_xy", "show_new", "show_save", "show_load", "show_rename"]),
+    ("Escenario, consola virtual y shows", &["lock", "show_merge", "stage_save", "vc_save", "vc_press", "vc_value", "vc_xy", "show_new", "show_save", "show_load", "show_rename"]),
 ];
 
 pub const REF: &[Entry] = &[
@@ -164,6 +164,7 @@ pub const REF: &[Entry] = &[
     e("vc_press", "Pulsa/suelta un widget de la consola virtual (id de get_show vconsole).", r#"{"type":"vc_press","widget":1,"down":true}"#, None),
     e("vc_value", "Pone el valor 0..1 de un fader/slider de la consola virtual.", r#"{"type":"vc_value","widget":2,"value":0.7}"#, None),
     e("vc_xy", "Mueve un XY pad (x,y 0..1).", r#"{"type":"vc_xy","widget":3,"x":0.5,"y":0.5}"#, None),
+    e("lock", "Bloquea la mesa para todos pidiendo el PIN (necesita un PIN definido). Solo si el usuario lo pide; para desbloquear hace falta el PIN, que la IA no maneja. El blackout de emergencia sigue disponible.", r#"{"type":"lock"}"#, None),
     e("show_merge", "Añade partes de OTRO show guardado a este (se puede deshacer): parts = fixtures (patch), groups, palettes, scenes, cuelists, chases, effects, macros, timelines, scripts, locate. Los ids que chocan se renumeran y las referencias los siguen. Sin fusionar fixtures, solo valen los aparatos con el mismo número y perfil. Las macros, timelines y acciones del guion que llaman a cosas por número NO se reescriben.", r#"{"type":"show_merge","name":"Obra anterior","parts":["groups","palettes","cuelists"]}"#, None),
     e("show_new", "Nuevo show vacío. DESTRUCTIVO: solo si el usuario lo pide.", r#"{"type":"show_new","name":"Obra"}"#, None),
     e("show_save", "Guarda el show (name null = el actual).", r#"{"type":"show_save","name":null}"#, None),
@@ -172,7 +173,7 @@ pub const REF: &[Entry] = &[
 ];
 
 /// Commands that `send_command` refuses by design (UI plumbing, assistant control, raw streams).
-pub const NOT_FOR_AI: &[&str] = &["command_line", "midi_in", "subscribe_dmx", "learn_start", "learn_stop", "ai_send", "ai_cancel", "ai_confirm", "ai_answer", "ai_reset", "ai_undo", "ai_configure", "ai_list_models", "ai_test_provider"];
+pub const NOT_FOR_AI: &[&str] = &["command_line", "midi_in", "subscribe_dmx", "learn_start", "learn_stop", "ai_send", "ai_cancel", "ai_confirm", "ai_answer", "ai_reset", "ai_undo", "ai_configure", "ai_list_models", "ai_test_provider", "unlock", "lock_set"];
 
 pub fn find(ty: &str) -> Option<&'static Entry> {
     REF.iter().find(|x| x.ty == ty)

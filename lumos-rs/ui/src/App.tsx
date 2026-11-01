@@ -20,6 +20,7 @@ import { AiButton, HelpButton } from "./ai/Buttons";
 import { aiWorkspace, nav, toggleQuick } from "./ai/state";
 import { setSettingsCat } from "./workspaces/Settings";
 import { HelpCenter } from "./help/HelpCenter";
+import { LockButton, LockOverlay } from "./lock/Lock";
 import { closeHelp, helpPage, openHelp } from "./help/state";
 import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
 import { MergeDialog } from "./workspaces/exchange/MergeDialog";
@@ -244,6 +245,7 @@ function MainApp() {
         <span class="tc hide-narrow" title={t("Show timecode")} style={{ color: tc?.running ? "var(--amber)" : "var(--text)" }}>{tc?.text ?? "00:00:00:00"}</span>
         <UBars />
         <StatusChip />
+        <LockButton />
         <button class="btn icon ghost" aria-label={t("Help")} title={t("Help (?)")} onClick={() => openHelp()}>?</button>
       </header>
       <TestBanner />
@@ -263,6 +265,7 @@ function MainApp() {
         <button class={`btn-blackout ${bo ? "active" : ""}`} aria-pressed={bo} onClick={() => send({ type: "blackout", on: !bo })} title={t("Blackout (Ctrl+B)")}>BLACKOUT</button>
       </footer>
       <HelpCenter />
+      <LockOverlay />
       <AiPanel />
       <QuickAsk />
       <DialogHost />
@@ -332,6 +335,7 @@ function SecondaryApp() {
           <WorkspaceGrid value={ws.id} onPick={(id) => { goto(id); setPick(false); }} />
         </Modal>
       )}
+      <LockOverlay />
       <DialogHost />
       <Toasts />
     </div>
