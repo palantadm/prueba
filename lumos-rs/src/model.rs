@@ -1263,6 +1263,71 @@ pub struct SpeechRt {
     pub error: String,
 }
 
+/// Pattern of a pixel map.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum PixelKind {
+    Solid,
+    Gradient,
+    Rainbow,
+    Wave,
+    Chase,
+    Noise,
+    Strobe,
+}
+
+fn d_pw() -> u32 {
+    8
+}
+fn d_one_f() -> f32 {
+    1.0
+}
+fn d_quarter() -> f32 {
+    0.25
+}
+
+/// A row or grid of fixtures treated as the pixels of a small screen, painted with a moving pattern.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PixelMap {
+    pub id: u32,
+    pub name: String,
+    /// Fixtures in pixel order (left to right, then next row).
+    pub fixtures: Vec<u32>,
+    /// Pixels per row (a single row = a line / bar).
+    #[serde(default = "d_pw")]
+    pub width_px: u32,
+    /// Every second row is wired backwards.
+    #[serde(default)]
+    pub zigzag: bool,
+    pub kind: PixelKind,
+    /// Main colour and background colour (0..1 RGB).
+    pub color_a: [f32; 3],
+    pub color_b: [f32; 3],
+    /// Cycles per second (negative = the other way).
+    #[serde(default)]
+    pub speed: f32,
+    /// Repeats of the pattern across the map.
+    #[serde(default = "d_one_f")]
+    pub size: f32,
+    /// Direction of travel in degrees (0 = left → right, 90 = top → bottom).
+    #[serde(default)]
+    pub angle: f32,
+    /// Chase: bar width as a fraction of the cycle.
+    #[serde(default = "d_quarter")]
+    pub width: f32,
+    /// Chase: softness of the edges 0..1.
+    #[serde(default)]
+    pub softness: f32,
+    /// Overall level 0..1.
+    #[serde(default = "d_one_f")]
+    pub level: f32,
+    /// Also hold the fixtures' dimmer at full (RGB fixtures with a dimmer channel).
+    #[serde(default = "d_true")]
+    pub drive_dimmer: bool,
+}
+
 /// A part of a show that can be merged into another.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[serde(rename_all = "snake_case")]
@@ -1363,6 +1428,9 @@ pub struct Show {
     /// (dimmer up, colour/white, shutter open, lamp-on control channel…). Overrides the automatic guess.
     #[serde(default)]
     pub locate: BTreeMap<String, Attrs>,
+    /// Pixel maps (patterns across rows / grids of fixtures).
+    #[serde(default)]
+    pub pixelmaps: Vec<PixelMap>,
     #[serde(default)]
     pub scripts: Vec<Script>,
     #[serde(default)]
@@ -1396,6 +1464,7 @@ impl Default for Show {
             speed_masters: vec![],
             macros: vec![],
             locate: BTreeMap::new(),
+            pixelmaps: Vec::new(),
             scripts: vec![],
             timelines: vec![],
             cuelists: vec![],
@@ -1763,6 +1832,9 @@ pub struct Runtime {
     pub audio: AudioRt,
     #[serde(default)]
     pub macros_running: Vec<u32>,
+    /// Pixel maps that are running.
+    #[serde(default)]
+    pub pixels_running: Vec<u32>,
     /// Output test pattern running.
     #[serde(default)]
     pub testing: bool,
@@ -1926,6 +1998,10 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── pixel maps ──
+    PixelSave { map: PixelMap },
+    PixelRemove { id: u32 },
+    PixelRun { id: u32, on: bool },
     // ── show merge ──
     /// Add parts of another saved show to this one (undoable). Ids that clash are renumbered and references follow.
     ShowMerge { name: String, parts: Vec<MergePart> },

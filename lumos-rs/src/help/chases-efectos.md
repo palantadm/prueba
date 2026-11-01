@@ -14,3 +14,11 @@ Un `speed_master` tiene un `bpm` (20–240) que pueden seguir varios chases y ef
 ## Consejos
 - Para un barrido de color: efecto `hue` con `phase_spread` 360 y `rate` bajo.
 - Para un movimiento: efecto `circle` con `attr` pan y `attr2` tilt.
+
+## Mapas de píxeles
+Una fila o rejilla de aparatos RGB (barras LED, tubos de píxel, una pared de pares) se trata como los píxeles de una pantalla pequeña y se pinta con un patrón en movimiento. **Live → Píxeles → «+ Nuevo mapa de píxeles»** usa la selección **en orden de cableado**.
+- **Patrones:** arcoíris, degradado, onda, barra que corre (con ancho y suavidad), ruido, estrobo y color fijo.
+- **Controles:** píxeles por fila (rejilla), zigzag si las filas alternas están cableadas al revés, velocidad en ciclos por segundo (negativa = al revés), repeticiones por el mapa, dirección en grados (0 = izquierda→derecha, 90 = arriba→abajo), colores A y B y nivel.
+- **Prioridad:** actúa por encima de cuelists y escenas y **por debajo del programador** (lo que toques a mano manda). Se arranca y para con el botón ON/OFF o desde la consola: `pixel 1 on`, `pixel 1 off`.
+- Con «Mantener también el dimmer al máximo» los aparatos RGB con canal de dimmer se encienden solos; sin esa opción, el dimmer lo decides tú.
+<!--ai-->Por protocolo: `pixel_save {map}`, `pixel_run {id,on}`, `pixel_remove {id}`.<!--/ai-->

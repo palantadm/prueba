@@ -1,3 +1,5 @@
+export type { PixelMap } from "./gen/PixelMap";
+export type { PixelKind } from "./gen/PixelKind";
 export type { MergeReport } from "./gen/MergeReport";
 export type { MergeCount } from "./gen/MergeCount";
 export type { MergePart } from "./gen/MergePart";

@@ -158,3 +158,5 @@ button.sc-action-title { display: flex; align-items: center; gap: var(--s-2); fl
 .aim-dot { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 0 4px rgba(255, 180, 60, .25); pointer-events: none; }
 .aim-obj { position: absolute; background: rgba(120, 140, 170, .25); border: 1px solid rgba(120, 140, 170, .5); pointer-events: none; }
 .aim-aud { position: absolute; bottom: 4px; left: 0; right: 0; text-align: center; color: var(--mute); font-size: var(--fs-xs, 12px); pointer-events: none; }
+
+.px-sw { width: 56px; height: 14px; border-radius: 7px; border: 1px solid var(--line); }

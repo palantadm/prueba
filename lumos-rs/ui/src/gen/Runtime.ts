@@ -57,6 +57,10 @@ speech: SpeechRt,
  */
 audio: AudioRt, macros_running: Array<number>, 
 /**
+ * Pixel maps that are running.
+ */
+pixels_running: Array<number>, 
+/**
  * Output test pattern running.
  */
 testing: boolean, 

@@ -7,6 +7,7 @@ import { Modal } from "../../ui";
 import { ConfirmDialog, PromptDialog } from "./dialogs";
 import { ScenePool } from "./Scenes";
 import { ChasePool } from "./Chases";
+import { PixelPool } from "./PixelPool";
 import { t, tp } from "../../i18n";
 import { focusPalette } from "../../lib/state";
 
@@ -16,7 +17,7 @@ const KINDS: { id: PaletteKind; label: string }[] = [
 ];
 
 export function Pools() {
-  const [tab, setTab] = useState<"palettes" | "effects" | "scenes" | "chases">("palettes");
+  const [tab, setTab] = useState<"palettes" | "effects" | "scenes" | "chases" | "pixels">("palettes");
   useEffect(() => { if (focusPalette.value !== null) setTab("palettes"); }, [focusPalette.value]);
   return (
     <div class="panel lv-col pools">
@@ -25,8 +26,9 @@ export function Pools() {
         <button role="tab" aria-selected={tab === "effects"} class={`seg-btn ${tab === "effects" ? "active" : ""}`} onClick={() => setTab("effects")}>{t("Effects")}</button>
         <button role="tab" aria-selected={tab === "scenes"} class={`seg-btn ${tab === "scenes" ? "active" : ""}`} onClick={() => setTab("scenes")}>{t("Scenes")}</button>
         <button role="tab" aria-selected={tab === "chases"} class={`seg-btn ${tab === "chases" ? "active" : ""}`} onClick={() => setTab("chases")}>{t("Chases")}</button>
+        <button role="tab" aria-selected={tab === "pixels"} class={`seg-btn ${tab === "pixels" ? "active" : ""}`} onClick={() => setTab("pixels")}>{t("Pixels")}</button>
       </div>
-      {tab === "palettes" ? <PalettePool /> : tab === "effects" ? <EffectPool /> : tab === "scenes" ? <ScenePool /> : <ChasePool />}
+      {tab === "palettes" ? <PalettePool /> : tab === "effects" ? <EffectPool /> : tab === "scenes" ? <ScenePool /> : tab === "chases" ? <ChasePool /> : <PixelPool />}
     </div>
   );
 }

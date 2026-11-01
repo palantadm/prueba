@@ -9,6 +9,7 @@ import type { FixtureProfile } from "./FixtureProfile";
 import type { Group } from "./Group";
 import type { Macro } from "./Macro";
 import type { Palette } from "./Palette";
+import type { PixelMap } from "./PixelMap";
 import type { Scene } from "./Scene";
 import type { Script } from "./Script";
 import type { Settings } from "./Settings";
@@ -23,7 +24,11 @@ export type Show = { name: string, universes: Array<UniverseCfg>, fixtures: Arra
  * Per-profile "locate" look: attribute values that make a fixture of that profile visibly light
  * (dimmer up, colour/white, shutter open, lamp-on control channel…). Overrides the automatic guess.
  */
-locate: { [key in string]?: { [key in string]?: number } }, scripts: Array<Script>, timelines: Array<Timeline>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
+locate: { [key in string]?: { [key in string]?: number } }, 
+/**
+ * Pixel maps (patterns across rows / grids of fixtures).
+ */
+pixelmaps: Array<PixelMap>, scripts: Array<Script>, timelines: Array<Timeline>, cuelists: Array<Cuelist>, executors: Array<Executor>, effects: Array<Effect>, bindings: Array<Binding>, stage: Stage, settings: Settings, 
 /**
  * Profiles imported into / customised in this show (merged over the built-in library).
  */

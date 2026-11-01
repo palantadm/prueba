@@ -10,6 +10,7 @@ mod macros;
 mod morph;
 mod msc;
 mod patch;
+mod pixelmap;
 mod playback;
 #[cfg(test)]
 mod merge_tests;
@@ -253,6 +254,7 @@ struct Engine {
     ai: crate::ai::AiHub,
     voice: voice::Voice,
     audio: audio::AudioState,
+    pixels_on: BTreeSet<u32>,
     /// Script reader pointers and follow flags (see script.rs).
     script: script::ScriptState,
 }
@@ -289,6 +291,7 @@ impl Engine {
             ai: crate::ai::AiHub::new(store.clone(), out.clone()),
             voice: voice::Voice::load(&store),
             audio: audio::AudioState::load(&store),
+            pixels_on: BTreeSet::new(),
             script: Default::default(),
             store,
             t0: now,
@@ -995,6 +998,9 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            PixelSave { map } => self.pixel_save(map)?,
+            PixelRemove { id } => self.pixel_remove(id),
+            PixelRun { id, on } => self.pixel_run(id, on)?,
             ShowMerge { name, parts } => {
                 self.merge_report(&name, &parts, true)?;
             }
@@ -1727,6 +1733,7 @@ impl Engine {
         // 1b. scenes and scene morph
         self.apply_scenes(&mut merged);
         self.apply_chases(&mut merged);
+        self.apply_pixelmaps(&mut merged, now);
         self.last_merged = merged.clone();
         // 2. programmer (excluded while blind)
         if !self.prog.blind {
@@ -2111,6 +2118,7 @@ impl Engine {
             chases: self.chase_rt(),
             speed: self.speed_rt(),
             timelines: self.timelines_rt(),
+            pixels_running: self.pixels_on.iter().copied().collect(),
             macros_running: self.macros_running_ids(),
             testing: self.data.test.is_some(),
             identifying: self.data.identifying.iter().copied().collect(),

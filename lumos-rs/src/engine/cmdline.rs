@@ -147,6 +147,7 @@ const KW_FIRE: &[&str] = &["fire", "disparar", "lanzar"];
 const KW_OSC: &[&str] = &["osc"];
 const KW_MIDI: &[&str] = &["midi"];
 const KW_HTTP: &[&str] = &["http", "web"];
+const KW_PIXEL: &[&str] = &["pixel", "pixeles", "pixelmap"];
 const KW_AIM: &[&str] = &["aim", "apuntar", "point"];
 const KW_OBJECT: &[&str] = &["object", "objeto", "obj"];
 const KW_HEIGHT: &[&str] = &["height", "altura", "h"];
@@ -223,7 +224,7 @@ const VERB_GROUPS: &[&[&str]] = &[
     KW_FIXTURE, KW_GROUP, KW_ALL, KW_NONE, KW_ODD, KW_EVEN, KW_NEXT, KW_PREV, KW_AT, KW_COLOUR, KW_RECORD, KW_UPDATE,
     KW_DELETE, KW_APPLY, KW_GO, KW_BACK, KW_PAUSE, KW_RELEASE, KW_GOTO, KW_CUELIST, KW_SCENE, KW_CHASE, KW_MACRO,
     KW_TIMELINE, KW_BLACKOUT, KW_GM, KW_CLEAR, KW_PARK, KW_UNPARK, KW_UNDO, KW_REDO, KW_BLIND, KW_LOCATE,
-    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP, KW_EXEC, KW_SOUND, KW_AIM,
+    KW_SCRIPT, KW_OSC, KW_MIDI, KW_HTTP, KW_EXEC, KW_SOUND, KW_AIM, KW_PIXEL,
 ];
 
 fn all_keywords() -> Vec<&'static str> {
@@ -502,6 +503,7 @@ pub enum Stmt {
     Effect { id: u32, on: bool },
     Exec { id: u32, act: ExecAct },
     Aim { sel: Option<Sel>, target: AimTarget, height: f32 },
+    Pixel { id: u32, on: bool },
     Sound { file: String, vol: f32, looped: bool },
     SoundStop(Option<String>),
     MacroRun(u32),
@@ -896,6 +898,13 @@ impl<'a> P<'a> {
         if is(w, KW_AIM) {
             self.i += 1;
             return self.aim_tail(None);
+        }
+        if is(w, KW_PIXEL) {
+            self.i += 1;
+            let id = self.uint("a pixel map number")?;
+            let on = !(self.eat_kw(KW_OFF) || self.eat_kw(KW_OUT) || self.eat_kw(KW_STOP));
+            self.eat_kw(KW_ON);
+            return Ok(Stmt::Pixel { id, on });
         }
         if is(w, KW_SOUND) {
             self.i += 1;
@@ -1957,6 +1966,7 @@ pub fn resolve(stmt: &Stmt, ctx: &Ctx, sess: &mut Session) -> R<Compiled> {
             };
             one(cmd, format!("chase {id} {what}"))
         }
+        Stmt::Pixel { id, on } => one(Command::PixelRun { id: *id, on: *on }, format!("pixel map {id} {}", if *on { "on" } else { "off" })),
         Stmt::Aim { sel, target, height } => {
             let fx = selection_for(sel, ctx, sess)?;
             let n = fx.len();
@@ -2122,6 +2132,7 @@ pub fn help_json() -> serde_json::Value {
         ("chase", "chase N [on|off|tap|bpm V|next|prev]", "Chases", &["chase 1 on", "chase 2 bpm 128"]),
         ("effect", "effect N [on|off]", "Start/stop a saved effect (pool item N)", &["effect 5 on", "effect 2 off"]),
         ("executor", "exec|executor N go|back|flash [on|off]|at V", "Playback executor N: GO, BACK, FLASH (held) or fader level 0-100", &["exec 5 go", "exec 2 at 80", "exec 3 flash on"]),
+        ("pixel", "pixel N [on|off]", "Start / stop a pixel map (a pattern across a row or grid of fixtures)", &["pixel 1 on", "pixel 1 off"]),
         ("aim", "aim <x> <y> <z> [height H] | aim object N | aim fixture N  (or <sel> aim …)", "Point the selected moving heads at a point of the room in metres (x = stage right, y = up, z = towards the audience), at a stage object or at another fixture; height raises the aim point (a performer's chest)", &["aim 0 0 2", "fixture 1 thru 4 aim 1.5 0 -3 height 1.6", "aim object 3"]),
         ("sound", "sound \"file.wav\" [at V] [loop] | sound stop [\"file\"]", "Play a sound from the media folder on the sounds bus (level 0-100, loop); stop one or all", &["sound \"gong.wav\"", "sound \"ambiente.mp3\" at 60 loop", "sound stop"]),
         ("macro", "macro N | macro stop [N]", "Macros", &["macro 3"]),
@@ -2142,7 +2153,7 @@ pub fn help_json() -> serde_json::Value {
         ("half", KW_HALF), ("home", KW_HOME), ("colour", KW_COLOUR), ("record", KW_RECORD), ("update", KW_UPDATE),
         ("delete", KW_DELETE), ("apply", KW_APPLY), ("go", KW_GO), ("back", KW_BACK), ("pause", KW_PAUSE),
         ("release", KW_RELEASE), ("goto", KW_GOTO), ("cue", KW_CUE), ("cuelist", KW_CUELIST), ("scene", KW_SCENE),
-        ("chase", KW_CHASE), ("effect", KW_EFFECT), ("exec", KW_EXEC), ("sound", KW_SOUND), ("loop", KW_LOOP), ("aim", KW_AIM), ("object", KW_OBJECT), ("height", KW_HEIGHT), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
+        ("chase", KW_CHASE), ("effect", KW_EFFECT), ("exec", KW_EXEC), ("sound", KW_SOUND), ("loop", KW_LOOP), ("aim", KW_AIM), ("pixel", KW_PIXEL), ("object", KW_OBJECT), ("height", KW_HEIGHT), ("macro", KW_MACRO), ("timeline", KW_TIMELINE), ("script", KW_SCRIPT), ("follow", KW_FOLLOW), ("reset", KW_RESET), ("fire", KW_FIRE), ("osc", KW_OSC), ("midi", KW_MIDI), ("http", KW_HTTP), ("blackout", KW_BLACKOUT), ("gm", KW_GM),
         ("clear", KW_CLEAR), ("park", KW_PARK), ("unpark", KW_UNPARK), ("undo", KW_UNDO), ("redo", KW_REDO),
         ("blind", KW_BLIND), ("locate", KW_LOCATE),
     ];

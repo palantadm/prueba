@@ -91,6 +91,8 @@ pub fn history_key(cmd: &Command) -> Option<(String, bool)> {
         TimelineRemove { .. } => ("timeline_remove", 0, false),
         ScriptSave { script } => ("script_save", script.id as u64, true),
         ShowMerge { .. } => ("show_merge", 0, false),
+        PixelSave { map } => ("pixel_save", map.id as u64, true),
+        PixelRemove { id } => ("pixel_remove", *id as u64, false),
         ScriptRemove { .. } => ("script_remove", 0, false),
         _ => return None,
     };
