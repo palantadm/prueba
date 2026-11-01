@@ -16,7 +16,7 @@ pub mod anthropic;
 pub mod client;
 pub mod cmdref;
 pub mod config;
-pub mod help;
+pub use crate::help;
 pub mod netdiag;
 pub mod patchcheck;
 pub mod openai;

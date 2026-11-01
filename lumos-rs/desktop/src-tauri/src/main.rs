@@ -183,6 +183,10 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         "Ayuda",
         true,
         &[
+            &MenuItem::with_id(app, "help_manual", "Manual de ayuda", true, Some("F1"))?,
+            &MenuItem::with_id(app, "help_commands", "Referencia de comandos", true, None::<&str>)?,
+            &MenuItem::with_id(app, "help_keys", "Atajos de teclado", true, None::<&str>)?,
+            &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "browser", "Abrir en el navegador", true, None::<&str>)?,
             &MenuItem::with_id(app, "net", "Dirección para tablet o móvil…", true, None::<&str>)?,
         ],
@@ -217,6 +221,16 @@ fn on_menu(app: &AppHandle, id: &str) {
         "close_window" => {
             if let Some(w) = win {
                 let _ = w.close();
+            }
+        }
+        "help_manual" | "help_commands" | "help_keys" => {
+            if let Some(w) = win {
+                let page = match id {
+                    "help_commands" => "commands",
+                    "help_keys" => "shortcuts",
+                    _ => "topic:inicio",
+                };
+                let _ = w.eval(format!("window.__lumosOpenHelp&&window.__lumosOpenHelp('{page}')"));
             }
         }
         "open_data" => {

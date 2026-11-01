@@ -1,10 +1,10 @@
 ## Guardado
 - El show vivo se **autoguarda** a los pocos segundos de cada cambio (`autosave.json`) y se restaura al arrancar.
-- «Guardar» (`show_save`) escribe un fichero con nombre en la carpeta `shows` de los datos; `show_load` abre otro (¡sustituye el show actual!), `show_rename` lo renombra.
+- «Guardar» escribe un fichero con nombre en la carpeta `shows` de los datos; «Abrir» carga otro (¡sustituye el show actual!); «Renombrar» lo renombra.
 - Los datos viven en la carpeta que se pasa con `--data` (en la app de escritorio, `Documentos/Lumos`).
 
 ## Copias de seguridad
-`backup_create` hace una copia manual; hay copias automáticas. `backup_restore` recupera una (sustituye el show actual: acción destructiva).
+«Copia de seguridad» hace una copia manual; hay copias automáticas. «Restaurar» recupera una (sustituye el show actual: acción destructiva).
 
 ## Importar / exportar
 - Descargar el show actual: `GET /api/show`; importar: `PUT /api/show`.

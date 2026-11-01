@@ -2,7 +2,7 @@ Una **escena** es un look grabado (una foto de valores por aparato) que se puede
 
 ## Crear
 - Desde el programador: `record scene 3 Amanecer` (añade `output` para grabar lo que sale ahora en lugar del programador).
-- Por protocolo: `scene_record` (con `from_output`, `fixtures`, `merge`) o `scene_save` con la escena completa.
+<!--ai-->- Por protocolo: `scene_record` (con `from_output`, `fixtures`, `merge`) o `scene_save` con la escena completa.<!--/ai-->
 
 ## Usar
 - `scene 3 on`, `scene 3 off`, `scene 3 toggle`, `scene 3 at 60` (nivel), `scene solo 3` (apaga las demás), `scenes release`.

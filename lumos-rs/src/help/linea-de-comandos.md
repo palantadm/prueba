@@ -1,4 +1,4 @@
-La línea de comandos acepta órdenes de consola. Varias órdenes se separan con `;` o con saltos de línea y **comparten la selección** dentro del mismo texto. Las palabras clave funcionan en español e inglés, sin distinguir mayúsculas ni acentos. `# texto` es un comentario. Un error de sintaxis no ejecuta nada y avisa de la columna; si una orden falla, las siguientes no se ejecutan. El resultado de cada línea queda en el registro (`get_runtime` → `last_commands`).
+La línea de comandos acepta órdenes de consola. Varias órdenes se separan con `;` o con saltos de línea y **comparten la selección** dentro del mismo texto. Las palabras clave funcionan en español e inglés, sin distinguir mayúsculas ni acentos. `# texto` es un comentario. Un error de sintaxis no ejecuta nada y avisa de la columna; si una orden falla, las siguientes no se ejecutan. El resultado de cada línea queda en el registro de la consola.
 
 ## Gramática
 ```cmd
@@ -43,5 +43,5 @@ Atributos (con alias): dimmer (dim, intensity), pan, tilt, red/rojo, green/verde
 ## Consejos
 - Valores de 0 a 100. `full`/`max`/`pleno` = 100, `out`/`off`/`cero` = 0.
 - Después de grabar, `clear` evita que el programador siga mandando.
-- La línea de comandos **no parchea** ni configura universos, salidas, ajustes o perfiles: eso va con `send_command` (`fixture_add`, `universe_save`, `settings_save`…). Para grabar un cue complejo con tiempos, `cue_save`/`cuelist_save` por `send_command`.
+<!--ai-->- La línea de comandos **no parchea** ni configura universos, salidas, ajustes o perfiles: eso va con `send_command` (`fixture_add`, `universe_save`, `settings_save`…). Para grabar un cue complejo con tiempos, `cue_save`/`cuelist_save` por `send_command`.<!--/ai--><!--ui-->- La línea de comandos **no parchea** ni configura universos, salidas, ajustes o perfiles: eso se hace en Patch y en Ajustes.<!--/ui-->
 - Un aparato sin seleccionar (`red at 100` sin selección) da error: selecciona antes (`fixture 1 thru 4`, `group 2`, `all`).

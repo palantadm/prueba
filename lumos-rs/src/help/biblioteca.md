@@ -9,10 +9,10 @@ La biblioteca reúne los **perfiles** de aparato: lista de canales por modo, atr
 - No se admiten los formatos nativos de MagicQ (`heads.all`, `.hed`) ni MA2 XML.
 
 ## Importar
-Patch → Importar aparatos: arrastra los ficheros. El resultado indica cuántos perfiles se importaron y los errores. Con el asistente, `library_import_ofl` importa desde OFL.
+Patch → Importar aparatos: arrastra los ficheros. El resultado indica cuántos perfiles se importaron y los errores. <!--ai-->Con el asistente, `library_import_ofl` importa desde OFL.<!--/ai-->
 
 ## Buscar y usar
-- `search_library` busca por fabricante, modelo y categoría; `get_profile` muestra los modos y canales.
+<!--ai-->- `search_library` busca por fabricante, modelo y categoría; `get_profile` muestra los modos y canales.<!--/ai--><!--ui-->- En Patch → Añadir se busca por fabricante, modelo y categoría; al elegir el perfil se ven sus modos y canales.<!--/ui-->
 - Un perfil puede tener varios modos con distinto número de canales: elige el que coincida con el modo configurado en el propio aparato.
-- Si un aparato apunta a un perfil o modo que no existe, aparece como «perfil desconocido» y no emite: en `get_fixture_state` se avisa.
-- Eliminar un perfil importado (`library_remove`) deja huérfanos a los aparatos que lo usen.
+- Si un aparato apunta a un perfil o modo que no existe, aparece como «perfil desconocido» y no emite.<!--ai--> `get_fixture_state` lo avisa.<!--/ai-->
+- Eliminar un perfil importado deja huérfanos a los aparatos que lo usen.

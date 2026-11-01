@@ -8,6 +8,7 @@ pub mod engine;
 pub mod speech;
 pub mod gdtf;
 pub mod glb;
+pub mod help;
 pub mod io;
 pub mod library;
 pub mod midi;

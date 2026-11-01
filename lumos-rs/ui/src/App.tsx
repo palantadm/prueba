@@ -19,6 +19,8 @@ import { AiPanel, QuickAsk } from "./ai/Panel";
 import { AiButton, HelpButton } from "./ai/Buttons";
 import { aiWorkspace, nav, toggleQuick } from "./ai/state";
 import { setSettingsCat } from "./workspaces/Settings";
+import { HelpCenter } from "./help/HelpCenter";
+import { closeHelp, helpPage, openHelp } from "./help/state";
 import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
 
 export const current = signal(initialWorkspace());
@@ -39,17 +41,6 @@ function useAiBridge() {
   }, [n]);
 }
 
-const SHORTCUTS: [string, string][] = [
-  ["1 … 7", "Switch workspace"],
-  ["Ctrl/⌘ + B", "Toggle blackout"],
-  ["Ctrl/⌘ + S", "Save show"],
-  ["Ctrl/⌘ + Z", "Undo"],
-  ["Ctrl/⌘ + Y  ·  Ctrl/⌘ + Shift + Z", "Redo"],
-  ["Ctrl/⌘ + K", "Ask the assistant"],
-  ["/", "Command line"],
-  ["?", "This help"],
-  ["Esc", "Close dialogs"],
-];
 
 function ShowMenu() {
   const [open, setOpen] = useState(false);
@@ -195,7 +186,6 @@ function StatusChip() {
 }
 
 function MainApp() {
-  const [help, setHelp] = useState(false);
   useAiBridge();
   const bo = rt.value?.blackout ?? false;
 
@@ -216,7 +206,8 @@ function MainApp() {
       if (mod && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); void send({ type: e.shiftKey ? "redo" : "undo" }).catch(() => {}); return; }
       if (mod && !e.altKey && e.key.toLowerCase() === "y") { e.preventDefault(); void send({ type: "redo" }).catch(() => {}); return; }
       if (e.key === "/" && !mod && !e.altKey) { e.preventDefault(); setCmdOpen(true); return; }
-      if (e.key === "?") { setHelp((v) => !v); return; }
+      if (e.key === "F1") { e.preventDefault(); if (helpPage.value) closeHelp(); else openHelp(); return; }
+      if (e.key === "?") { if (helpPage.value) closeHelp(); else openHelp(); return; }
       if (mod || e.altKey) return;
       const w = workspaces.find((w) => w.key === e.key);
       if (w) goto(w.id);
@@ -250,7 +241,7 @@ function MainApp() {
         <span class="tc hide-narrow" title={t("Show timecode")} style={{ color: tc?.running ? "var(--amber)" : "var(--text)" }}>{tc?.text ?? "00:00:00:00"}</span>
         <UBars />
         <StatusChip />
-        <button class="btn icon ghost hide-narrow" aria-label={t("Keyboard shortcuts")} onClick={() => setHelp(true)}>?</button>
+        <button class="btn icon ghost" aria-label={t("Help")} title={t("Help (?)")} onClick={() => openHelp()}>?</button>
       </header>
       <TestBanner />
       <BlindBanner />
@@ -268,14 +259,7 @@ function MainApp() {
         <GrandMaster />
         <button class={`btn-blackout ${bo ? "active" : ""}`} aria-pressed={bo} onClick={() => send({ type: "blackout", on: !bo })} title={t("Blackout (Ctrl+B)")}>BLACKOUT</button>
       </footer>
-      {help && (
-        <Modal title={t("Keyboard shortcuts")} onClose={() => setHelp(false)}>
-          <table class="tbl"><tbody>
-            {SHORTCUTS.map(([k, d]) => <tr key={k}><td><Kbd>{k}</Kbd></td><td>{t(d)}</td></tr>)}
-            {workspaces.map((w) => <tr key={w.id}><td><Kbd>{w.key}</Kbd></td><td>{w.label}</td></tr>)}
-          </tbody></table>
-        </Modal>
-      )}
+      <HelpCenter />
       <AiPanel />
       <QuickAsk />
       <DialogHost />

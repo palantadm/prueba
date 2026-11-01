@@ -7,11 +7,11 @@ El **programador** es el área de trabajo manual: guarda los valores que pones a
 
 ## Poner valores
 - `fixture 1 thru 4 at 70` (dimmer por defecto), `red at 100`, `pan at 30`, `fixture 1 thru 8 at 0 thru 100` (abanico), `colour orange`.
-- Por protocolo: `prog_set` con `fixtures` y `attrs` (valores 0–1).
+<!--ai-->- Por protocolo: `prog_set` con `fixtures` y `attrs` (valores 0–1).<!--/ai-->
 - `locate`/`identify` enciende un aparato para localizarlo.
 
 ## Liberar y deshacer
-- `clear` (o `prog_release`) vacía el programador; puedes liberar solo ciertos aparatos o atributos.
+- `clear` vacía el programador; puedes liberar solo ciertos aparatos o atributos.
 - `blind on`: el programador deja de salir a escena para preparar un look sin que se vea; las ediciones en blind son seguras.
 
 ## Grabar

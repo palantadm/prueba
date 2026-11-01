@@ -1,6 +1,6 @@
 ## Macros
 Una macro es una lista de pasos (`steps`); cada paso es un texto de la línea de comandos más una espera (`wait`, segundos). Se ejecutan sin bloquear el motor, pueden anidarse hasta 8 niveles y, si un paso falla, la macro se aborta.
-- `macro_save` / `macro_remove`; lanzar con `macro 3`; parar con `macro stop`.
+- Las macros se crean y borran en su editor; se lanzan con `macro 3` y se paran con `macro stop`.<!--ai--> Por protocolo: `macro_save` / `macro_remove`.<!--/ai-->
 - Se pueden poner en un botón de la consola virtual.
 
 ## Timelines
