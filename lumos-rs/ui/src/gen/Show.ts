@@ -19,6 +19,7 @@ import type { Settings } from "./Settings";
 import type { SpeedMaster } from "./SpeedMaster";
 import type { Stage } from "./Stage";
 import type { Timeline } from "./Timeline";
+import type { TrackFollow } from "./TrackFollow";
 import type { UniverseCfg } from "./UniverseCfg";
 import type { VcPage } from "./VcPage";
 
@@ -47,7 +48,7 @@ vconsole: Array<VcPage>,
 /**
  * Programs on the network that the virtual console / scripts send OSC to.
  */
-osc_targets: Array<OscTarget>, 
+follows: Array<TrackFollow>, osc_targets: Array<OscTarget>, 
 /**
  * Programs added by the user (their own action lists), next to the built-in catalog.
  */

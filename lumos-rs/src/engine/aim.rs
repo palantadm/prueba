@@ -72,7 +72,7 @@ pub fn aim_at(pos: V3, rot: V3, pan_range: f32, tilt_range: f32, target: V3) -> 
 
 impl Engine {
     /// A moving head's pan/tilt ranges, or `None` when the fixture cannot pan/tilt.
-    fn mover_ranges(&self, f: &Fixture) -> Option<(f32, f32)> {
+    pub(super) fn mover_ranges(&self, f: &Fixture) -> Option<(f32, f32)> {
         let p = self.profiles.get(&f.profile)?;
         let m = p.modes.iter().find(|m| m.name == f.mode)?;
         let has = |a: &str| m.channels.iter().any(|c| c.attr == a);

@@ -4,6 +4,7 @@ import type { GeoPos } from "./GeoPos";
 import type { MscCfg } from "./MscCfg";
 import type { OscFeedbackCfg } from "./OscFeedbackCfg";
 import type { OscInCfg } from "./OscInCfg";
+import type { PsnCfg } from "./PsnCfg";
 import type { TimecodeCfg } from "./TimecodeCfg";
 
 export type Settings = { 
@@ -22,4 +23,8 @@ start_blackout: boolean,
 /**
  * Venue position for sunrise / sunset rules.
  */
-location: GeoPos | null, };
+location: GeoPos | null, 
+/**
+ * Tracking input (PosiStageNet).
+ */
+psn: PsnCfg, };

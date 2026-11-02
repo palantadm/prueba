@@ -22,6 +22,7 @@ mod inputs;
 mod mtc;
 mod nodes;
 mod oscout;
+mod psnin;
 mod sacn;
 mod serial;
 mod usb;
@@ -55,6 +56,8 @@ pub enum IoEvent {
     SpeechStatus { listening: bool, error: String },
     /// A model download finished (`error` empty = ok).
     SpeechDownloaded { id: String, error: String },
+    /// A PosiStageNet datagram (tracking data).
+    Psn { data: Vec<u8> },
     /// An Art-Net RDM packet (ArtTodData / ArtRdm) received on the network.
     Rdm { from: std::net::SocketAddr, data: Vec<u8> },
     /// Audio-reactive values from an input channel (level, bass, mid, treble), whether a beat fell in the window, tempo.
@@ -124,6 +127,10 @@ pub struct IoHub {
     osc_in_key: Option<u16>,
     osc_error: String,
 
+    psn_in: Option<psnin::PsnListener>,
+    psn_key: Option<String>,
+    psn_error: String,
+
     artnet_shared: Arc<artnet::ArtShared>,
     artnet_listener: Option<artnet::ArtNetListener>,
     artnet_key: Option<u16>,
@@ -162,6 +169,9 @@ impl IoHub {
             osc_in: None,
             osc_in_key: None,
             osc_error: String::new(),
+            psn_in: None,
+            psn_key: None,
+            psn_error: String::new(),
             artnet_shared: Arc::new(artnet::ArtShared::default()),
             artnet_listener: None,
             artnet_key: None,
@@ -243,6 +253,24 @@ impl IoHub {
             }
         }
 
+        // ── PosiStageNet (tracking) input ──
+        let p = &settings.psn;
+        let want_psn = p.enabled.then(|| format!("{}|{}|{}", p.port, p.group, p.iface));
+        if want_psn != self.psn_key || (want_psn.is_some() && self.psn_in.is_none() && self.psn_error.is_empty()) {
+            self.psn_in = None;
+            self.psn_error.clear();
+            self.psn_key = want_psn;
+            if self.psn_key.is_some() {
+                match psnin::PsnListener::start(p.port, &p.group, &p.iface, self.tx.clone()) {
+                    Ok(l) => {
+                        self.psn_error = l.warning.clone();
+                        self.psn_in = Some(l);
+                    }
+                    Err(e) => self.psn_error = e,
+                }
+            }
+        }
+
         // ── Art-Net listener (poll replies + input) ──
         self.artnet_shared
             .in_enabled
@@ -307,6 +335,8 @@ impl IoHub {
             })
             .collect();
         let inputs = InputStatus {
+            psn_listening: self.psn_in.is_some(),
+            psn_error: self.psn_error.clone(),
             osc_listening: self.osc_in.is_some(),
             osc_port: self.osc_in_key.unwrap_or(0),
             osc_error: self.osc_error.clone(),

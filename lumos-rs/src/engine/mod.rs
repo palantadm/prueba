@@ -13,6 +13,7 @@ mod msc;
 mod patch;
 mod pixelmap;
 mod oscsw;
+mod track;
 mod rdm;
 mod playback;
 #[cfg(test)]
@@ -262,6 +263,7 @@ struct Engine {
     sched: sched::Sched,
     lock: lock::LockState,
     rdm: rdm::RdmHub,
+    track: track::TrackState,
     /// Script reader pointers and follow flags (see script.rs).
     script: script::ScriptState,
 }
@@ -302,6 +304,7 @@ impl Engine {
             sched: Default::default(),
             lock: lock::LockState::load(&store),
             rdm: Default::default(),
+            track: Default::default(),
             script: Default::default(),
             store,
             t0: now,
@@ -501,6 +504,7 @@ impl Engine {
                 let _ = self.out.send(Out::Json(Arc::from(j)));
             }
             IoEvent::Rdm { from, data } => self.on_rdm_packet(from, data),
+            IoEvent::Psn { data } => self.on_psn(&data),
             ev @ (IoEvent::AudioBands { .. } | IoEvent::AudioLtc { .. } | IoEvent::AudioStatus { .. } | IoEvent::AudioError { .. }) => self.on_audio_event(ev),
             ev @ (IoEvent::Speech { .. } | IoEvent::SpeechStatus { .. } | IoEvent::SpeechDownloaded { .. }) => self.on_voice_event(ev),
             IoEvent::ExternalDmx { universe, data } => {
@@ -935,6 +939,9 @@ impl Engine {
                 if settings.timecode.fps <= 0.0 || !settings.timecode.fps.is_finite() {
                     return Err("Invalid frame rate".into());
                 }
+                if settings.psn.port == 0 {
+                    return Err("PSN: el puerto no puede ser 0 (el habitual es 56565)".into());
+                }
                 self.hz = settings.tick_hz.clamp(10, 100);
                 self.show.settings = settings;
                 self.io_dirty = true;
@@ -1044,6 +1051,7 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            c @ (FollowSave { .. } | FollowRemove { .. } | FollowSet { .. }) => self.follow_command(c)?,
             c @ (OscTargetSave { .. } | OscTargetRemove { .. } | OscSoftwareSave { .. } | OscSoftwareRemove { .. } | OscSend { .. } | VcAddOsc { .. }) => self.osc_command(c)?,
             c @ (RdmScan { .. } | RdmRefresh { .. } | RdmIdentify { .. } | RdmSetAddress { .. } | RdmSetLabel { .. } | RdmSetPersonality { .. } | RdmClear) => self.rdm_command(c)?,
             c @ (Lock | Unlock { .. } | LockSet { .. }) => self.lock_command(c)?,
@@ -1886,6 +1894,7 @@ impl Engine {
                 }
             }
         }
+        self.apply_follows(&mut merged, now);
         // 3b. inhibitive submasters cap the dimmer of their fixtures (before the masters)
         self.apply_inhibit(&mut merged);
         // 4. masters
@@ -2187,6 +2196,7 @@ impl Engine {
         let mut effects_running: Vec<u32> = self.effects_on.union(&self.effect_flash).copied().collect();
         effects_running.sort_unstable();
         let frames = self.tc_display();
+        let psn = self.psn_rt(&inputs);
         Runtime {
             grand_master: self.grand_master,
             blackout: self.blackout,
@@ -2216,6 +2226,7 @@ impl Engine {
             schedule: self.schedule_rt(),
             lock: self.lock_rt(),
             rdm: self.rdm_rt(),
+            psn,
             macros_running: self.macros_running_ids(),
             testing: self.data.test.is_some(),
             identifying: self.data.identifying.iter().copied().collect(),

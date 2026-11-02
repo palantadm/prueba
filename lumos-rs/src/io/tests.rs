@@ -531,3 +531,33 @@ fn osc_send_reaches_arbitrary_target() {
     }
     assert!(!hub.osc_send("no-such-host.invalid", 9, "/x", 1.0));
 }
+
+// ── PosiStageNet in (via hub) ──
+
+#[test]
+fn psn_datagrams_reach_the_engine_and_bad_settings_are_reported() {
+    let (tx, mut rx) = unbounded_channel();
+    let mut hub = IoHub::new(tx);
+    let port = free_port();
+    let mut s = Settings::default();
+    s.psn.enabled = true;
+    s.psn.port = port;
+    hub.configure(&[], &s);
+    let (_, ins) = hub.status();
+    assert!(ins.psn_listening, "{}", ins.psn_error);
+    let pkt = crate::psn::build::data(1, &[(3, [1.0, 2.0, 3.0])]);
+    UdpSocket::bind("127.0.0.1:0").unwrap().send_to(&pkt, ("127.0.0.1", port)).unwrap();
+    match recv_event(&mut rx, 1000) {
+        Some(IoEvent::Psn { data }) => assert_eq!(data, pkt),
+        e => panic!("unexpected {e:?}"),
+    }
+    // not a multicast group → refused with a clear message, nothing listening
+    s.psn.group = "10.0.0.1".into();
+    hub.configure(&[], &s);
+    let (_, ins) = hub.status();
+    assert!(!ins.psn_listening && ins.psn_error.contains("multicast"), "{}", ins.psn_error);
+    // switched off → closed
+    s.psn.enabled = false;
+    hub.configure(&[], &s);
+    assert!(!hub.status().1.psn_listening);
+}

@@ -750,6 +750,9 @@ pub struct Settings {
     /// Venue position for sunrise / sunset rules.
     #[serde(default)]
     pub location: Option<GeoPos>,
+    /// Tracking input (PosiStageNet).
+    #[serde(default)]
+    pub psn: PsnCfg,
 }
 
 /// MIDI Show Control (theatre standard): lighting commands received as SysEx.
@@ -788,6 +791,7 @@ impl Default for Settings {
             msc: MscCfg::default(),
             start_blackout: false,
             location: None,
+            psn: PsnCfg::default(),
         }
     }
 }
@@ -1648,6 +1652,114 @@ pub struct OscTarget {
     pub port: u16,
 }
 
+/// Which axis of the tracking system feeds a stage axis.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum PsnAxis {
+    #[default]
+    X,
+    Y,
+    Z,
+}
+
+/// How tracker coordinates (metres, the tracking system's axes) become stage coordinates (x right, y up, z depth).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PsnMap {
+    pub to_x: PsnAxis,
+    pub to_y: PsnAxis,
+    pub to_z: PsnAxis,
+    pub invert_x: bool,
+    pub invert_y: bool,
+    pub invert_z: bool,
+    /// Metres added after mapping (stage origin vs tracking origin).
+    pub offset: [f32; 3],
+    /// Multiplier (1 = metres).
+    pub scale: f32,
+}
+
+impl Default for PsnMap {
+    /// Most systems (BlackTrax, Zactrack) use X right, Y forward, Z up; the stage has y up.
+    fn default() -> Self {
+        PsnMap { to_x: PsnAxis::X, to_y: PsnAxis::Z, to_z: PsnAxis::Y, invert_x: false, invert_y: false, invert_z: false, offset: [0.0; 3], scale: 1.0 }
+    }
+}
+
+/// PosiStageNet receiver (tracking from BlackTrax, Zactrack, Stage Precision…).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PsnCfg {
+    pub enabled: bool,
+    pub port: u16,
+    /// Multicast group (`236.10.10.10` by default).
+    pub group: String,
+    /// Local IPv4 of the network card to listen on (empty = the system default).
+    pub iface: String,
+    pub map: PsnMap,
+}
+
+impl Default for PsnCfg {
+    fn default() -> Self {
+        PsnCfg { enabled: false, port: 56565, group: "236.10.10.10".into(), iface: String::new(), map: PsnMap::default() }
+    }
+}
+
+/// A group of moving heads that follows a tracker (a follow-spot without an operator).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct TrackFollow {
+    pub id: u32,
+    pub name: String,
+    pub enabled: bool,
+    /// Tracker id as sent by the tracking system.
+    pub tracker: u16,
+    /// Group whose moving heads aim at the tracker.
+    pub group: u32,
+    /// Metres above the tracked point to aim at (tracker on a belt → 0.3, on the floor → 1.5).
+    #[serde(default)]
+    pub height: f32,
+    /// Smoothing time in milliseconds (0 = follow every sample).
+    #[serde(default)]
+    pub smooth_ms: u32,
+    /// Dimmer (0..1) while the tracker is present; it goes to 0 when the tracker is lost. `None` leaves the dimmer alone.
+    #[serde(default)]
+    pub intensity: Option<f32>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PsnTrackerRt {
+    pub id: u16,
+    pub name: String,
+    /// Stage coordinates after mapping.
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
+    /// Milliseconds since the last sample.
+    pub age_ms: u32,
+    pub active: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct FollowRt {
+    pub id: u32,
+    /// The tracker is present and the group is being aimed.
+    pub tracking: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct PsnRt {
+    pub listening: bool,
+    pub error: String,
+    pub system: String,
+    pub packets: u32,
+    pub trackers: Vec<PsnTrackerRt>,
+    pub follows: Vec<FollowRt>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Show {
@@ -1692,6 +1804,8 @@ pub struct Show {
     pub vconsole: Vec<VcPage>,
     /// Programs on the network that the virtual console / scripts send OSC to.
     #[serde(default)]
+    pub follows: Vec<TrackFollow>,
+    #[serde(default)]
     pub osc_targets: Vec<OscTarget>,
     /// Programs added by the user (their own action lists), next to the built-in catalog.
     #[serde(default)]
@@ -1725,6 +1839,7 @@ impl Default for Show {
             settings: Settings::default(),
             profiles: vec![],
             vconsole: vec![],
+            follows: vec![],
             osc_targets: vec![],
             osc_software: vec![],
         }
@@ -2032,6 +2147,10 @@ pub struct InputStatus {
     pub osc_error: String,
     pub artnet_listening: bool,
     pub artnet_error: String,
+    #[serde(default)]
+    pub psn_listening: bool,
+    #[serde(default)]
+    pub psn_error: String,
     /// Last few input events for the activity monitor (newest first).
     pub recent: Vec<String>,
 }
@@ -2111,6 +2230,8 @@ pub struct Runtime {
     /// RDM devices found on the DMX lines.
     #[serde(default)]
     pub rdm: RdmRt,
+    #[serde(default)]
+    pub psn: PsnRt,
     /// Output test pattern running.
     #[serde(default)]
     pub testing: bool,
@@ -2274,6 +2395,11 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── tracking (PSN / BlackTrax) ──
+    FollowSave { follow: TrackFollow },
+    FollowRemove { id: u32 },
+    /// Turn a follow on or off.
+    FollowSet { id: u32, enabled: bool },
     // ── external software over OSC ──
     OscTargetSave { target: OscTarget },
     OscTargetRemove { id: u32 },

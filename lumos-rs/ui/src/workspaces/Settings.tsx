@@ -10,6 +10,7 @@ import { AudioPage } from "./settings/Audio";
 import { SchedulePage } from "./settings/Schedule";
 import { RdmPage } from "./settings/Rdm";
 import { ProgramsPage } from "./settings/Programs";
+import { TrackingPage } from "./settings/Tracking";
 import { Icon } from "../ui/Icon";
 import { lang, setLang, t } from "../i18n";
 
@@ -22,6 +23,7 @@ const cats = [
   { id: "artnet", icon: "M4 12h12M12 6l6 6-6 6", label: "Art-Net input", c: ArtNetInPage },
   { id: "timecode", icon: "M12 7v5l3 2M12 3a9 9 0 100 18 9 9 0 000-18z", label: "Timecode", c: TimecodePage },
   { id: "schedule", icon: "M7 3v3M17 3v3M4 8h16M5 5h14v15H5zM9 13h2v2H9z", label: "Schedule", c: SchedulePage },
+  { id: "tracking", icon: "M12 12m-2 0a2 2 0 104 0 2 2 0 10-4 0M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2 2M16 16l2 2", label: "Tracking", c: TrackingPage },
   { id: "programs", icon: "M5 5h6v6H5zM13 5h6v6h-6zM5 13h6v6H5zM16 13v6M13 16h6", label: "External programs", c: ProgramsPage },
   { id: "rdm", icon: "M4 6h16M4 12h10M4 18h16M18 10l3 2-3 2", label: "RDM", c: RdmPage },
   { id: "msc", icon: "M5 4h14v16H5zM9 9h6M9 13h6", label: "Show Control (MSC)", c: MscPage },
