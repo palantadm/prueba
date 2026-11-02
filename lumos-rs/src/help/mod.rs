@@ -26,6 +26,7 @@ pub const TOPICS: &[(&str, &str, &str)] = &[
     ("audio", "Audio: dispositivos, canales de entrada/salida, matriz, sonidos, LTC y audio reactivo", include_str!("audio.md")),
     ("guion", "Guion: escaleta, marcas de cue y seguimiento en directo", include_str!("guion.md")),
     ("consola-virtual", "Consola virtual", include_str!("consola-virtual.md")),
+    ("programas-externos", "Programas externos por OSC (Resolume, QLab, Ableton…)", include_str!("programas-externos.md")),
     ("escenario", "Visualizador 3D, planta 2D y escenario", include_str!("escenario.md")),
     ("shows", "Shows, copias de seguridad e importar/exportar", include_str!("shows.md")),
     ("diagnostico", "Diagnóstico: «no sale luz» y otros problemas", include_str!("diagnostico.md")),
@@ -77,7 +78,32 @@ pub fn render(body: &str, aud: Audience) -> String {
         }
     }
     out.push_str(rest);
+    if out.contains("{{OSC_CATALOG}}") {
+        out = out.replace("{{OSC_CATALOG}}", &osc_catalog_md(aud));
+    }
     out
+}
+
+/// The built-in OSC catalog as a Markdown list (the assistant gets the ids it must send; people get the names).
+fn osc_catalog_md(aud: Audience) -> String {
+    let mut s = String::new();
+    for sw in crate::oscpresets::builtin() {
+        let _ = std::fmt::Write::write_fmt(&mut s, format_args!("\n### {} (puerto {})\n{}\n", sw.name, sw.port, sw.note));
+        for a in &sw.actions {
+            let kind = match a.kind {
+                crate::model::OscKind::Trigger => "botón",
+                crate::model::OscKind::Toggle => "interruptor",
+                crate::model::OscKind::Fader => "fader",
+            };
+            let params = if a.params.is_empty() { String::new() } else { format!(" — pide: {}", a.params.iter().map(|p| if aud == Audience::Ai { format!("`{}` (def. {})", p.key, p.default) } else { p.label.clone() }).collect::<Vec<_>>().join(", ")) };
+            if aud == Audience::Ai {
+                let _ = std::fmt::Write::write_fmt(&mut s, format_args!("- `{}/{}` — {} ({kind}){params}\n", sw.id, a.id, a.label));
+            } else {
+                let _ = std::fmt::Write::write_fmt(&mut s, format_args!("- {} ({kind}){params}\n", a.label));
+            }
+        }
+    }
+    s
 }
 
 /// Normalised search words of a query (shared by the manual's topic and command search).

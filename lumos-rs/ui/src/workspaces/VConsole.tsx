@@ -1,11 +1,12 @@
 import "../styles/vc.css";
-import { useEffect, useRef } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { connected, midiPorts, rt, show, toast } from "../store";
 import { t } from "../i18n";
 import { initMidi, midiActivity, midiOutLog, midiOutEnabled, midiState } from "../midi";
 import { EmptyState, Segmented, Tabs, promptDialog, confirmDialog } from "../ui";
 import type { VcPage } from "../types";
 import { Canvas } from "../vc/Canvas";
+import { AddFromProgram } from "../vc/AddFromProgram";
 import { MultiProps, PageProps, WidgetProps } from "../vc/Props";
 import { KINDS, nextPageId, nextWidgetId } from "../vc/model";
 import { autoBuildFromExecutors } from "../vc/presets";
@@ -80,6 +81,7 @@ function Activity() {
 export function VConsole() {
   useEditorKeys();
   const imp = useRef<HTMLInputElement>(null);
+  const [prog, setProg] = useState(false);
   const pg = page.value;
   const pages = draft.value;
   const editing = editMode.value;
@@ -125,6 +127,9 @@ export function VConsole() {
                 <span class="vc-pal-i" aria-hidden="true">{k.icon}</span><span>{t(k.label)}</span>
               </button>
             ))}
+            <button class="vc-pal" onClick={() => { ensureFirstPage(); setProg(true); }}>
+              <span class="vc-pal-i" aria-hidden="true">⇄</span><span>{t("From a program…")}</span>
+            </button>
             <div class="faint vc-hint" style={{ marginTop: 8 }}>{t("Drag to move, corner handle to resize. Shift-click or drag a box to multi-select. Delete, Ctrl+C/V/D/Z work.")}</div>
           </aside>
         )}
@@ -141,6 +146,7 @@ export function VConsole() {
           </aside>
         )}
       </div>
+      {prog && <AddFromProgram onClose={() => setProg(false)} />}
       {(editing || midiActivity.value.length > 0) && <Activity />}
     </div>
   );

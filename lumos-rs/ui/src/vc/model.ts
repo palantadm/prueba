@@ -100,6 +100,7 @@ export function describeAction(a: VcAction, show: Show | null): string {
     case "page": return t("Page {name}", { name: show?.vconsole.find((p) => p.id === a.page)?.name ?? `#${a.page}` });
     case "xy": return `${nm(show?.groups, a.group)} ${a.x_attr}/${a.y_attr}`;
     case "command": return t("Command: {text}", { text: a.text.length > 40 ? a.text.slice(0, 40) + "…" : a.text });
+    case "osc": return `OSC ${show?.osc_targets?.find((x) => x.id === a.target)?.name ?? a.host ?? ""} ${a.address}`;
   }
 }
 
@@ -122,11 +123,12 @@ export const ACTION_TYPES: { type: VcAction["type"]; label: string }[] = [
   { type: "page", label: "Go to page" },
   { type: "xy", label: "XY (group)" },
   { type: "command", label: "Command" },
+  { type: "osc", label: "Another program (OSC)" },
 ];
 export function actionTypesFor(k: VcKind): VcAction["type"][] {
   switch (k) {
-    case "button": return ["none", "exec", "cuelist", "scene", "blackout", "grand_master", "effect_toggle", "palette_apply", "prog_clear", "page", "dmx", "command"];
-    case "slider": case "knob": return ["none", "exec", "cuelist", "scene", "scene_morph", "grand_master", "group_attr", "fixture_attr", "dmx", "effect_rate"];
+    case "button": return ["none", "exec", "cuelist", "scene", "blackout", "grand_master", "effect_toggle", "palette_apply", "prog_clear", "page", "dmx", "command", "osc"];
+    case "slider": case "knob": return ["none", "exec", "cuelist", "scene", "scene_morph", "grand_master", "group_attr", "fixture_attr", "dmx", "effect_rate", "osc"];
     case "xy_pad": return ["xy", "none"];
     case "cue_list": return ["cuelist", "none"];
     case "speed_dial": return ["effect_rate", "none"];
@@ -149,6 +151,7 @@ export function defaultAction(type: VcAction["type"], show: Show | null, kind: V
     case "page": return { type, page: show?.vconsole[0]?.id ?? 0 };
     case "xy": return { type, group: show?.groups[0]?.id ?? 0, x_attr: "pan", y_attr: "tilt" };
     case "command": return { type, text: "go" };
+    case "osc": return { type, target: show?.osc_targets?.[0]?.id ?? 0, host: "127.0.0.1", port: 7000, address: "/", args: [], value: "float" };
     default: return { type } as VcAction;
   }
 }
@@ -181,6 +184,7 @@ export function autoLabel(a: VcAction, show: Show | null): string | null {
     case "xy": return nm(show?.groups, a.group) ?? null;
     case "dmx": return `DMX ${a.universe}/${a.channel}`;
     case "command": return a.text.trim().split(/[;\n]/)[0].slice(0, 24) || null;
+    case "osc": return a.address.split("/").filter(Boolean).slice(-2).join(" ").slice(0, 24) || null;
     default: return null;
   }
 }

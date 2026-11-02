@@ -8,6 +8,8 @@ import type { Fixture } from "./Fixture";
 import type { FixtureProfile } from "./FixtureProfile";
 import type { Group } from "./Group";
 import type { Macro } from "./Macro";
+import type { OscSoftware } from "./OscSoftware";
+import type { OscTarget } from "./OscTarget";
 import type { Palette } from "./Palette";
 import type { PixelMap } from "./PixelMap";
 import type { Scene } from "./Scene";
@@ -41,4 +43,12 @@ profiles: Array<FixtureProfile>,
 /**
  * Virtual console pages (button/slider/knob/XY widgets with input mapping and feedback).
  */
-vconsole: Array<VcPage>, };
+vconsole: Array<VcPage>, 
+/**
+ * Programs on the network that the virtual console / scripts send OSC to.
+ */
+osc_targets: Array<OscTarget>, 
+/**
+ * Programs added by the user (their own action lists), next to the built-in catalog.
+ */
+osc_software: Array<OscSoftware>, };

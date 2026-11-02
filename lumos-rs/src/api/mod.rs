@@ -28,6 +28,7 @@ pub fn router(h: Handle) -> Router {
     Router::new()
         .route("/ws", get(ws_handler))
         .route("/api/ports", get(ports))
+        .route("/api/osc/catalog", get(osc_catalog))
         .route("/api/net", get(net))
         .route("/api/media", post(upload).layer(DefaultBodyLimit::max(512 * 1024 * 1024)))
         .route("/api/show", get(get_show).put(put_show).layer(DefaultBodyLimit::max(64 * 1024 * 1024)))
@@ -47,6 +48,11 @@ pub fn router(h: Handle) -> Router {
 }
 
 // ───────────── REST ─────────────
+
+/// Ready-made OSC controls of other programs (the built-in catalog; the user's own are in the show).
+async fn osc_catalog() -> Json<Vec<OscSoftware>> {
+    Json(crate::oscpresets::builtin())
+}
 
 async fn ports() -> Json<serde_json::Value> {
     let v: Vec<_> = tokio::task::spawn_blocking(crate::io::list_serial_ports)

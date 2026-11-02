@@ -104,6 +104,18 @@ function ActionEditor({ w }: { w: VcWidget }) {
       {a.type === "command" && <Row label={t("Command line")}>
         <TextField class="bare mono" value={a.text} placeholder="go cuelist 1; scene 3 on" onChange={(v) => set({ ...a, text: v })} />
       </Row>}
+      {a.type === "osc" && <>
+        <Row label={t("Program")}>
+          <Select class="bare" value={a.target} options={[{ value: 0, label: t("Other (IP below)") }, ...(show.value?.osc_targets ?? []).map((x) => ({ value: x.id, label: `${x.name} · ${x.host}:${x.port}` }))]} onChange={(v) => set({ ...a, target: v })} />
+        </Row>
+        {a.target === 0 && <>
+          <Row label={t("IP address or name")}><TextField class="bare mono" value={a.host} onChange={(v) => set({ ...a, host: v })} /></Row>
+          <Row label={t("Port")}><NumberField class="bare" value={a.port} min={1} max={65535} onChange={(v) => set({ ...a, port: v })} /></Row>
+        </>}
+        <Row label={t("OSC address")}><TextField class="bare mono" value={a.address} onChange={(v) => set({ ...a, address: v })} /></Row>
+        <Row label={t("Fixed arguments")}><TextField class="bare mono" value={a.args.join(" ")} placeholder="i:0 i:1" onChange={() => {}} onCommit={(v) => set({ ...a, args: v.split(/\s+/).filter(Boolean) })} /></Row>
+        <Row label={t("Then sends")}><Select class="bare" value={a.value} options={[{ value: "float", label: t("a decimal number") }, { value: "int", label: t("a whole number") }, { value: "none", label: t("no number") }]} onChange={(v) => set({ ...a, value: v as typeof a.value })} /></Row>
+      </>}
       {a.type === "page" && <Row label={t("Page")}><Picker value={a.page} options={L.pages} onChange={(v) => set({ ...a, page: v })} /></Row>}
       {a.type === "xy" && <>
         <Row label={t("Group")}><Picker value={a.group} options={L.groups} onChange={(v) => set({ ...a, group: v })} /></Row>

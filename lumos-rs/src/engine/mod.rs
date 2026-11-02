@@ -12,6 +12,7 @@ mod morph;
 mod msc;
 mod patch;
 mod pixelmap;
+mod oscsw;
 mod rdm;
 mod playback;
 #[cfg(test)]
@@ -1043,6 +1044,7 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            c @ (OscTargetSave { .. } | OscTargetRemove { .. } | OscSoftwareSave { .. } | OscSoftwareRemove { .. } | OscSend { .. } | VcAddOsc { .. }) => self.osc_command(c)?,
             c @ (RdmScan { .. } | RdmRefresh { .. } | RdmIdentify { .. } | RdmSetAddress { .. } | RdmSetLabel { .. } | RdmSetPersonality { .. } | RdmClear) => self.rdm_command(c)?,
             c @ (Lock | Unlock { .. } | LockSet { .. }) => self.lock_command(c)?,
             ScheduleSave { rule } => self.schedule_save(rule)?,

@@ -25,7 +25,7 @@ pub struct VcRt {
     /// Last feedback value sent per (widget, feedback index): `u32::MAX` = never.
     fb_last: HashMap<(u32, usize), u32>,
     fb_refresh_at: Instant,
-    force_refresh: bool,
+    pub(super) force_refresh: bool,
 }
 
 impl Default for VcRt {
@@ -212,7 +212,7 @@ impl Engine {
                     .unwrap_or(0.0);
                 (Self::vc_norm_out(w, rate), self.effects_on.contains(effect))
             }
-            VcAction::PaletteApply { .. } | VcAction::Page { .. } | VcAction::None => {
+            VcAction::PaletteApply { .. } | VcAction::Page { .. } | VcAction::None | VcAction::Osc { .. } => {
                 let t = self.vc.toggled.get(&w.id).copied().unwrap_or(false);
                 (self.vc.values.get(&w.id).copied().unwrap_or(t as u8 as f32), t)
             }
@@ -440,8 +440,22 @@ impl Engine {
                 self.vc.toggled.insert(w.id, on);
                 Ok(())
             }
+            VcAction::Osc { value, .. } => {
+                self.vc.toggled.insert(w.id, on);
+                // a message without a value (QLab /go…) is sent once, when the button goes down
+                if *value == OscValue::None && !on {
+                    return Ok(());
+                }
+                self.vc_osc_send(w, if on { w.out_max } else { w.out_min })
+            }
             VcAction::Xy { .. } => Ok(()),
         }
+    }
+
+    /// Send the widget's OSC action with `mapped` as its value.
+    fn vc_osc_send(&mut self, w: &VcWidget, mapped: f32) -> Result<(), String> {
+        let VcAction::Osc { target, host, port, address, args, value } = &w.action else { return Ok(()) };
+        self.osc_emit(*target, host, *port, address, args, *value, mapped)
     }
 
     /// One-shot firing of the widget's action (trigger mode, or the "fire" half of other modes).
@@ -543,6 +557,7 @@ impl Engine {
                 self.vc.toggled.insert(w.id, !t);
                 Ok(())
             }
+            VcAction::Osc { .. } => self.vc_osc_send(w, w.out_max),
             VcAction::Xy { .. } => Ok(()),
         }
     }
@@ -583,6 +598,13 @@ impl Engine {
             VcAction::Scene { scene, op: VcOp::Level } => self.scene_level(*scene, clamp01(mapped)),
             VcAction::SceneMorph { a, b } => self.scene_morph(*a, *b, Some(mapped)),
             VcAction::Xy { .. } => Ok(()),
+            VcAction::Osc { value, .. } if *value != OscValue::None => {
+                // a fader: send only when the (mapped) value really changed, not on every repeated event
+                if prev.map_or(false, |p| (p - v01).abs() < 1e-4) {
+                    return Ok(());
+                }
+                self.vc_osc_send(&w, mapped)
+            }
             _ => {
                 // Trigger-type action driven by an analogue value: press on the rising edge through 0.5,
                 // release on the falling edge.

@@ -1558,6 +1558,96 @@ pub struct ScriptRt {
 
 // ───────────────────────────── Show ─────────────────────────────
 
+/// How an external-software action is used on the virtual console.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum OscKind {
+    /// Button that fires once.
+    Trigger,
+    /// Button that switches on/off.
+    Toggle,
+    /// Fader / knob sending a continuous value.
+    Fader,
+}
+
+/// What number (if any) is appended after the fixed arguments.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum OscValue {
+    #[default]
+    Float,
+    Int,
+    /// The message carries only its fixed arguments (e.g. QLab `/go`).
+    None,
+}
+
+/// A placeholder `{key}` in the address or arguments that the user fills in (layer, clip, cue…).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct OscParam {
+    pub key: String,
+    pub label: String,
+    pub default: String,
+}
+
+/// One ready-made control of an external program.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct OscAction {
+    pub id: String,
+    pub label: String,
+    /// Section in the picker (Clips, Layers, Transport…).
+    pub group: String,
+    /// OSC address; `{key}` placeholders are replaced by the params.
+    pub address: String,
+    /// Fixed leading arguments typed by content (`i:`/`f:`/`s:` prefixes force a type); may contain `{key}`.
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub value: OscValue,
+    pub kind: OscKind,
+    #[serde(default)]
+    pub params: Vec<OscParam>,
+    /// Range a fader / the "on" value maps to.
+    #[serde(default)]
+    pub min: f32,
+    #[serde(default = "d_one")]
+    pub max: f32,
+    #[serde(default)]
+    pub note: String,
+}
+
+/// A program Lumos can drive over OSC with a list of ready-made actions (built in, or added by the user).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct OscSoftware {
+    pub id: String,
+    pub name: String,
+    /// Port the program listens on by default.
+    pub port: u16,
+    #[serde(default)]
+    pub note: String,
+    pub actions: Vec<OscAction>,
+    /// `true` for the catalog shipped with Lumos (read-only).
+    #[serde(default)]
+    pub builtin: bool,
+}
+
+/// A copy of a program on the network (address + port) that widgets and scripts send to.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct OscTarget {
+    pub id: u32,
+    pub name: String,
+    /// Software id (`resolume`, `qlab`…, or a user one); empty = generic.
+    #[serde(default)]
+    pub software: String,
+    pub host: String,
+    pub port: u16,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Show {
@@ -1600,6 +1690,12 @@ pub struct Show {
     /// Virtual console pages (button/slider/knob/XY widgets with input mapping and feedback).
     #[serde(default)]
     pub vconsole: Vec<VcPage>,
+    /// Programs on the network that the virtual console / scripts send OSC to.
+    #[serde(default)]
+    pub osc_targets: Vec<OscTarget>,
+    /// Programs added by the user (their own action lists), next to the built-in catalog.
+    #[serde(default)]
+    pub osc_software: Vec<OscSoftware>,
 }
 
 impl Default for Show {
@@ -1629,6 +1725,8 @@ impl Default for Show {
             settings: Settings::default(),
             profiles: vec![],
             vconsole: vec![],
+            osc_targets: vec![],
+            osc_software: vec![],
         }
     }
 }
@@ -1714,6 +1812,21 @@ pub enum VcAction {
     SceneMorph { a: u32, b: u32 },
     /// XY pad: `group` moves `x_attr`/`y_attr` (typically pan/tilt).
     Xy { group: u32, x_attr: String, y_attr: String },
+    /// Send an OSC message to another program. Buttons send the widget's `out_max` (on) / `out_min` (off) as `value`,
+    /// sliders their value; `args` go first. `target` > 0 uses that [`OscTarget`]'s host and port, else `host`/`port`.
+    Osc {
+        #[serde(default)]
+        target: u32,
+        #[serde(default)]
+        host: String,
+        #[serde(default)]
+        port: u16,
+        address: String,
+        #[serde(default)]
+        args: Vec<String>,
+        #[serde(default)]
+        value: OscValue,
+    },
 }
 
 /// One physical input mapped onto a widget.
@@ -2161,6 +2274,35 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── external software over OSC ──
+    OscTargetSave { target: OscTarget },
+    OscTargetRemove { id: u32 },
+    /// Add or replace a user program (its own action list). Ids of built-in programs are reserved.
+    OscSoftwareSave { software: OscSoftware },
+    OscSoftwareRemove { id: String },
+    /// Put a ready-made action of a program on the virtual console as a new button or fader.
+    /// `action` = `<software>/<action id>`; `params` fill the `{key}` placeholders (default if missing).
+    VcAddOsc {
+        target: u32,
+        action: String,
+        #[serde(default)]
+        params: BTreeMap<String, String>,
+        /// Virtual-console page id (default: the first page; one is created if there are none).
+        #[serde(default)]
+        page: Option<u32>,
+        #[serde(default)]
+        label: Option<String>,
+    },
+    /// Send a ready-made action once now (to try it).
+    OscSend {
+        target: u32,
+        action: String,
+        #[serde(default)]
+        params: BTreeMap<String, String>,
+        /// Value for faders / "on" for buttons (default: the action's max).
+        #[serde(default)]
+        value: Option<f32>,
+    },
     // ── RDM ──
     /// Ask the Art-Net nodes for the devices on their DMX lines (`flush`: make the nodes run discovery again first).
     RdmScan { flush: bool },
