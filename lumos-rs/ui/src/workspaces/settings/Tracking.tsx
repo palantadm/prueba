@@ -8,7 +8,6 @@ import { t } from "../../i18n";
 
 /* Tracking input (PosiStageNet: BlackTrax, Zactrack…) and the follow rules that point moving heads at trackers. */
 
-const fail = (e: unknown) => toast(String((e as Error)?.message ?? e), "err");
 const AXES: PsnAxis[] = ["x", "y", "z"];
 const axisOpts = () => AXES.map((a) => ({ value: a, label: a.toUpperCase() }));
 const fmt = (v: number) => v.toFixed(2);
@@ -20,7 +19,7 @@ function FollowDialog({ init, onClose }: { init: TrackFollow; onClose: () => voi
   return (
     <Modal title={f.id ? t("Edit follow") : t("New follow")} onClose={onClose} footer={<>
       <span class="sp" /><button class="btn" onClick={onClose}>{t("Cancel")}</button>
-      <button class="btn primary" disabled={!f.group} onClick={() => { void send({ type: "follow_save", follow: f }).then(onClose).catch(fail); }}>{t("Save")}</button>
+      <button class="btn primary" disabled={!f.group} onClick={() => { void send({ type: "follow_save", follow: f }).then(onClose).catch(() => {}); }}>{t("Save")}</button>
     </>}>
       <TextField label={t("Name")} value={f.name} placeholder={t("(auto)")} onChange={(name) => setF({ ...f, name })} />
       <div class="field"><label>{t("Tracker")}</label>
@@ -60,7 +59,7 @@ export function TrackingPage() {
   const groups = show.value?.groups ?? [];
   const m = c.map;
   return (
-    <SettingsPage title={t("Tracking")} sub={t("Receive positions from BlackTrax, Zactrack… (PosiStageNet) and make moving heads follow people.")} bar={<SaveBar {...{ dirty, save, revert }} />}>
+    <SettingsPage title={t("Person tracking")} sub={t("Receive positions from BlackTrax, Zactrack… (PosiStageNet) and make moving heads follow people.")} bar={<SaveBar {...{ dirty, save, revert }} />}>
       <div class="panel">
         <div class="panel-head row"><span class="grow">{t("PosiStageNet input")}</span>
           <span class={`chip ${p?.listening ? (p.error ? "warn" : "ok") : ""}`}>{p?.listening ? t("listening") : t("off")}</span></div>
@@ -74,16 +73,21 @@ export function TrackingPage() {
       </div>
       <div class="panel">
         <div class="panel-head">{t("Axes: tracker → stage")}</div>
-        <div class="panel-body grid2">
-          {(["x", "y", "z"] as const).map((ax) => (
-            <div key={ax} class="row" style={{ gap: 8, alignItems: "center" }}>
-              <b>{t("Stage {a}", { a: ax.toUpperCase() })}</b>
-              <Select value={m[`to_${ax}`]} options={axisOpts()} onChange={(v) => patch((d) => { d.psn.map[`to_${ax}`] = v; })} />
-              <Toggle checked={m[`invert_${ax}`]} onChange={(v) => patch((d) => { d.psn.map[`invert_${ax}`] = v; })} label={t("Invert")} />
-              <NumberField float step={0.1} value={m.offset[ax === "x" ? 0 : ax === "y" ? 1 : 2]} onChange={(v) => patch((d) => { d.psn.map.offset[ax === "x" ? 0 : ax === "y" ? 1 : 2] = v; })} label={t("Offset (m)")} />
-            </div>
-          ))}
-          <NumberField label={t("Scale (1 = metres)")} float step={0.1} value={m.scale} onChange={(scale) => patch((d) => { d.psn.map.scale = scale; })} />
+        <div class="panel-body">
+          <table class="tbl">
+            <thead><tr><th>{t("Stage")}</th><th>{t("Takes the tracker axis")}</th><th>{t("Invert")}</th><th>{t("Offset (m)")}</th></tr></thead>
+            <tbody>
+              {(["x", "y", "z"] as const).map((ax, i) => (
+                <tr key={ax}>
+                  <td><b>{ax.toUpperCase()}</b></td>
+                  <td><Select value={m[`to_${ax}`]} options={axisOpts()} onChange={(v) => patch((d) => { d.psn.map[`to_${ax}`] = v; })} /></td>
+                  <td><Toggle checked={m[`invert_${ax}`]} onChange={(v) => patch((d) => { d.psn.map[`invert_${ax}`] = v; })} label={t("Invert")} /></td>
+                  <td><NumberField float step={0.1} value={m.offset[i]} onChange={(v) => patch((d) => { d.psn.map.offset[i] = v; })} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div style={{ marginTop: 8, maxWidth: 240 }}><NumberField label={t("Scale (1 = metres)")} float step={0.1} value={m.scale} onChange={(scale) => patch((d) => { d.psn.map.scale = scale; })} /></div>
         </div>
         <div class="panel-body faint">{t("Stage axes: X to the right, Y up, Z depth. Most systems send X right, Y forward, Z up.")}</div>
       </div>

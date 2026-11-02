@@ -109,4 +109,8 @@ export const settingsUi: Record<string, string> = {
   "tracking": "siguiendo",
   "waiting for tracker": "esperando al tracker",
   "— choose a group —": "— elige un grupo —",
+  "Person tracking": "Seguimiento de personas",
+  "action": "acción",
+  "Stage": "Escenario",
+  "Takes the tracker axis": "Toma el eje del tracker",
 };

@@ -8,7 +8,6 @@ import { t } from "../../i18n";
 
 /* Other programs on the network that the console sends OSC to (Resolume, QLab…), and programs the user adds. */
 
-const fail = (e: unknown) => toast(String((e as Error)?.message ?? e), "err");
 const KIND_LABEL = () => ({ trigger: t("Button"), toggle: t("Switch"), fader: t("Fader") });
 
 function TargetDialog({ init, onClose }: { init: OscTarget; onClose: () => void }) {
@@ -17,7 +16,7 @@ function TargetDialog({ init, onClose }: { init: OscTarget; onClose: () => void 
   return (
     <Modal title={x.id ? t("Edit program") : t("New program on the network")} onClose={onClose} footer={<>
       <span class="sp" /><button class="btn" onClick={onClose}>{t("Cancel")}</button>
-      <button class="btn primary" onClick={() => { void send({ type: "osc_target_save", target: x }).then(onClose).catch(fail); }}>{t("Save")}</button>
+      <button class="btn primary" onClick={() => { void send({ type: "osc_target_save", target: { ...x, name: x.name.trim() || sw?.name || "" } }).then(onClose).catch(() => {}); }}>{t("Save")}</button>
     </>}>
       <TextField label={t("Name")} value={x.name} onChange={(name) => setX({ ...x, name })} placeholder="PC vídeo" />
       <div class="field"><label>{t("Program")}</label>
@@ -51,13 +50,13 @@ function SoftwareDialog({ init, onClose }: { init: OscSoftware; onClose: () => v
   const slug = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
   return (
     <Modal title={isNew ? t("New own program") : t("Edit own program")} onClose={onClose} footer={<>
-      {!isNew && <button class="btn danger" onClick={() => { void send({ type: "osc_software_remove", id: x.id }).then(onClose).catch(fail); }}>{t("Delete")}</button>}
+      {!isNew && <button class="btn danger" onClick={() => { void send({ type: "osc_software_remove", id: x.id }).then(onClose).catch(() => {}); }}>{t("Delete")}</button>}
       <span class="sp" /><button class="btn" onClick={onClose}>{t("Cancel")}</button>
       <button class="btn primary" onClick={() => {
         const out = structuredClone(x);
         out.id = out.id || slug(out.name);
         out.actions.forEach((a) => { a.id = a.id || slug(a.label); });
-        void send({ type: "osc_software_save", software: out }).then(onClose).catch(fail);
+        void send({ type: "osc_software_save", software: out }).then(onClose).catch(() => {});
       }}>{t("Save")}</button>
     </>}>
       <TextField label={t("Name")} value={x.name} onChange={(name) => setX({ ...x, name })} />
@@ -125,7 +124,7 @@ export function ProgramsPage() {
       <div class="panel">
         <div class="panel-head row"><span class="grow">{t("Programs included")}</span></div>
         <div class="panel-body col" style={{ gap: 4 }}>
-          {oscCatalog.value.filter((s) => s.builtin).map((s) => <div key={s.id}><b>{s.name}</b> <span class="faint">· {s.actions.length} {t("actions")} · {t("port")} {s.port}</span></div>)}
+          {oscCatalog.value.filter((s) => s.builtin).map((s) => <div key={s.id}><b>{s.name}</b> <span class="faint">· {s.actions.length} {s.actions.length === 1 ? t("action") : t("actions")} · {t("port")} {s.port}</span></div>)}
         </div>
       </div>
       <div class="panel">

@@ -30,10 +30,10 @@ export function AddFromProgram({ onClose }: { onClose: () => void }) {
   }
   return (
     <Modal title={t("Add control from a program")} onClose={onClose} footer={<>
-      <button class="btn" disabled={!cur} onClick={() => send({ type: "osc_send", ...body(), value: null }).then(() => toast(t("Sent"), "info", 1200)).catch((e) => toast(String(e?.message ?? e), "err"))}>{t("Try it")}</button>
+      <button class="btn" disabled={!cur} onClick={() => send({ type: "osc_send", ...body(), value: null }).then(() => toast(t("Sent"), "info", 1200)).catch(() => {})}>{t("Try it")}</button>
       <span class="sp" />
       <button class="btn" onClick={onClose}>{t("Cancel")}</button>
-      <button class="btn primary" disabled={!cur} onClick={() => { void send({ type: "vc_add_osc", ...body(), page: show.value?.vconsole.some((p) => p.id === pageId.value) ? pageId.value : null, label: label.trim() || null }).then(onClose).catch((e) => toast(String(e?.message ?? e), "err")); }}>{t("Add to console")}</button>
+      <button class="btn primary" disabled={!cur} onClick={() => { void send({ type: "vc_add_osc", ...body(), page: show.value?.vconsole.some((p) => p.id === pageId.value) ? pageId.value : null, label: label.trim() || null }).then(onClose).catch(() => {}); }}>{t("Add to console")}</button>
     </>}>
       <div class="field"><label>{t("Program on the network")}</label>
         <Select value={target} options={targets.map((x) => ({ value: x.id, label: `${x.name} · ${x.host}:${x.port}` }))} onChange={(v) => { setTarget(v); setActionId(""); setParams({}); }} />
