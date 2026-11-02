@@ -9,6 +9,8 @@
 ## Importar / exportar
 - Descargar el show actual: `GET /api/show`; importar: `PUT /api/show`.
 - Patch: importar CSV y MVR; informes (PDF/CSV) en el espacio de Patch.
+- **Plano de escenario (stage plot)**: informe PDF con la planta y el alzado del rig (símbolos por tipo de aparato —cabeza móvil, color/LED, convencional— con su ID, elementos de escenario, rejilla de 1 m, público) y la lista de aparatos con universo, dirección y altura. Se saca de los informes del espacio de Patch. Lo dibuja con las posiciones del escenario: colócalas antes en el espacio 3D o 2D.
+- **Con ChamSys MagicQ / MagicVis**: intercambia el rig por **MVR** (exporta de Lumos e importa en MagicQ, o al revés) y los perfiles por GDTF; las posiciones del plano viajan en el MVR.
 - Perfiles de aparato: ver tema `biblioteca`.
 
 ## Deshacer

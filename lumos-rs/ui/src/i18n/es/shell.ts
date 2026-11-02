@@ -910,4 +910,6 @@ export const shell: Record<string, string> = {
   "nothing held": "nada retenido",
   "Saved locate look for this model": "Localizar guardado para este modelo",
   "automatic": "automático",
+  "Stage plot": "Plano de escenario (stage plot)",
+  "Printable plan and front view of the rig: fixture symbols with their IDs, stage elements, scale and a fixture list.": "Plano imprimible del rig en planta y alzado: símbolos de los aparatos con su ID, elementos de escenario, escala y lista de aparatos.",
 };

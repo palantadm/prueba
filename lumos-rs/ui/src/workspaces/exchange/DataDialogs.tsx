@@ -13,6 +13,7 @@ const REPORTS: { kind: ReportKind; title: string; hint: string }[] = [
   { kind: "channels", title: "Channel hookup", hint: "DMX address map per universe." },
   { kind: "cues", title: "Cue sheets", hint: "Cues of every cuelist with times and notes." },
   { kind: "power", title: "Power report", hint: "Wattage per universe and total, with amps at 230 V." },
+  { kind: "plot", title: "Stage plot", hint: "Printable plan and front view of the rig: fixture symbols with their IDs, stage elements, scale and a fixture list." },
   { kind: "scenes", title: "Scenes & palettes", hint: "Overview of scenes and palettes." },
 ];
 

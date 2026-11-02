@@ -46,7 +46,7 @@ fn err(code: StatusCode, msg: impl Into<String>) -> Response {
 
 async fn report(State(h): State<Handle>, Path(name): Path<String>, Query(o): Query<Opts>) -> Response {
     let Some(kind) = reports::kind_from(&name) else {
-        return err(StatusCode::NOT_FOUND, "Unknown report (patch, channels, cues, power, scenes)");
+        return err(StatusCode::NOT_FOUND, "Unknown report (patch, channels, cues, power, scenes, plot)");
     };
     let Some(show) = h.get_show().await else { return err(StatusCode::SERVICE_UNAVAILABLE, "engine stopped") };
     let lang = reports::Lang::parse(o.lang.as_deref());

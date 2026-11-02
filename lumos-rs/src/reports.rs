@@ -34,6 +34,7 @@ pub enum Kind {
     Cues,
     Power,
     Scenes,
+    Plot,
 }
 
 pub fn kind_from(name: &str) -> Option<Kind> {
@@ -43,6 +44,7 @@ pub fn kind_from(name: &str) -> Option<Kind> {
         "cues" => Some(Kind::Cues),
         "power" => Some(Kind::Power),
         "scenes" => Some(Kind::Scenes),
+        "plot" => Some(Kind::Plot),
         _ => None,
     }
 }
@@ -299,6 +301,7 @@ pub fn generate(kind: Kind, show: &Show, lang: Lang, date: &str) -> Vec<u8> {
         Kind::Cues => cues(show, lang, date),
         Kind::Power => power(show, lang, date),
         Kind::Scenes => scenes(show, lang, date),
+        Kind::Plot => plot(show, lang, date),
     }
 }
 
@@ -691,6 +694,31 @@ mod tests {
     }
 
     #[test]
+    fn stage_plot_has_plan_front_view_legend_and_tables() {
+        let mut show = demo_show(14);
+        for (i, f) in show.fixtures.iter_mut().enumerate() {
+            f.pos = [-4.0 + i as f32 * 0.6, 5.0 - (i % 3) as f32 * 0.5, -2.0 + (i % 4) as f32 * 1.2];
+        }
+        show.stage.objects.push(StageObject { id: 1, kind: StageKind::Truss, name: "Truss frontal".into(), pos: [0.0, 5.0, 1.5], rot: [0.0, 15.0, 0.0], size: [8.0, 0.3, 0.3], color: "#888888".into(), media: None, screen_type: None, brightness: 1.0 });
+        show.stage.objects.push(StageObject { id: 2, kind: StageKind::Platform, name: "Tarima".into(), pos: [2.0, 0.2, -1.0], rot: [0.0, 30.0, 0.0], size: [3.0, 0.4, 2.0], color: "#336699".into(), media: None, screen_type: None, brightness: 1.0 });
+        let pdf = generate(Kind::Plot, &show, Lang::Es, "2026-10-22");
+        assert!(pdf.starts_with(b"%PDF-1.4") && pdf.ends_with(b"%%EOF\n"));
+        assert!(has(&pdf, "Plano de escenario"));
+        assert!(has(&pdf, "PÚBLICO") && has(&pdf, "Vista desde el público"));
+        assert!(has(&pdf, "Cabeza móvil (2)") && has(&pdf, "Color / LED (12)"), "legend counts");
+        assert!(has(&pdf, "Truss frontal") && has(&pdf, "Tarima"));
+        assert!(has(&pdf, "Foco 14") && has(&pdf, "Elementos de escenario"));
+        let en = generate(Kind::Plot, &show, Lang::En, "2026-10-22");
+        assert!(has(&en, "Stage plot") && has(&en, "AUDIENCE"));
+        // an empty show still produces a document
+        let empty = generate(Kind::Plot, &Show::default(), Lang::Es, "2026-10-22");
+        assert!(empty.starts_with(b"%PDF"));
+        if let Ok(path) = std::env::var("LUMOS_PLOT_OUT") {
+            std::fs::write(path, &pdf).unwrap();
+        }
+    }
+
+    #[test]
     fn dates() {
         assert_eq!(date_string(0), "1970-01-01");
         assert_eq!(date_string(1_792_000_000), "2026-10-14");
@@ -698,6 +726,7 @@ mod tests {
         assert_eq!(Lang::parse(Some("en")), Lang::En);
         assert_eq!(Lang::parse(None), Lang::Es);
         assert_eq!(kind_from("power.pdf"), Some(Kind::Power));
+        assert_eq!(kind_from("plot.pdf"), Some(Kind::Plot));
         assert_eq!(kind_from("nope.pdf"), None);
     }
 
@@ -794,4 +823,291 @@ mod tests {
             assert!(pdf.starts_with(b"%PDF") && pages(&pdf) >= 1, "{k:?}");
         }
     }
+}
+
+
+// ───────────────────────────── stage plot ─────────────────────────────
+
+type Rgb = (f32, f32, f32);
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Sym {
+    Mover,
+    Color,
+    Other,
+}
+
+fn symbol_of(f: &Fixture, profs: &HashMap<String, FixtureProfile>) -> Sym {
+    let Some(m) = profs.get(&f.profile).and_then(|p| p.modes.iter().find(|m| m.name == f.mode)) else { return Sym::Other };
+    let has = |a: &str| m.channels.iter().any(|c| c.attr == a);
+    if has("pan") && has("tilt") {
+        Sym::Mover
+    } else if has("red") && has("green") && has("blue") {
+        Sym::Color
+    } else {
+        Sym::Other
+    }
+}
+
+fn sym_rgb(s: Sym) -> Rgb {
+    match s {
+        Sym::Mover => (0.12, 0.35, 0.80),
+        Sym::Color => (0.10, 0.55, 0.25),
+        Sym::Other => (0.85, 0.45, 0.05),
+    }
+}
+
+fn hex_rgb(c: &str) -> Option<Rgb> {
+    let h = c.trim().trim_start_matches('#');
+    if h.len() != 6 {
+        return None;
+    }
+    let v = |i: usize| u8::from_str_radix(&h[i..i + 2], 16).ok().map(|b| b as f32 / 255.0);
+    Some((v(0)?, v(2)?, v(4)?))
+}
+
+/// A projection of the rig onto the page: `plan` = from above (x right, z towards the audience downwards),
+/// `front` = from the audience (x right, y up).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum View {
+    Plan,
+    Front,
+}
+
+impl View {
+    /// Horizontal and vertical coordinate (vertical grows downwards in `plan`, upwards in `front`).
+    fn pt(self, p: [f32; 3]) -> (f32, f32) {
+        match self {
+            View::Plan => (p[0], p[2]),
+            View::Front => (p[0], -p[1]),
+        }
+    }
+}
+
+struct Map {
+    x0: f32,
+    y_top: f32,
+    min: (f32, f32),
+    scale: f32,
+}
+
+impl Map {
+    fn to_page(&self, p: (f32, f32)) -> (f32, f32) {
+        (self.x0 + (p.0 - self.min.0) * self.scale, self.y_top - (p.1 - self.min.1) * self.scale)
+    }
+}
+
+/// Footprint corners (x, z) of an object rotated about the vertical axis.
+fn object_outline(o: &StageObject, view: View) -> Vec<[f32; 3]> {
+    let (w, h, d) = (o.size[0].max(0.02), o.size[1].max(0.02), o.size[2].max(0.02));
+    let (s, c) = (o.rot[1].to_radians().sin(), o.rot[1].to_radians().cos());
+    let rot = |x: f32, z: f32| [o.pos[0] + x * c + z * s, 0.0, o.pos[2] - x * s + z * c];
+    match view {
+        View::Plan => {
+            let mut v = vec![rot(-w / 2.0, -d / 2.0), rot(w / 2.0, -d / 2.0), rot(w / 2.0, d / 2.0), rot(-w / 2.0, d / 2.0)];
+            for p in &mut v {
+                p[1] = o.pos[1];
+            }
+            v
+        }
+        View::Front => {
+            // width along the rotated x axis seen from the front; height from the floor/centre as the 3D scene does
+            let half = (w * c.abs() + d * s.abs()) / 2.0;
+            let (y0, y1) = (o.pos[1] - h / 2.0, o.pos[1] + h / 2.0);
+            vec![[o.pos[0] - half, y0, 0.0], [o.pos[0] + half, y0, 0.0], [o.pos[0] + half, y1, 0.0], [o.pos[0] - half, y1, 0.0]]
+        }
+    }
+}
+
+fn draw_symbol(p: &mut crate::pdf::Page, x: f32, y: f32, sym: Sym, r: f32) {
+    let c = sym_rgb(sym);
+    match sym {
+        Sym::Mover => p.disc(x, y, r, c),
+        Sym::Color => p.fill_poly(&[(x - r, y - r), (x + r, y - r), (x + r, y + r), (x - r, y + r)], c),
+        Sym::Other => p.fill_poly(&[(x, y + r * 1.25), (x + r * 1.1, y - r * 0.8), (x - r * 1.1, y - r * 0.8)], c),
+    }
+}
+
+/// Draw one view inside the box `(x0, y_top, w, h)` (page units, `y_top` is the upper edge). Returns nothing; labels fixtures by id.
+fn draw_view(p: &mut crate::pdf::Page, show: &Show, profs: &HashMap<String, FixtureProfile>, view: View, bx: (f32, f32, f32, f32), lang: Lang) -> f32 {
+    let (x0, y_top, w, h) = bx;
+    let st = &show.stage;
+    let (sw, sd, sh) = (st.size[0].max(1.0), st.size[2].max(1.0), st.size[1].max(1.0));
+    // stage rectangle in view coordinates
+    let stage: Vec<(f32, f32)> = match view {
+        View::Plan => vec![(-sw / 2.0, -sd / 2.0), (sw / 2.0, -sd / 2.0), (sw / 2.0, sd / 2.0), (-sw / 2.0, sd / 2.0)],
+        View::Front => vec![(-sw / 2.0, 0.0), (sw / 2.0, 0.0), (sw / 2.0, -sh), (-sw / 2.0, -sh)],
+    };
+    let mut pts: Vec<(f32, f32)> = stage.clone();
+    for f in &show.fixtures {
+        pts.push(view.pt(f.pos));
+    }
+    for o in &st.objects {
+        for c in object_outline(o, view) {
+            pts.push(view.pt(c));
+        }
+    }
+    let (mut minx, mut maxx, mut miny, mut maxy) = (f32::MAX, f32::MIN, f32::MAX, f32::MIN);
+    for q in &pts {
+        minx = minx.min(q.0);
+        maxx = maxx.max(q.0);
+        miny = miny.min(q.1);
+        maxy = maxy.max(q.1);
+    }
+    let pad = 0.6;
+    let (minx, miny) = (minx - pad, miny - pad);
+    let (spanx, spany) = ((maxx + pad - minx).max(1.0), (maxy + pad - miny).max(1.0));
+    let scale = (w / spanx).min((h - 18.0) / spany);
+    let used_w = spanx * scale;
+    let m = Map { x0: x0 + (w - used_w) / 2.0, y_top: y_top - 8.0, min: (minx, miny), scale };
+    let grid = (0.88, 0.88, 0.88);
+    // 1 m grid
+    let (mut gx, gy_end) = (minx.ceil(), maxy + pad);
+    while gx <= maxx + pad {
+        let (a, b) = (m.to_page((gx, miny)), m.to_page((gx, gy_end)));
+        p.line_rgb(a.0, a.1, b.0, b.1, 0.3, grid);
+        gx += 1.0;
+    }
+    let mut gy = miny.ceil();
+    while gy <= maxy + pad {
+        let (a, b) = (m.to_page((minx, gy)), m.to_page((maxx + pad, gy)));
+        p.line_rgb(a.0, a.1, b.0, b.1, 0.3, grid);
+        gy += 1.0;
+    }
+    // stage outline and centre line
+    let sp: Vec<(f32, f32)> = stage.iter().map(|q| m.to_page(*q)).collect();
+    p.stroke_poly(&sp, 1.2, (0.15, 0.15, 0.15));
+    let (c0, c1) = match view {
+        View::Plan => (m.to_page((0.0, -sd / 2.0)), m.to_page((0.0, sd / 2.0))),
+        View::Front => (m.to_page((0.0, 0.0)), m.to_page((0.0, -sh))),
+    };
+    p.line_rgb(c0.0, c0.1, c1.0, c1.1, 0.5, (0.6, 0.6, 0.6));
+    // stage objects
+    for o in &st.objects {
+        let o_pts: Vec<(f32, f32)> = object_outline(o, view).iter().map(|c| m.to_page(view.pt(*c))).collect();
+        let col = hex_rgb(&o.color).unwrap_or((0.45, 0.45, 0.45));
+        let soft = (0.5 + col.0 * 0.5, 0.5 + col.1 * 0.5, 0.5 + col.2 * 0.5);
+        if matches!(o.kind, StageKind::Truss) && view == View::Plan {
+            // a truss is a line with its length
+            let (s, c) = (o.rot[1].to_radians().sin(), o.rot[1].to_radians().cos());
+            let a = m.to_page(view.pt([o.pos[0] - o.size[0] / 2.0 * c, 0.0, o.pos[2] + o.size[0] / 2.0 * s]));
+            let b = m.to_page(view.pt([o.pos[0] + o.size[0] / 2.0 * c, 0.0, o.pos[2] - o.size[0] / 2.0 * s]));
+            p.line_rgb(a.0, a.1, b.0, b.1, 2.5, (0.25, 0.25, 0.25));
+        } else {
+            p.fill_poly(&o_pts, soft);
+            p.stroke_poly(&o_pts, 0.8, (0.3, 0.3, 0.3));
+        }
+        let cx = o_pts.iter().map(|q| q.0).sum::<f32>() / o_pts.len().max(1) as f32;
+        let cy = o_pts.iter().map(|q| q.1).sum::<f32>() / o_pts.len().max(1) as f32;
+        p.text(cx - text_width(&o.name, 6.0, false) / 2.0, cy - 2.0, 6.0, false, &fit(&o.name, 90.0, 6.0, false));
+    }
+    // fixtures
+    let r = (0.17 * scale).clamp(2.2, 5.5);
+    let mut fx: Vec<&Fixture> = show.fixtures.iter().collect();
+    fx.sort_by_key(|f| f.id);
+    for f in &fx {
+        let q = m.to_page(view.pt(f.pos));
+        draw_symbol(p, q.0, q.1, symbol_of(f, profs), r);
+        p.text(q.0 + r + 1.0, q.1 + r * 0.4, 5.5, true, &f.id.to_string());
+    }
+    // audience marker and scale bar
+    let base = m.to_page((minx + 0.2, maxy + pad));
+    match view {
+        View::Plan => {
+            let mid = x0 + w / 2.0;
+            p.text(mid - 22.0, m.to_page((0.0, maxy + pad)).1 - 10.0, 8.0, true, lang.t("PÚBLICO", "AUDIENCE"));
+        }
+        View::Front => p.text(x0 + w / 2.0 - 40.0, m.to_page((0.0, maxy + pad)).1 - 10.0, 8.0, true, lang.t("Vista desde el público", "View from the audience")),
+    }
+    let bar = m.to_page((minx + 0.2, miny + 0.2));
+    let _ = base;
+    p.line_rgb(bar.0, bar.1 + 6.0, bar.0 + scale, bar.1 + 6.0, 1.5, (0.1, 0.1, 0.1));
+    p.text(bar.0, bar.1 + 9.0, 6.0, false, "1 m");
+    8.0 + spany * scale + 18.0
+}
+
+fn plot(show: &Show, lang: Lang, date: &str) -> Vec<u8> {
+    let profs = profile_map(show);
+    let mut r = Rep::new(lang.t("Plano de escenario (stage plot)", "Stage plot"), &show.name, date, lang);
+    let (mut movers, mut colors, mut others) = (0, 0, 0);
+    for f in &show.fixtures {
+        match symbol_of(f, &profs) {
+            Sym::Mover => movers += 1,
+            Sym::Color => colors += 1,
+            Sym::Other => others += 1,
+        }
+    }
+    r.note(&format!(
+        "{} {} · {} {} · {} {}",
+        lang.t("Escenario", "Stage"),
+        format!("{}×{} m", num(show.stage.size[0]), num(show.stage.size[2])),
+        show.fixtures.len(),
+        lang.t("aparatos", "fixtures"),
+        show.stage.objects.len(),
+        lang.t("elementos de escenario", "stage elements")
+    ));
+    // legend
+    let ly = r.y;
+    {
+        let p = &mut r.doc.pages[r.page];
+        let items = [(Sym::Mover, lang.t("Cabeza móvil", "Moving head"), movers), (Sym::Color, lang.t("Color / LED", "Colour / LED"), colors), (Sym::Other, lang.t("Convencional / otros", "Conventional / other"), others)];
+        let mut x = MARGIN + 6.0;
+        for (s, label, n) in items {
+            draw_symbol(p, x, ly - 6.0, s, 4.0);
+            let txt = format!("{label} ({n})");
+            p.text(x + 8.0, ly - 8.0, 8.0, false, &txt);
+            x += 22.0 + text_width(&txt, 8.0, false);
+        }
+        p.text_right(PAGE_W - MARGIN, ly - 8.0, 7.5, false, lang.t("El número es el ID del aparato", "The number is the fixture ID"));
+    }
+    r.y -= 18.0;
+    let total_h = r.y - BOTTOM;
+    let (w, h) = (PAGE_W - 2.0 * MARGIN, total_h * 0.64);
+    let top = r.y;
+    let used = {
+        let p = &mut r.doc.pages[r.page];
+        draw_view(p, show, &profs, View::Plan, (MARGIN, top, w, h), lang)
+    };
+    let top2 = top - used - 14.0;
+    {
+        let p = &mut r.doc.pages[r.page];
+        draw_view(p, show, &profs, View::Front, (MARGIN, top2, w, (top2 - BOTTOM).max(60.0)), lang);
+    }
+    // legend table on the following pages
+    r.new_page();
+    r.heading(lang.t("Aparatos", "Fixtures"));
+    let cols = [
+        rcol("ID", 0.6),
+        col(lang.t("Nombre", "Name"), 2.4),
+        col(lang.t("Perfil", "Profile"), 3.2),
+        rcol(lang.t("Univ.", "Univ."), 0.8),
+        rcol(lang.t("Dir.", "Addr."), 0.8),
+        rcol(lang.t("Altura", "Height"), 0.9),
+        col(lang.t("Tipo", "Type"), 1.6),
+    ];
+    let rows: Vec<Vec<String>> = sorted_fixtures(show)
+        .iter()
+        .map(|f| {
+            let kind = match symbol_of(f, &profs) {
+                Sym::Mover => lang.t("Móvil", "Mover"),
+                Sym::Color => lang.t("Color / LED", "Colour / LED"),
+                Sym::Other => lang.t("Convencional", "Conventional"),
+            };
+            vec![f.id.to_string(), f.name.clone(), profile_label(profs.get(&f.profile), &f.profile), f.universe.to_string(), f.address.to_string(), format!("{} m", num(f.pos[1])), kind.to_string()]
+        })
+        .collect();
+    r.table(&cols, &rows);
+    if !show.stage.objects.is_empty() {
+        r.heading(lang.t("Elementos de escenario", "Stage elements"));
+        let cols = [col(lang.t("Nombre", "Name"), 2.4), col(lang.t("Tipo", "Kind"), 1.4), rcol("X", 0.8), rcol("Y", 0.8), rcol("Z", 0.8), col(lang.t("Medidas (a×h×p)", "Size (w×h×d)"), 2.0)];
+        let rows: Vec<Vec<String>> = show
+            .stage
+            .objects
+            .iter()
+            .map(|o| vec![o.name.clone(), format!("{:?}", o.kind).to_lowercase(), num(o.pos[0]), num(o.pos[1]), num(o.pos[2]), format!("{}×{}×{}", num(o.size[0]), num(o.size[1]), num(o.size[2]))])
+            .collect();
+        r.table(&cols, &rows);
+    }
+    r.note(lang.t("Posiciones en metros (x: derecha de escena, y: altura, z: hacia el público).", "Positions in metres (x: stage right, y: height, z: downstage)."));
+    r.finish()
 }

@@ -1,5 +1,5 @@
 // REST helpers for reports, CSV/MVR exchange (wave 2).
-export type ReportKind = "patch" | "channels" | "cues" | "power" | "scenes";
+export type ReportKind = "patch" | "channels" | "cues" | "power" | "scenes" | "plot";
 
 export const absoluteUrl = (path: string) => new URL(path, location.origin).toString();
 export const reportPath = (k: ReportKind, lang: string) => `/api/report/${k}.pdf?lang=${lang}`;

@@ -127,7 +127,7 @@ impl Page {
     /// `y` is measured from the bottom of the page (PDF convention).
     pub fn text(&mut self, x: f32, y: f32, size: f32, bold: bool, s: &str) {
         let f = if bold { "F2" } else { "F1" };
-        let _ = write!(self.ops_str(), "BT /{f} {size:.2} Tf {x:.2} {y:.2} Td ");
+        let _ = write!(self.ops_str(), "0 g BT /{f} {size:.2} Tf {x:.2} {y:.2} Td ");
         push_pdf_string(&mut self.ops, s);
         self.ops.extend_from_slice(b" Tj ET\n");
     }
@@ -143,6 +143,40 @@ impl Page {
 
     pub fn rect_fill(&mut self, x: f32, y: f32, w: f32, h: f32, rgb: (f32, f32, f32)) {
         let _ = write!(self.ops_str(), "{:.3} {:.3} {:.3} rg {x:.2} {y:.2} {w:.2} {h:.2} re f\n", rgb.0, rgb.1, rgb.2);
+    }
+
+    /// Closed outline through `pts` in colour `rgb`.
+    pub fn stroke_poly(&mut self, pts: &[(f32, f32)], width: f32, rgb: (f32, f32, f32)) {
+        if pts.len() < 2 {
+            return;
+        }
+        let _ = write!(self.ops_str(), "{:.3} {:.3} {:.3} RG {width:.2} w {:.2} {:.2} m ", rgb.0, rgb.1, rgb.2, pts[0].0, pts[0].1);
+        for q in &pts[1..] {
+            let _ = write!(self.ops_str(), "{:.2} {:.2} l ", q.0, q.1);
+        }
+        self.ops.extend_from_slice(b"h S\n");
+    }
+
+    pub fn fill_poly(&mut self, pts: &[(f32, f32)], rgb: (f32, f32, f32)) {
+        if pts.len() < 3 {
+            return;
+        }
+        let _ = write!(self.ops_str(), "{:.3} {:.3} {:.3} rg {:.2} {:.2} m ", rgb.0, rgb.1, rgb.2, pts[0].0, pts[0].1);
+        for q in &pts[1..] {
+            let _ = write!(self.ops_str(), "{:.2} {:.2} l ", q.0, q.1);
+        }
+        self.ops.extend_from_slice(b"h f\n");
+    }
+
+    /// Open line in colour.
+    pub fn line_rgb(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, width: f32, rgb: (f32, f32, f32)) {
+        let _ = write!(self.ops_str(), "{:.3} {:.3} {:.3} RG {width:.2} w {x1:.2} {y1:.2} m {x2:.2} {y2:.2} l S\n", rgb.0, rgb.1, rgb.2);
+    }
+
+    /// Filled disc (polygon approximation).
+    pub fn disc(&mut self, cx: f32, cy: f32, r: f32, rgb: (f32, f32, f32)) {
+        let pts: Vec<(f32, f32)> = (0..20).map(|i| { let a = i as f32 / 20.0 * std::f32::consts::TAU; (cx + r * a.cos(), cy + r * a.sin()) }).collect();
+        self.fill_poly(&pts, rgb);
     }
 
     fn ops_str(&mut self) -> OpsWriter<'_> {
