@@ -890,7 +890,7 @@ mod tests {
     fn effect_rate_is_runtime_only() {
         let mut e = engine();
         e.handle(Command::EffectSave {
-            effect: Effect { attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0,
+            effect: Effect { attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default(),
                 id: 0,
                 name: "e".into(),
                 attr: "dimmer".into(),

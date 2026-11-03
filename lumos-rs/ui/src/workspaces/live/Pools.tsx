@@ -186,6 +186,7 @@ function EffectPool() {
     id: Math.max(0, ...effects.map((e) => e.id)) + 1, name: t("Effect {n}", { n: effects.length + 1 }),
     attr: "dimmer", shape: "sine", rate: 0.5, depth: 0.5, phase_spread: 0, fixtures: [...selection.value],
     attr2: null, speed_master: null, bpm: 0, rotation: 0,
+    adv: { parity: "all", from: 0, to: 0, every: 0, every_offset: 0, order: "normal", groups: 0, blocks: 0, wings: 0, direction: "forward", phase_offset: 0, width: 0, offset: 0, absolute: false, low: 0, high: 1 },
   });
   return (
     <>
@@ -217,10 +218,18 @@ function EffectPool() {
   );
 }
 
+const ORDER_LABEL = { normal: "Normal", reverse: "Reverse", random: "Random", centre_out: "Centre out", edges_in: "Edges in" } as const;
+const DIR_LABEL = { forward: "Forward", backward: "Backward", bounce: "Bounce" } as const;
+
 function EffectEditor({ e, exists, onClose }: { e: Effect; exists: boolean; onClose: () => void }) {
   const [d, setD] = useState<Effect>(e);
   const up = (patch: Partial<Effect>) => setD({ ...d, ...patch });
+  const upAdv = (patch: Partial<Effect["adv"]>) => setD({ ...d, adv: { ...d.adv, ...patch } });
   const num = (v: string, f: number) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : f);
+  const numField = (label: string, value: number, set: (v: number) => void, min: number, max: number, title?: string) => (
+    <div class="field grow" title={title}><label>{label}</label>
+      <input class="input num" style={{ minHeight: 44 }} type="number" min={min} max={max} value={value} onInput={(ev) => set(Math.min(max, Math.max(min, Math.round(num((ev.target as HTMLInputElement).value, 0)))))} /></div>
+  );
   const masters = show.value?.speed_masters ?? [];
   const mode: "hz" | "bpm" | "master" = d.speed_master !== null ? "master" : d.bpm > 0 ? "bpm" : "hz";
   const setMode = (m: "hz" | "bpm" | "master") =>
@@ -284,6 +293,54 @@ function EffectEditor({ e, exists, onClose }: { e: Effect; exists: boolean; onCl
         <div class="field grow"><label>{t("Phase spread °")}</label><input class="input num" style={{ minHeight: 44 }} type="number" min="0" max="360" value={d.phase_spread} onInput={(ev) => up({ phase_spread: num((ev.target as HTMLInputElement).value, 0) })} /></div>
         {two && <div class="field grow"><label>{t("Rotation °")}</label><input class="input num" style={{ minHeight: 44 }} type="number" min="-360" max="360" value={d.rotation} onInput={(ev) => up({ rotation: num((ev.target as HTMLInputElement).value, 0) })} /></div>}
       </div>
+      <details class="fx-adv" open={JSON.stringify(d.adv) !== JSON.stringify(e.adv) || undefined}>
+        <summary>{t("Advanced: fixtures, order, phase, range")}</summary>
+        <div class="field"><label>{t("Fixtures that take part")}</label>
+          <div class="row wrap">
+            <select class="input" style={{ minHeight: 44 }} aria-label={t("Odd / even")} value={d.adv.parity} onChange={(ev) => upAdv({ parity: (ev.target as HTMLSelectElement).value as Effect["adv"]["parity"] })}>
+              <option value="all">{t("All")}</option><option value="odd">{t("Odd (1, 3, 5…)")}</option><option value="even">{t("Even (2, 4, 6…)")}</option>
+            </select>
+            {numField(t("From no."), d.adv.from, (v) => upAdv({ from: v }), 0, 999)}
+            {numField(t("To no."), d.adv.to, (v) => upAdv({ to: v }), 0, 999)}
+            {numField(t("Every N-th"), d.adv.every, (v) => upAdv({ every: v }), 0, 64)}
+            {d.adv.every > 1 && numField(t("Starting at"), d.adv.every_offset, (v) => upAdv({ every_offset: v }), 0, 63)}
+          </div>
+          <span class="dim" style={{ fontSize: 11 }}>{t("Numbers count along the effect's fixture list. 0 = no limit.")}</span>
+        </div>
+        <div class="field"><label>{t("Phase order")}</label>
+          <div class="fx-modes" role="tablist" aria-label={t("Phase order")}>
+            {(["normal", "reverse", "random", "centre_out", "edges_in"] as const).map((o) => (
+              <button key={o} role="tab" aria-selected={d.adv.order === o} class={`btn ${d.adv.order === o ? "sel" : ""}`} onClick={() => upAdv({ order: o })}>{t(ORDER_LABEL[o])}</button>
+            ))}
+          </div>
+        </div>
+        <div class="row wrap">
+          {numField(t("Groups"), d.adv.groups, (v) => upAdv({ groups: v }), 0, 32, t("Fixtures taken in turn A B A B… share the phase of their group"))}
+          {numField(t("Blocks of"), d.adv.blocks, (v) => upAdv({ blocks: v }), 0, 64, t("N consecutive fixtures move together"))}
+          {numField(t("Wings"), d.adv.wings, (v) => upAdv({ wings: v }), 0, 2, t("2 = mirrored: the wave runs from the centre to both sides"))}
+          {numField(t("Phase offset °"), d.adv.phase_offset, (v) => upAdv({ phase_offset: v }), -360, 360)}
+        </div>
+        <div class="field"><label>{t("Direction")}</label>
+          <div class="fx-modes" role="tablist" aria-label={t("Direction")}>
+            {(["forward", "backward", "bounce"] as const).map((o) => (
+              <button key={o} role="tab" aria-selected={d.adv.direction === o} class={`btn ${d.adv.direction === o ? "sel" : ""}`} onClick={() => upAdv({ direction: o })}>{t(DIR_LABEL[o])}</button>
+            ))}
+          </div>
+        </div>
+        <div class="field"><label>{t("Range")}</label>
+          <div class="fx-modes" role="tablist" aria-label={t("Range")}>
+            <button role="tab" aria-selected={!d.adv.absolute} class={`btn ${!d.adv.absolute ? "sel" : ""}`} onClick={() => upAdv({ absolute: false })} title={t("The wave moves around the value the programmer or cue holds")}>{t("Relative")}</button>
+            <button role="tab" aria-selected={d.adv.absolute} class={`btn ${d.adv.absolute ? "sel" : ""}`} onClick={() => upAdv({ absolute: true })} title={t("The wave swings between Low and High whatever the current value")}>{t("Absolute")}</button>
+          </div>
+          <div class="row wrap">
+            {d.adv.absolute ? <>
+              {numField(t("Low %"), Math.round(d.adv.low * 100), (v) => upAdv({ low: v / 100 }), 0, 100)}
+              {numField(t("High %"), Math.round(d.adv.high * 100), (v) => upAdv({ high: v / 100 }), 0, 100)}
+            </> : numField(t("Offset %"), Math.round(d.adv.offset * 100), (v) => upAdv({ offset: v / 100 }), -100, 100, t("Shifts the centre of the wave"))}
+            {(d.shape === "square" || d.shape === "pulse") && numField(t("Width %"), Math.round(d.adv.width * 100), (v) => upAdv({ width: v / 100 }), 0, 99, t("Share of the cycle that is on; 0 = default"))}
+          </div>
+        </div>
+      </details>
       <div class="row">
         <span class="dim grow">{t("Fixtures:")} {d.fixtures.length ? d.fixtures.join(", ") : t("none")}</span>
         <button class="btn" style={{ minHeight: 44 }} disabled={!selection.value.length} onClick={() => up({ fixtures: selection.value.filter((i) => fixtureById(i)) })}>{t("Use selection ({n})", { n: selection.value.length })}</button>

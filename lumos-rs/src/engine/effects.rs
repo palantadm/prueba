@@ -9,7 +9,13 @@ fn frac(x: f64) -> f64 {
 
 /// Waveform in −1..1 for `phase` (cycles).
 pub fn shape_value(shape: Shape, phase: f64, seed: u32) -> f32 {
+    shape_value_w(shape, phase, seed, 0.0)
+}
+
+/// Like [`shape_value`] with a duty cycle `width` (0..1) for square and pulse waves (0 = the shape's default).
+pub fn shape_value_w(shape: Shape, phase: f64, seed: u32, width: f32) -> f32 {
     let f = frac(phase);
+    let duty = |default: f64| if width > 0.0 && width < 1.0 { width as f64 } else { default };
     (match shape {
         // Circle / Eight are 2-D (see `shape_xy`); driving a single attribute they behave like a sine.
         Shape::Sine | Shape::Circle | Shape::Eight => (phase * std::f64::consts::TAU).sin(),
@@ -17,7 +23,7 @@ pub fn shape_value(shape: Shape, phase: f64, seed: u32) -> f32 {
         Shape::Ramp => 1.0 - 2.0 * f,
         // Short flash: +1 for the first 15 % of the cycle, -1 otherwise.
         Shape::Pulse => {
-            if f < 0.15 {
+            if f < duty(0.15) {
                 1.0
             } else {
                 -1.0
@@ -34,7 +40,7 @@ pub fn shape_value(shape: Shape, phase: f64, seed: u32) -> f32 {
         }
         Shape::Saw => 2.0 * f - 1.0,
         Shape::Square => {
-            if f < 0.5 {
+            if f < duty(0.5) {
                 1.0
             } else {
                 -1.0
@@ -102,12 +108,93 @@ fn is_2d(e: &Effect) -> bool {
     matches!(e.shape, Shape::Circle | Shape::Eight) && e.attr2.is_some() && e.attr != "hue"
 }
 
+/// Positions (0-based) in `e.fixtures` of the fixtures that take part, after parity, range and "every N".
+pub fn participants(e: &Effect) -> Vec<usize> {
+    let a = &e.adv;
+    (0..e.fixtures.len())
+        .filter(|p| match a.parity {
+            Parity::All => true,
+            Parity::Odd => p % 2 == 0,
+            Parity::Even => p % 2 == 1,
+        })
+        .filter(|p| (a.from == 0 || p + 1 >= a.from as usize) && (a.to == 0 || p + 1 <= a.to as usize))
+        .filter(|p| a.every <= 1 || p % a.every as usize == a.every_offset as usize % a.every as usize)
+        .collect()
+}
+
+/// For each of the `m` participating fixtures, `(index, count)`: its slot among `count` equal phase steps
+/// (fixtures that share a slot move together). Applies order, groups / blocks and wings.
+pub fn phase_slots(e: &Effect, m: usize) -> Vec<(usize, usize)> {
+    let a = &e.adv;
+    if m == 0 {
+        return vec![];
+    }
+    let mut v: Vec<(usize, usize)> = match a.order {
+        EffOrder::Normal => (0..m).map(|k| (k, m)).collect(),
+        EffOrder::Reverse => (0..m).map(|k| (m - 1 - k, m)).collect(),
+        EffOrder::Random => {
+            // fixed shuffle seeded by the effect id (Fisher–Yates with a small LCG)
+            let mut perm: Vec<usize> = (0..m).collect();
+            let mut st = 0x9E37_79B9_7F4A_7C15u64 ^ (e.id as u64).wrapping_mul(0xA24B_AED4_963E_E407);
+            for i in (1..m).rev() {
+                st = st.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                perm.swap(i, ((st >> 33) as usize) % (i + 1));
+            }
+            perm.into_iter().map(|p| (p, m)).collect()
+        }
+        EffOrder::CentreOut | EffOrder::EdgesIn => {
+            let count = (m - 1) / 2 + 1;
+            (0..m)
+                .map(|k| {
+                    let rank = (2 * k as i64 - (m as i64 - 1)).unsigned_abs() as usize / 2;
+                    (if a.order == EffOrder::CentreOut { rank } else { count - 1 - rank }, count)
+                })
+                .collect()
+        }
+    };
+    if a.blocks > 1 {
+        let b = a.blocks as usize;
+        for x in &mut v {
+            *x = (x.0 / b, (x.1 + b - 1) / b);
+        }
+    } else if a.groups > 1 {
+        let g = a.groups as usize;
+        for x in &mut v {
+            *x = (x.0 % g, g.min(x.1));
+        }
+    }
+    if a.wings > 1 {
+        for x in &mut v {
+            *x = (x.0.min(x.1 - 1 - x.0), (x.1 + 1) / 2);
+        }
+    }
+    v
+}
+
+/// Position of the wave in cycles for a base phase and a direction.
+pub fn directed_phase(dir: EffDir, base: f64) -> f64 {
+    match dir {
+        EffDir::Forward => base,
+        EffDir::Backward => -base,
+        EffDir::Bounce => {
+            let q = base.rem_euclid(2.0);
+            if q > 1.0 {
+                2.0 - q
+            } else {
+                q
+            }
+        }
+    }
+}
+
 /// Apply every running effect to `state`.
 /// * `depth_mul(effect id)` is the executor fader.
 /// * `phase_of(effect id)` is the effect's accumulated phase in cycles (see `Engine::effect_phases`).
 ///
-/// Amplitude: `depth` 1 swings +-0.5 of the attribute range around its current value (1-D shapes) or
-/// draws a circle of radius 0.5 (2-D shapes). `phase_spread` offsets the fixtures evenly.
+/// Relative (default): `depth` 1 swings +-0.5 of the attribute range around its current value (1-D shapes) or
+/// draws a circle of radius 0.5 (2-D shapes). Absolute (`adv.absolute`): the wave swings between `adv.low` and
+/// `adv.high`, whatever the current value; the fader then fades between the current value and the wave.
+/// `phase_spread` offsets the fixtures evenly; `adv` chooses who takes part and how the phase is shared.
 pub fn apply(
     state: &mut PerFixture,
     effects: &[Effect],
@@ -120,12 +207,19 @@ pub fn apply(
         if !running(e.id) || e.fixtures.is_empty() {
             continue;
         }
-        let depth = (e.depth * depth_mul(e.id)).clamp(0.0, 1.0);
-        let n = e.fixtures.len() as f64;
-        let base_phase = phase_of(e.id);
-        for (i, &fid) in e.fixtures.iter().enumerate() {
+        let fader = depth_mul(e.id).clamp(0.0, 1.0);
+        let depth = (e.depth * fader).clamp(0.0, 1.0);
+        let adv = &e.adv;
+        let base_phase = directed_phase(adv.direction, phase_of(e.id));
+        let part = participants(e);
+        let slots = phase_slots(e, part.len());
+        let (low, high) = (if adv.low.is_finite() { adv.low.clamp(0.0, 1.0) } else { 0.0 }, if adv.high.is_finite() { adv.high.clamp(0.0, 1.0) } else { 1.0 });
+        let offset = if adv.offset.is_finite() { adv.offset.clamp(-1.0, 1.0) } else { 0.0 };
+        for (k, &pos) in part.iter().enumerate() {
+            let fid = e.fixtures[pos];
             let Some(pf) = patch.get(fid) else { continue };
-            let phase = base_phase + (i as f64 / n) * (e.phase_spread as f64 / 360.0);
+            let (idx, count) = slots[k];
+            let phase = base_phase + (idx as f64 / count as f64) * (e.phase_spread as f64 / 360.0) + adv.phase_offset as f64 / 360.0;
             let attrs = state.entry(fid).or_default();
             if is_2d(e) {
                 let y_attr = e.attr2.as_deref().unwrap_or_default();
@@ -136,11 +230,13 @@ pub fn apply(
                 let (x, y) = rotate(x, y, e.rotation);
                 for (name, d) in [(e.attr.as_str(), x), (y_attr, y)] {
                     let base = attrs.get(name).copied().unwrap_or_else(|| attr_default(name));
-                    attrs.insert(name.into(), (base + d * depth * 0.5).clamp(0.0, 1.0));
+                    let v = if adv.absolute { base + ((low + high) / 2.0 + d * (high - low) / 2.0 - base) * fader } else { base + d * depth * 0.5 + offset };
+                    attrs.insert(name.into(), v.clamp(0.0, 1.0));
                 }
                 continue;
             }
-            let x = shape_value(e.shape, phase, fid.wrapping_add(e.id.wrapping_mul(7919)));
+            let x = shape_value_w(e.shape, phase, fid.wrapping_add(e.id.wrapping_mul(7919)), adv.width);
+            let abs_val = low + (x + 1.0) / 2.0 * (high - low);
             if e.attr == "hue" {
                 if !(pf.has_attr("red") && pf.has_attr("green") && pf.has_attr("blue")) {
                     continue;
@@ -151,11 +247,13 @@ pub fn apply(
                     attrs.insert(name.into(), base + (target - base) * depth);
                 }
             } else if e.attr == "dimmer" {
-                let factor = 1.0 - depth * (0.5 - 0.5 * x);
                 if pf.has_dimmer {
                     let base = attrs.get("dimmer").copied().unwrap_or(0.0);
-                    attrs.insert("dimmer".into(), (base * factor).clamp(0.0, 1.0));
+                    let v = if adv.absolute { base + (abs_val - base) * fader } else { base * (1.0 - depth * (0.5 - 0.5 * x)) };
+                    attrs.insert("dimmer".into(), v.clamp(0.0, 1.0));
                 } else {
+                    // no dimmer channel: scale the colour
+                    let factor = if adv.absolute { 1.0 + (abs_val - 1.0) * fader } else { 1.0 - depth * (0.5 - 0.5 * x) };
                     for a in COLOR_ATTRS {
                         if pf.has_attr(a) {
                             if let Some(v) = attrs.get_mut(*a) {
@@ -166,7 +264,8 @@ pub fn apply(
                 }
             } else {
                 let base = attrs.get(&e.attr).copied().unwrap_or_else(|| attr_default(&e.attr));
-                attrs.insert(e.attr.clone(), (base + x * depth * 0.5).clamp(0.0, 1.0));
+                let v = if adv.absolute { base + (abs_val - base) * fader } else { base + x * depth * 0.5 + offset };
+                attrs.insert(e.attr.clone(), v.clamp(0.0, 1.0));
             }
         }
     }
@@ -174,6 +273,80 @@ pub fn apply(
 
 #[cfg(test)]
 mod tests {
+    fn eff(n: u32) -> Effect {
+        Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: (1..=n).collect(), attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: EffectAdv::default() }
+    }
+
+    #[test]
+    fn odd_even_range_and_every_pick_the_fixtures() {
+        let mut e = eff(8);
+        assert_eq!(participants(&e), vec![0, 1, 2, 3, 4, 5, 6, 7]);
+        e.adv.parity = Parity::Odd;
+        assert_eq!(participants(&e), vec![0, 2, 4, 6], "1st, 3rd, 5th, 7th");
+        e.adv.parity = Parity::Even;
+        assert_eq!(participants(&e), vec![1, 3, 5, 7]);
+        e.adv.parity = Parity::All;
+        e.adv.from = 3;
+        e.adv.to = 6;
+        assert_eq!(participants(&e), vec![2, 3, 4, 5], "positions 3 to 6");
+        e.adv.from = 0;
+        e.adv.to = 0;
+        e.adv.every = 3;
+        assert_eq!(participants(&e), vec![0, 3, 6]);
+        e.adv.every_offset = 1;
+        assert_eq!(participants(&e), vec![1, 4, 7]);
+        e.adv.every = 0;
+        e.adv.every_offset = 0;
+        e.adv.to = 99;
+        assert_eq!(participants(&e).len(), 8, "a range past the end is just the end");
+    }
+
+    #[test]
+    fn phase_slots_follow_order_groups_blocks_and_wings() {
+        let mut e = eff(6);
+        let idx = |e: &Effect, m: usize| phase_slots(e, m).iter().map(|x| x.0).collect::<Vec<_>>();
+        assert_eq!(idx(&e, 6), vec![0, 1, 2, 3, 4, 5]);
+        e.adv.order = EffOrder::Reverse;
+        assert_eq!(idx(&e, 6), vec![5, 4, 3, 2, 1, 0]);
+        e.adv.order = EffOrder::CentreOut;
+        assert_eq!(idx(&e, 6), vec![2, 1, 0, 0, 1, 2], "the two middle ones go first, together");
+        assert_eq!(idx(&e, 5), vec![2, 1, 0, 1, 2]);
+        e.adv.order = EffOrder::EdgesIn;
+        assert_eq!(idx(&e, 5), vec![0, 1, 2, 1, 0]);
+        e.adv.order = EffOrder::Random;
+        let r = idx(&e, 6);
+        let mut sorted = r.clone();
+        sorted.sort();
+        assert_eq!(sorted, vec![0, 1, 2, 3, 4, 5], "a shuffle uses every slot once");
+        assert_eq!(r, idx(&e, 6), "and is the same every time");
+        e.adv.order = EffOrder::Normal;
+        e.adv.groups = 2;
+        assert_eq!(phase_slots(&e, 6), vec![(0, 2), (1, 2), (0, 2), (1, 2), (0, 2), (1, 2)], "A B A B A B");
+        e.adv.groups = 0;
+        e.adv.blocks = 2;
+        assert_eq!(phase_slots(&e, 6), vec![(0, 3), (0, 3), (1, 3), (1, 3), (2, 3), (2, 3)]);
+        e.adv.blocks = 0;
+        e.adv.wings = 2;
+        assert_eq!(idx(&e, 6), vec![0, 1, 2, 2, 1, 0], "mirrored");
+        assert_eq!(phase_slots(&e, 6)[0].1, 3);
+        assert!(phase_slots(&e, 0).is_empty());
+    }
+
+    #[test]
+    fn direction_and_width() {
+        assert_eq!(directed_phase(EffDir::Forward, 0.3), 0.3);
+        assert_eq!(directed_phase(EffDir::Backward, 0.3), -0.3);
+        assert!((directed_phase(EffDir::Bounce, 0.25) - 0.25).abs() < 1e-9);
+        assert!((directed_phase(EffDir::Bounce, 1.25) - 0.75).abs() < 1e-9, "on the way back");
+        assert!((directed_phase(EffDir::Bounce, 2.25) - 0.25).abs() < 1e-9);
+        // duty cycle of a square wave
+        assert_eq!(shape_value_w(Shape::Square, 0.2, 0, 0.25), 1.0);
+        assert_eq!(shape_value_w(Shape::Square, 0.3, 0, 0.25), -1.0);
+        assert_eq!(shape_value_w(Shape::Square, 0.3, 0, 0.0), 1.0, "0 = default 50 %");
+        assert_eq!(shape_value_w(Shape::Pulse, 0.3, 0, 0.5), 1.0);
+        assert_eq!(shape_value_w(Shape::Pulse, 0.3, 0, 0.0), -1.0);
+    }
+
     use super::*;
 
     #[test]
@@ -243,7 +416,7 @@ mod tests {
 
     #[test]
     fn cycles_per_sec_priority() {
-        let mut e = Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Sine, rate: 2.0, depth: 1.0, phase_spread: 0.0, fixtures: vec![], attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0 };
+        let mut e = Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Sine, rate: 2.0, depth: 1.0, phase_spread: 0.0, fixtures: vec![], attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default() };
         assert_eq!(cycles_per_sec(&e, None), 2.0);
         e.bpm = 90.0;
         assert_eq!(cycles_per_sec(&e, None), 1.5);
@@ -259,7 +432,7 @@ mod engine_tests {
     fn fx(shape: Shape) -> Effect {
         Effect {
             id: 0, name: "fx".into(), attr: "pan".into(), shape, rate: 1.0, depth: 0.4, phase_spread: 0.0, fixtures: vec![1],
-            attr2: Some("tilt".into()), speed_master: None, bpm: 0.0, rotation: 0.0,
+            attr2: Some("tilt".into()), speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default(),
         }
     }
 
@@ -272,6 +445,45 @@ mod engine_tests {
     fn pan_tilt(e: &mut Engine, now: f64) -> (f32, f32) {
         let m = e.compute_look(now);
         (m[&1]["pan"], m[&1]["tilt"])
+    }
+
+    #[test]
+    fn absolute_effect_on_odd_fixtures_only_swings_between_low_and_high() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 4);
+        let mut f = fx(Shape::Square);
+        f.attr = "dimmer".into();
+        f.attr2 = None;
+        f.depth = 1.0;
+        f.fixtures = vec![1, 2, 3, 4];
+        f.adv.parity = Parity::Odd;
+        f.adv.absolute = true;
+        f.adv.low = 0.2;
+        f.adv.high = 0.9;
+        start(&mut e, f);
+        let on = e.compute_look(0.1);
+        let off = e.compute_look(0.6);
+        assert!((on[&1]["dimmer"] - 0.9).abs() < 1e-5 && (on[&3]["dimmer"] - 0.9).abs() < 1e-5, "high half of the wave");
+        assert!((off[&1]["dimmer"] - 0.2).abs() < 1e-5, "low half");
+        assert!(on.get(&2).map_or(true, |a| !a.contains_key("dimmer")) && off.get(&4).map_or(true, |a| !a.contains_key("dimmer")), "even fixtures are left alone");
+    }
+
+    #[test]
+    fn relative_offset_shifts_the_centre_and_old_shows_still_load() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        let mut f = fx(Shape::Square);
+        f.attr = "zoom".into();
+        f.attr2 = None;
+        f.depth = 0.0;
+        f.adv.offset = 0.25;
+        start(&mut e, f);
+        let m = e.compute_look(0.1);
+        assert!((m[&1]["zoom"] - (attr_default("zoom") + 0.25)).abs() < 1e-5, "{}", m[&1]["zoom"]);
+        // a saved effect without any `adv` (older show) loads with the defaults
+        let old: Effect = serde_json::from_str(r#"{"id":1,"name":"x","attr":"dimmer","shape":"sine","rate":1.0,"depth":1.0,"phase_spread":0.0,"fixtures":[1]}"#).unwrap();
+        assert_eq!(old.adv, EffectAdv::default());
+        assert_eq!((old.adv.low, old.adv.high), (0.0, 1.0));
     }
 
     #[test]

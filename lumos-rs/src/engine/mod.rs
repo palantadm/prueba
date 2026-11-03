@@ -2589,7 +2589,7 @@ mod tests {
             set(&mut e, f, "dimmer", 1.0);
         }
         e.handle(Command::EffectSave {
-            effect: Effect { attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, id: 0, name: "pulse".into(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: vec![1, 2] },
+            effect: Effect { attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default(), id: 0, name: "pulse".into(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: vec![1, 2] },
         })
         .unwrap();
         e.handle(Command::EffectToggle { id: 1, on: true }).unwrap();

@@ -12,6 +12,17 @@ Un efecto es una forma de onda que se suma al valor actual de un atributo: `attr
 Un `speed_master` tiene un `bpm` (20–240) que pueden seguir varios chases y efectos; un executor de velocidad lo ajusta y su botón marca el tempo (tap).
 
 ## Consejos
+
+## Ajustes avanzados del efecto
+Como en ChamSys o GrandMA, cada efecto tiene opciones para decidir **quién** participa y **cómo** se reparte la fase. En el editor del efecto, sección «Avanzado»:
+- **Pares / impares**, **desde–hasta** (posiciones de la lista de aparatos del efecto) y **uno de cada N**: el efecto solo toca esos aparatos.
+- **Orden de la fase**: normal, inverso, aleatorio (siempre el mismo), **del centro afuera** o **de los lados al centro**.
+- **Grupos** (A B A B…) y **bloques** (N aparatos seguidos) comparten la fase; **alas** = 2 hace la onda simétrica.
+- **Dirección**: adelante, atrás o ida y vuelta. **Desfase** global en grados.
+- **Rango**: *relativo* (se mueve alrededor del valor actual, con un desplazamiento opcional) o *absoluto* (oscila entre un mínimo y un máximo sin importar el valor actual: lo habitual para efectos de intensidad que enciendan y apaguen).
+- **Ancho** del ciclo en ondas cuadrada y pulso.
+<!--ai-->Por protocolo, todo esto va en el objeto `adv` de `effect_save` (mira `get_help comando effect_save`).<!--/ai-->
+
 - Para un barrido de color: efecto `hue` con `phase_spread` 360 y `rate` bajo.
 - Para un movimiento: efecto `circle` con `attr` pan y `attr2` tilt.
 

@@ -536,6 +536,89 @@ pub struct Effect {
     /// Rotation of 2-D shapes in degrees.
     #[serde(default)]
     pub rotation: f32,
+    /// Advanced settings: which fixtures take part, in which order, how phase is shared, direction, absolute range.
+    #[serde(default)]
+    pub adv: EffectAdv,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum Parity {
+    #[default]
+    All,
+    /// 1st, 3rd, 5th… of the effect's fixture list.
+    Odd,
+    /// 2nd, 4th, 6th…
+    Even,
+}
+
+/// Order in which the phase runs across the fixtures that take part.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum EffOrder {
+    #[default]
+    Normal,
+    Reverse,
+    /// A fixed shuffle (the same every time).
+    Random,
+    /// Starts at the middle and runs outwards.
+    CentreOut,
+    /// Starts at both ends and runs inwards.
+    EdgesIn,
+}
+
+/// Which way time runs through the waveform.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "snake_case")]
+#[ts(export)]
+pub enum EffDir {
+    #[default]
+    Forward,
+    Backward,
+    /// Forward then backward, over and over.
+    Bounce,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[serde(default)]
+#[ts(export)]
+pub struct EffectAdv {
+    pub parity: Parity,
+    /// Only fixtures from this position of the list (1-based; 0 = the first).
+    pub from: u16,
+    /// …up to this position (inclusive; 0 = the last).
+    pub to: u16,
+    /// Only every N-th fixture (0 or 1 = all)…
+    pub every: u8,
+    /// …starting at this one (0-based within the N).
+    pub every_offset: u8,
+    pub order: EffOrder,
+    /// Split the fixtures into N groups taken in turn (1st, 2nd… to group A, B…); fixtures of a group share the phase. 0/1 = off.
+    pub groups: u8,
+    /// Blocks of N consecutive fixtures that share the phase. 0/1 = off.
+    pub blocks: u8,
+    /// 2 = mirror: the second half of the phases runs back (a wave that opens from the centre). 0/1 = off.
+    pub wings: u8,
+    pub direction: EffDir,
+    /// Extra phase for the whole effect in degrees.
+    pub phase_offset: f32,
+    /// Duty cycle of square / pulse waves, 0..1 (0 = the shape's default).
+    pub width: f32,
+    /// Shift of the centre, −1..1 of the attribute range (relative mode).
+    pub offset: f32,
+    /// Absolute: the wave swings between `low` and `high` whatever the programmer or cue holds,
+    /// instead of moving around the current value.
+    pub absolute: bool,
+    pub low: f32,
+    pub high: f32,
+}
+
+impl Default for EffectAdv {
+    fn default() -> Self {
+        EffectAdv { parity: Parity::All, from: 0, to: 0, every: 0, every_offset: 0, order: EffOrder::Normal, groups: 0, blocks: 0, wings: 0, direction: EffDir::Forward, phase_offset: 0.0, width: 0.0, offset: 0.0, absolute: false, low: 0.0, high: 1.0 }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, TS)]
