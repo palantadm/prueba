@@ -1,0 +1,32 @@
+La consola se divide en espacios de trabajo. Se cambia de espacio con el menú superior o con las teclas numéricas:
+
+| Tecla | Espacio | Para qué sirve |
+|---|---|---|
+| 1 | En vivo (Live) | Selección, programador, grupos, paletas, efectos, línea de comandos |
+| 2 | Mesa (Desk) | Executors (faders y botones), páginas, escenas, chases, masters |
+| 3 | Cues | Cuelists y cues: tiempos, tracking, notas, timecode |
+| 4 | Patch | Aparatos, perfiles, direcciones, importar bibliotecas, CSV/MVR |
+| 5 | 3D | Visualizador 3D con haces, gobos y escenario |
+| 8 | 2D | Planta/alzado con haces y huellas en el suelo |
+| 6 | Monitor | Monitor DMX por universo, estado de salidas y entradas |
+| 7 | Ajustes | Universos y salidas, entradas, MIDI, timecode, MSC, asistente de IA |
+| 9 | Consola | Consola virtual: botones, faders, XY… asignables a MIDI/OSC |
+| 0 | Timeline | Línea de tiempo con eventos que lanzan comandos |
+
+- La **línea de comandos** está en el espacio En vivo: admite autocompletado y aparece el resultado de cada orden.
+- El asistente de IA tiene su panel de chat accesible desde la barra superior.
+- Hay deshacer/rehacer para los cambios del show (no para lo que se lanza en directo).
+- Los controles de alta frecuencia (faders, encoders) no esperan confirmación del servidor, por eso responden al instante.
+- La interfaz está en español; los términos de oficio (Patch, Blackout, Cue, GO, Master…) se mantienen en inglés.
+
+## Bloquear la mesa
+El botón 🔒 de la barra superior congela la mesa **en todas las pantallas** (y el asistente) hasta que se introduzca el PIN. La primera vez pide definir un PIN de 4 a 12 cifras; el clic derecho (o pulsación larga) del botón permite cambiarlo o quitarlo. Con la mesa bloqueada solo funciona el **blackout de emergencia**; tras 5 PIN incorrectos hay que esperar 30 s. El PIN se guarda cifrado (sal + SHA-256) en la carpeta de datos. Es una protección contra manos ajenas, no contra quien tenga acceso al ordenador.
+<!--ai-->El asistente no puede desbloquear ni cambiar el PIN. `lock` bloquea.<!--/ai-->
+
+## Disposición libre de ventanas
+El espacio **Disposición** (tecla `L`) es un escritorio donde cada vista de Lumos (En vivo, Cues, Monitor, 3D, Consola virtual, Patch…) puede estar en su propia **ventana flotante**:
+- **+ Ventana** añade una vista; también hay plantillas (p. ej. En vivo + Cues + Monitor, 3D + En vivo).
+- Arrastra una ventana por su título; redimensiónala desde la esquina inferior derecha; doble clic en el título la maximiza. En el título puedes cambiar la vista que muestra.
+- **Mosaico** reparte las ventanas por el escritorio. «Ajustar a la rejilla» alinea al mover.
+- Puedes tener **varias disposiciones** con nombre (una para ensayo, otra para el directo…) y cambiar entre ellas. Se guardan en este navegador o aplicación.
+- Con la ventana nueva de la app de escritorio puedes llevar una disposición a otra pantalla.

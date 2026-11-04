@@ -1,0 +1,213 @@
+import { useEffect, useRef, useState } from "preact/hooks";
+import "../styles/plan.css";
+import { library, selection, show, toast } from "../store";
+import { releaseDmx, requestDmx } from "../lib/dmxsub";
+import { PlanController } from "../plan/controller";
+import { aimMode, currentBg, editLayout, hud, labelMode, layers, menu, selObj, setBg, tool, view, type LabelMode } from "../plan/state";
+import { t, tp } from "../i18n";
+import { promptDialog, DialogHost } from "../ui";
+import { angleOf } from "../plan/fixture";
+import type { ViewKind } from "../plan/math";
+
+const VIEWS: [ViewKind, string, string][] = [["plan", "Plan", "Top-down plan"], ["front", "Front", "Front elevation (from the audience)"], ["side", "Side", "Side elevation"]];
+
+function Seg<T extends string>(p: { value: T; opts: [T, string, string?][]; onPick: (v: T) => void }) {
+  return (
+    <div class="pl-group st-card" role="group">
+      {p.opts.map(([v, label, title]) => (
+        <button key={v} class={`btn ${p.value === v ? "sel" : ""}`} title={title ? t(title) : undefined} aria-pressed={p.value === v} onClick={() => p.onPick(v)}>{t(label)}</button>
+      ))}
+    </div>
+  );
+}
+
+async function uploadImage(file: File): Promise<string> {
+  const fd = new FormData();
+  fd.append("file", file);
+  const r = await fetch("/api/media", { method: "POST", body: fd });
+  if (!r.ok) throw new Error(t("Upload failed ({status})", { status: r.status }));
+  return ((await r.json()) as { url: string }).url;
+}
+
+function BackgroundPanel(p: { ctl: PlanController; close: () => void }) {
+  const bg = currentBg();
+  const [align, setAlign] = useState(true);
+  const file = useRef<HTMLInputElement>(null);
+  const pick = async (f: File | undefined) => {
+    if (!f) return;
+    try {
+      const url = await uploadImage(f);
+      const im = new Image();
+      im.onload = () => {
+        setBg({ url, aspect: im.naturalHeight / im.naturalWidth, width: show.value?.stage.size[0] ?? 12, cx: 0, cz: 0, rot: 0, opacity: 0.5 });
+        layers.value = { ...layers.value, background: true };
+        view.value = "plan";
+        toast(t("Floor plan loaded — use Calibrate to set its scale"), "ok");
+      };
+      im.src = url;
+    } catch (e) { toast((e as Error).message, "err"); }
+  };
+  const calibrate = () => {
+    view.value = "plan";
+    p.close();
+    toast(t("Click point A, then point B on the plan image"), "info", 5000);
+    p.ctl.calibrate = {
+      pts: [],
+      done: async (pts) => {
+        const v = await promptDialog(t("Calibrate floor plan"), t("Real distance between the two points (metres)"), "5");
+        const m = v === null ? NaN : parseFloat(v.replace(",", "."));
+        if (m > 0) { p.ctl.applyCalibration(pts, m, align); toast(t("Plan calibrated"), "ok"); }
+      },
+    };
+  };
+  const num = (label: string, val: number, set: (n: number) => void, step = 0.1) => (
+    <label class="pl-num"><span>{t(label)}</span>
+      <input class="input num pl-in" type="number" step={step} value={+val.toFixed(3)} onInput={(e) => { const n = parseFloat((e.target as HTMLInputElement).value); if (!Number.isNaN(n)) set(n); }} />
+    </label>
+  );
+  return (
+    <div class="pl-pop st-card" onPointerDown={(e) => e.stopPropagation()}>
+      <div class="st-h">{t("Floor-plan background")}</div>
+      <div class="row wrap">
+        <button class="btn" onClick={() => file.current?.click()}>{bg ? t("Replace image…") : t("Upload image…")}</button>
+        {bg && <button class="btn danger" onClick={() => setBg(null)}>{t("Remove")}</button>}
+        <input ref={file} type="file" accept="image/*" hidden onChange={(e) => pick((e.target as HTMLInputElement).files?.[0])} />
+      </div>
+      {bg ? (
+        <>
+          <label class="pl-num"><span>{t("Opacity")}</span>
+            <input type="range" min="0.05" max="1" step="0.05" value={bg.opacity} onInput={(e) => setBg({ opacity: parseFloat((e.target as HTMLInputElement).value) })} />
+          </label>
+          {num("Width m", bg.width, (n) => n > 0.1 && setBg({ width: n }), 0.5)}
+          {num("Rotation °", bg.rot, (n) => setBg({ rot: n }), 0.5)}
+          {num("Offset X m", bg.cx, (n) => setBg({ cx: n }))}
+          {num("Offset Z m", bg.cz, (n) => setBg({ cz: n }))}
+          <label class="check pl-check"><input type="checkbox" checked={align} onChange={(e) => setAlign((e.target as HTMLInputElement).checked)} /> {t("Align picked line to horizontal")}</label>
+          <button class="btn primary" onClick={calibrate}>{t("Calibrate with two points…")}</button>
+        </>
+      ) : <div class="faint" style={{ fontSize: "var(--fs-xs)" }}>{t("Upload a PNG/JPG of the venue plan, then calibrate it by clicking two points a known distance apart.")}</div>}
+    </div>
+  );
+}
+
+function LayersPanel() {
+  const L = layers.value;
+  const chk = (k: keyof typeof L, label: string) => (
+    <button key={k} class="switch-row pl-sw" role="switch" aria-checked={L[k]} onClick={() => (layers.value = { ...L, [k]: !L[k] })}>
+      <span class={`switch ${L[k] ? "on" : ""}`} /><span>{t(label)}</span>
+    </button>
+  );
+  return (
+    <div class="pl-pop st-card" onPointerDown={(e) => e.stopPropagation()}>
+      <div class="st-h">{t("Layers")}</div>
+      <div class="pl-swgrid">
+        {chk("beams", "Beams")}{chk("smoke", "Smoke")}{chk("footprints", "Footprints (floor)")}{chk("objects", "Stage objects")}{chk("grid", "Grid & rulers")}{chk("background", "Floor-plan image")}{chk("handles", "Aim handles")}
+      </div>
+    </div>
+  );
+}
+
+function Legend() {
+  const items: [string, string][] = [
+    ["○", "Par"], ["◉", "LED par"], ["◎", "Fresnel"], ["⊗", "Profile"], ["▭", "Bar / blinder"], ["▦", "Strobe"],
+    ["⌖", "Aim handle (drag)"], ["⚡", "Strobing"], ["⬭", "Floor footprint"], ["◣", "Beam cone"],
+  ];
+  return (
+    <div class="pl-legend st-card">
+      <div class="st-h">{t("Legend")}</div>
+      <div class="pl-leg-grid">{items.map(([g, label]) => <span key={label}><b>{g}</b>{t(label)}</span>)}</div>
+      <div class="faint pl-leg-note">{t("Moving head: base · yoke · head turns with PAN, the lens end follows TILT; arrow = beam heading.")}</div>
+    </div>
+  );
+}
+
+function Info(p: { ctl: PlanController }) {
+  const [, tick] = useState(0);
+  useEffect(() => { const iv = setInterval(() => tick((n) => n + 1), 250); return () => clearInterval(iv); }, []);
+  const ids = selection.value;
+  if (ids.length !== 1) return ids.length > 1 ? <div class="pl-info st-card"><b>{ids.length}</b> {tp(ids.length, "fixture selected", "fixtures selected")} · {t("aim mode")} <b>{aimMode.value === "stack" ? t("Stack") : t("Fan")}</b></div> : null;
+  const g = p.ctl.geoOf(ids[0]);
+  if (!g) return null;
+  const deg = 180 / Math.PI;
+  return (
+    <div class="pl-info st-card">
+      <b>{g.fx.id}</b> {g.fx.name}<span class="faint"> · {g.prof?.manufacturer} {g.prof?.model}</span>
+      {g.moving && <div class="mono">Pan {(g.P * deg).toFixed(0)}° · Tilt {(g.T * deg).toFixed(0)}°{g.plan ? ` · ${t("Beam")} ${angleOf(g.plan, g.st).toFixed(0)}°` : ""}{g.beam ? ` · ${t("Throw")} ${g.beam.dist.toFixed(1)} m` : ""}</div>}
+      {!g.moving && <div class="mono">U{g.fx.universe}.{g.fx.address} · {(g.st.bright * 100).toFixed(0)}%</div>}
+    </div>
+  );
+}
+
+export function Plan2D() {
+  const host = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const ctl = useRef<PlanController | null>(null);
+  const [pop, setPop] = useState<"layers" | "bg" | null>(null);
+  const [legend, setLegend] = useState(false);
+
+  useEffect(() => {
+    requestDmx("plan", null);
+    const c = new PlanController(canvas.current!);
+    ctl.current = c;
+    (window as unknown as { __plan?: PlanController }).__plan = c;
+    return () => { c.dispose(); releaseDmx("plan"); ctl.current = null; delete (window as unknown as { __plan?: PlanController }).__plan; };
+  }, []);
+
+  useEffect(() => { ctl.current?.fit(); }, [library.value.length === 0]);
+
+  const m = menu.value;
+  const hv = hud.value;
+  const nMov = show.value?.fixtures.length ?? 0;
+  return (
+    <div class="pl-root" ref={host} onPointerDown={() => pop && setPop(null)}>
+      <canvas ref={canvas} class="pl-canvas" />
+      <div class="pl-bar" onPointerDown={(e) => e.stopPropagation()}>
+        <Seg value={view.value} opts={VIEWS} onPick={(v) => (view.value = v)} />
+        <div class="pl-group st-card" role="group">
+          <button class={`btn ${tool.value === "select" ? "sel" : ""}`} aria-label={t("Select")} title={t("Select / drag (Esc)")} onClick={() => (tool.value = "select")}>↖<span class="pl-l"> {t("Select")}</span></button>
+          <button class={`btn ${tool.value === "hand" ? "sel" : ""}`} aria-label={t("Move view")} title={t("Pan the view (H, or hold Space)")} onClick={() => (tool.value = tool.value === "hand" ? "select" : "hand")}>✋<span class="pl-l"> {t("Move view")}</span></button>
+          <button class={`btn ${tool.value === "aim" ? "sel" : ""}`} aria-label={t("Aim")} title={t("Click the stage to aim selected moving heads (A)")} onClick={() => (tool.value = tool.value === "aim" ? "select" : "aim")}>⌖<span class="pl-l"> {t("Aim")}</span></button>
+        </div>
+        <Seg value={aimMode.value} opts={[["stack", "Stack", "All selected heads aim at the same point"], ["fan", "Fan", "Keep each head's offset while dragging the aim handle"]]} onPick={(v) => (aimMode.value = v)} />
+        <div class="pl-group st-card">
+          <button class={`btn ${editLayout.value ? "" : "on"}`} aria-pressed={!editLayout.value} aria-label={editLayout.value ? t("Edit layout") : t("Locked")} title={t("Lock layout: fixtures and objects can't be dragged")} onClick={() => (editLayout.value = !editLayout.value)}>{editLayout.value ? "🔓" : "🔒"}<span class="pl-l"> {editLayout.value ? t("Edit layout") : t("Locked")}</span></button>
+        </div>
+      </div>
+      <div class="pl-bottom" onPointerDown={(e) => e.stopPropagation()}>
+        {pop === "layers" && <LayersPanel />}
+        {pop === "bg" && ctl.current && <BackgroundPanel ctl={ctl.current} close={() => setPop(null)} />}
+        {legend && <Legend />}
+        {tool.value === "aim" && <div class="pl-banner">{t("AIM — click the stage to point the selected moving heads (Esc to stop)")}</div>}
+        {selObj.value !== null && <div class="pl-banner pl-banner-b">{t("Object selected — drag to move")}{editLayout.value ? "" : " " + t("(layout locked)")}</div>}
+        {ctl.current && <Info ctl={ctl.current} />}
+        <div class="pl-dock">
+          <div class="pl-group st-card">
+            <button class="btn icon" aria-label={t("Zoom out (−)")} title={t("Zoom out (−)")} onClick={() => ctl.current?.zoomBy(0.8)}>−</button>
+            <button class="btn" title={t("Fit to stage (F)")} onClick={() => ctl.current?.fit()}>{t("Fit")}</button>
+            <button class="btn icon" aria-label={t("Zoom in (+)")} title={t("Zoom in (+)")} onClick={() => ctl.current?.zoomBy(1.25)}>+</button>
+          </div>
+          <div class="pl-group st-card">
+            <button class={`btn ${pop === "layers" ? "sel" : ""}`} aria-label={t("Layers")} aria-pressed={pop === "layers"} onClick={() => setPop(pop === "layers" ? null : "layers")}>▤<span class="pl-l"> {t("Layers")}</span></button>
+            <button class={`btn ${pop === "bg" ? "sel" : ""}`} aria-label={t("Plan image")} aria-pressed={pop === "bg"} onClick={() => setPop(pop === "bg" ? null : "bg")}>🗺<span class="pl-l"> {t("Plan image")}</span></button>
+            <button class="btn" title={t("Export the current view as PNG")} onClick={() => ctl.current?.exportPng(show.value?.name ?? "lumos")}>⭳ PNG</button>
+            <button class={`btn icon ${legend ? "sel" : ""}`} aria-label={t("Legend")} aria-pressed={legend} title={t("Legend")} onClick={() => setLegend(!legend)}>?</button>
+          </div>
+          <select class="input pl-sel" value={labelMode.value} aria-label={t("Labels")} onChange={(e) => (labelMode.value = (e.target as HTMLSelectElement).value as LabelMode)}>
+            <option value="id">{t("Labels: ID")}</option><option value="name">{t("Labels: Name")}</option><option value="addr">{t("Labels: Address")}</option><option value="none">{t("Labels: off")}</option>
+          </select>
+          <span class="pl-hud mono">
+            {view.value === "plan" ? `X ${hv.x.toFixed(2)}  Z ${hv.z.toFixed(2)}` : view.value === "front" ? `X ${hv.x.toFixed(2)}  Y ${hv.y.toFixed(2)}` : `Z ${hv.z.toFixed(2)}  Y ${hv.y.toFixed(2)}`} m · {hv.scale.toFixed(0)} px/m · {hv.fps} fps · {tp(nMov, "{n} fixture", "{n} fixtures")}
+          </span>
+        </div>
+      </div>
+      {m && (
+        <div class="pl-menu" style={{ left: Math.min(m.x, (host.current?.clientWidth ?? 9999) - 240), top: Math.min(m.y, (host.current?.clientHeight ?? 9999) - m.items.length * 48 - 8) }} onPointerDown={(e) => e.stopPropagation()}>
+          {m.items.map((it, i) => it.sep ? <div key={i} class="pl-sep" /> : (
+            <button key={i} class="pl-item" disabled={it.disabled || !it.run} onClick={() => { menu.value = null; it.run?.(); }}>{it.label}</button>
+          ))}
+        </div>
+      )}
+      <DialogHost />
+    </div>
+  );
+}

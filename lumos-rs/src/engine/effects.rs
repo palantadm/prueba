@@ -1,0 +1,711 @@
+//! Parametric effects evaluated on top of the merged state.
+
+use super::patch::{Patch, COLOR_ATTRS};
+use crate::model::*;
+
+fn frac(x: f64) -> f64 {
+    x - x.floor()
+}
+
+/// Waveform in −1..1 for `phase` (cycles).
+pub fn shape_value(shape: Shape, phase: f64, seed: u32) -> f32 {
+    shape_value_w(shape, phase, seed, 0.0)
+}
+
+/// Like [`shape_value`] with a duty cycle `width` (0..1) for square and pulse waves (0 = the shape's default).
+pub fn shape_value_w(shape: Shape, phase: f64, seed: u32, width: f32) -> f32 {
+    let f = frac(phase);
+    let duty = |default: f64| if width > 0.0 && width < 1.0 { width as f64 } else { default };
+    (match shape {
+        // Circle / Eight are 2-D (see `shape_xy`); driving a single attribute they behave like a sine.
+        Shape::Sine | Shape::Circle | Shape::Eight => (phase * std::f64::consts::TAU).sin(),
+        // Falling ramp: starts at +1, drops to -1, then snaps back.
+        Shape::Ramp => 1.0 - 2.0 * f,
+        // Short flash: +1 for the first 15 % of the cycle, -1 otherwise.
+        Shape::Pulse => {
+            if f < duty(0.15) {
+                1.0
+            } else {
+                -1.0
+            }
+        }
+        Shape::Triangle => {
+            if f < 0.25 {
+                4.0 * f
+            } else if f < 0.75 {
+                2.0 - 4.0 * f
+            } else {
+                4.0 * f - 4.0
+            }
+        }
+        Shape::Saw => 2.0 * f - 1.0,
+        Shape::Square => {
+            if f < duty(0.5) {
+                1.0
+            } else {
+                -1.0
+            }
+        }
+        Shape::Random => {
+            let mut h = (phase.floor() as i64 as u64) ^ ((seed as u64) << 32) ^ 0x9E37_79B9_7F4A_7C15;
+            h ^= h >> 33;
+            h = h.wrapping_mul(0xff51_afd7_ed55_8ccd);
+            h ^= h >> 33;
+            h = h.wrapping_mul(0xc4ce_b9fe_1a85_ec53);
+            h ^= h >> 33;
+            (h % 20001) as f64 / 10000.0 - 1.0
+        }
+    }) as f32
+}
+
+pub fn hsv_to_rgb(h: f32, s: f32, v: f32) -> (f32, f32, f32) {
+    let h = (h - h.floor()) * 6.0;
+    let i = h.floor() as i32;
+    let f = h - i as f32;
+    let p = v * (1.0 - s);
+    let q = v * (1.0 - s * f);
+    let t = v * (1.0 - s * (1.0 - f));
+    match i.rem_euclid(6) {
+        0 => (v, t, p),
+        1 => (q, v, p),
+        2 => (p, v, t),
+        3 => (p, q, v),
+        4 => (t, p, v),
+        _ => (v, p, q),
+    }
+}
+
+/// Cycles per second: its speed master's BPM when it has one, else its own BPM (>0), else `rate` (Hz).
+/// `master_bpm` is the already-resolved BPM of `e.speed_master` (`None` if unset or unknown).
+pub fn cycles_per_sec(e: &Effect, master_bpm: Option<f32>) -> f64 {
+    if let Some(b) = master_bpm {
+        return b as f64 / 60.0;
+    }
+    if e.bpm > 0.0 {
+        return e.bpm as f64 / 60.0;
+    }
+    e.rate as f64
+}
+
+/// Unit offset (-1..1 on both axes) of a 2-D shape at `phase` cycles, before rotation.
+/// Circle starts at (1, 0) and runs counter-clockwise; Eight is the figure-eight x = sin t, y = sin 2t
+/// (crosses the centre at t = 0 and pi). 1-D shapes return `(shape_value, 0)`.
+pub fn shape_xy(shape: Shape, phase: f64) -> (f32, f32) {
+    let th = phase * std::f64::consts::TAU;
+    match shape {
+        Shape::Circle => (th.cos() as f32, th.sin() as f32),
+        Shape::Eight => (th.sin() as f32, (2.0 * th).sin() as f32),
+        s => (shape_value(s, phase, 0), 0.0),
+    }
+}
+
+pub fn rotate(x: f32, y: f32, deg: f32) -> (f32, f32) {
+    let (s, c) = (deg.to_radians().sin(), deg.to_radians().cos());
+    (x * c - y * s, x * s + y * c)
+}
+
+fn is_2d(e: &Effect) -> bool {
+    matches!(e.shape, Shape::Circle | Shape::Eight) && e.attr2.is_some() && e.attr != "hue"
+}
+
+/// Positions (0-based) in `e.fixtures` of the fixtures that take part, after parity, range and "every N".
+pub fn participants(e: &Effect) -> Vec<usize> {
+    let a = &e.adv;
+    (0..e.fixtures.len())
+        .filter(|p| match a.parity {
+            Parity::All => true,
+            Parity::Odd => p % 2 == 0,
+            Parity::Even => p % 2 == 1,
+        })
+        .filter(|p| (a.from == 0 || p + 1 >= a.from as usize) && (a.to == 0 || p + 1 <= a.to as usize))
+        .filter(|p| a.every <= 1 || p % a.every as usize == a.every_offset as usize % a.every as usize)
+        .collect()
+}
+
+/// For each of the `m` participating fixtures, `(index, count)`: its slot among `count` equal phase steps
+/// (fixtures that share a slot move together). Applies order, groups / blocks and wings.
+pub fn phase_slots(e: &Effect, m: usize) -> Vec<(usize, usize)> {
+    let a = &e.adv;
+    if m == 0 {
+        return vec![];
+    }
+    let mut v: Vec<(usize, usize)> = match a.order {
+        EffOrder::Normal => (0..m).map(|k| (k, m)).collect(),
+        EffOrder::Reverse => (0..m).map(|k| (m - 1 - k, m)).collect(),
+        EffOrder::Random => {
+            // fixed shuffle seeded by the effect id (Fisher–Yates with a small LCG)
+            let mut perm: Vec<usize> = (0..m).collect();
+            let mut st = 0x9E37_79B9_7F4A_7C15u64 ^ (e.id as u64).wrapping_mul(0xA24B_AED4_963E_E407);
+            for i in (1..m).rev() {
+                st = st.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                perm.swap(i, ((st >> 33) as usize) % (i + 1));
+            }
+            perm.into_iter().map(|p| (p, m)).collect()
+        }
+        EffOrder::CentreOut | EffOrder::EdgesIn => {
+            let count = (m - 1) / 2 + 1;
+            (0..m)
+                .map(|k| {
+                    let rank = (2 * k as i64 - (m as i64 - 1)).unsigned_abs() as usize / 2;
+                    (if a.order == EffOrder::CentreOut { rank } else { count - 1 - rank }, count)
+                })
+                .collect()
+        }
+    };
+    if a.blocks > 1 {
+        let b = a.blocks as usize;
+        for x in &mut v {
+            *x = (x.0 / b, (x.1 + b - 1) / b);
+        }
+    } else if a.groups > 1 {
+        let g = a.groups as usize;
+        for x in &mut v {
+            *x = (x.0 % g, g.min(x.1));
+        }
+    }
+    if a.wings > 1 {
+        for x in &mut v {
+            *x = (x.0.min(x.1 - 1 - x.0), (x.1 + 1) / 2);
+        }
+    }
+    v
+}
+
+/// Position of the wave in cycles for a base phase and a direction.
+pub fn directed_phase(dir: EffDir, base: f64) -> f64 {
+    match dir {
+        EffDir::Forward => base,
+        EffDir::Backward => -base,
+        EffDir::Bounce => {
+            let q = base.rem_euclid(2.0);
+            if q > 1.0 {
+                2.0 - q
+            } else {
+                q
+            }
+        }
+    }
+}
+
+/// Apply every running effect to `state`.
+/// * `depth_mul(effect id)` is the executor fader.
+/// * `phase_of(effect id)` is the effect's accumulated phase in cycles (see `Engine::effect_phases`).
+///
+/// Relative (default): `depth` 1 swings +-0.5 of the attribute range around its current value (1-D shapes) or
+/// draws a circle of radius 0.5 (2-D shapes). Absolute (`adv.absolute`): the wave swings between `adv.low` and
+/// `adv.high`, whatever the current value; the fader then fades between the current value and the wave.
+/// `phase_spread` offsets the fixtures evenly; `adv` chooses who takes part and how the phase is shared.
+pub fn apply(
+    state: &mut PerFixture,
+    effects: &[Effect],
+    running: &dyn Fn(u32) -> bool,
+    depth_mul: &dyn Fn(u32) -> f32,
+    phase_of: &dyn Fn(u32) -> f64,
+    patch: &Patch,
+) {
+    for e in effects {
+        if !running(e.id) || e.fixtures.is_empty() {
+            continue;
+        }
+        let fader = depth_mul(e.id).clamp(0.0, 1.0);
+        let adv = &e.adv;
+        let part = participants(e);
+        let slots = phase_slots(e, part.len());
+        let lines = lines_of(e);
+        for l in &lines {
+            let depth = (l.depth * fader).clamp(0.0, 1.0);
+            let base_phase = directed_phase(adv.direction, phase_of(e.id) * l.rate_mul as f64);
+            let (low, high) = (if l.low.is_finite() { l.low.clamp(0.0, 1.0) } else { 0.0 }, if l.high.is_finite() { l.high.clamp(0.0, 1.0) } else { 1.0 });
+            let offset = if l.offset.is_finite() { l.offset.clamp(-1.0, 1.0) } else { 0.0 };
+            for (k, &pos) in part.iter().enumerate() {
+                let fid = e.fixtures[pos];
+                let Some(pf) = patch.get(fid) else { continue };
+                let (idx, count) = slots[k];
+                let phase = base_phase + (idx as f64 / count as f64) * (e.phase_spread as f64 / 360.0) + (adv.phase_offset + l.phase_offset) as f64 / 360.0;
+                let attrs = state.entry(fid).or_default();
+                if matches!(l.shape, Shape::Circle | Shape::Eight) && l.attr2.is_some() && l.attr != "hue" {
+                    let y_attr = l.attr2.as_deref().unwrap_or_default();
+                    if !(pf.has_attr(&l.attr) && pf.has_attr(y_attr)) {
+                        continue;
+                    }
+                    let (x, y) = shape_xy(l.shape, phase);
+                    let (x, y) = rotate(x, y, l.rotation);
+                    for (name, d) in [(l.attr.as_str(), x), (y_attr, y)] {
+                        let base = attrs.get(name).copied().unwrap_or_else(|| attr_default(name));
+                        let v = if l.absolute { base + ((low + high) / 2.0 + d * (high - low) / 2.0 - base) * fader } else { base + d * depth * 0.5 + offset };
+                        attrs.insert(name.into(), v.clamp(0.0, 1.0));
+                    }
+                    continue;
+                }
+                let x = shape_value_w(l.shape, phase, fid.wrapping_add(e.id.wrapping_mul(7919)), l.width);
+                let abs_val = low + (x + 1.0) / 2.0 * (high - low);
+                if l.attr == "hue" {
+                    if !(pf.has_attr("red") && pf.has_attr("green") && pf.has_attr("blue")) {
+                        continue;
+                    }
+                    let (r, g, b) = hsv_to_rgb(frac(phase) as f32, 1.0, 1.0);
+                    for (name, target) in [("red", r), ("green", g), ("blue", b)] {
+                        let base = attrs.get(name).copied().unwrap_or(0.0);
+                        attrs.insert(name.into(), base + (target - base) * depth);
+                    }
+                } else if l.attr == "dimmer" {
+                    if pf.has_dimmer {
+                        let base = attrs.get("dimmer").copied().unwrap_or(0.0);
+                        let v = if l.absolute { base + (abs_val - base) * fader } else { base * (1.0 - depth * (0.5 - 0.5 * x)) };
+                        attrs.insert("dimmer".into(), v.clamp(0.0, 1.0));
+                    } else {
+                        // no dimmer channel: scale the colour
+                        let factor = if l.absolute { 1.0 + (abs_val - 1.0) * fader } else { 1.0 - depth * (0.5 - 0.5 * x) };
+                        for a in COLOR_ATTRS {
+                            if pf.has_attr(a) {
+                                if let Some(v) = attrs.get_mut(*a) {
+                                    *v = (*v * factor).clamp(0.0, 1.0);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    let base = attrs.get(&l.attr).copied().unwrap_or_else(|| attr_default(&l.attr));
+                    let v = if l.absolute { base + (abs_val - base) * fader } else { base + x * depth * 0.5 + offset };
+                    attrs.insert(l.attr.clone(), v.clamp(0.0, 1.0));
+                }
+            }
+        }
+    }
+}
+
+/// The attribute lines of an effect: its own (attr, shape, depth, range…) first, then the extra ones.
+struct LineP {
+    attr: String,
+    attr2: Option<String>,
+    shape: Shape,
+    depth: f32,
+    rotation: f32,
+    rate_mul: f32,
+    phase_offset: f32,
+    absolute: bool,
+    low: f32,
+    high: f32,
+    offset: f32,
+    width: f32,
+}
+
+fn lines_of(e: &Effect) -> Vec<LineP> {
+    let a = &e.adv;
+    let mut v = vec![LineP { attr: e.attr.clone(), attr2: e.attr2.clone(), shape: e.shape, depth: e.depth, rotation: e.rotation, rate_mul: 1.0, phase_offset: 0.0, absolute: a.absolute, low: a.low, high: a.high, offset: a.offset, width: a.width }];
+    for l in e.lines.iter().take(15) {
+        let rm = if l.rate_mul.is_finite() && l.rate_mul > 0.0 { l.rate_mul.min(64.0) } else { 1.0 };
+        v.push(LineP { attr: l.attr.clone(), attr2: l.attr2.clone(), shape: l.shape, depth: l.depth, rotation: l.rotation, rate_mul: rm, phase_offset: l.phase_offset, absolute: l.absolute, low: l.low, high: l.high, offset: l.offset, width: l.width });
+    }
+    v
+}
+
+#[cfg(test)]
+mod tests {
+    fn eff(n: u32) -> Effect {
+        Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: (1..=n).collect(), attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: EffectAdv::default(), lines: vec![] }
+    }
+
+    #[test]
+    fn odd_even_range_and_every_pick_the_fixtures() {
+        let mut e = eff(8);
+        assert_eq!(participants(&e), vec![0, 1, 2, 3, 4, 5, 6, 7]);
+        e.adv.parity = Parity::Odd;
+        assert_eq!(participants(&e), vec![0, 2, 4, 6], "1st, 3rd, 5th, 7th");
+        e.adv.parity = Parity::Even;
+        assert_eq!(participants(&e), vec![1, 3, 5, 7]);
+        e.adv.parity = Parity::All;
+        e.adv.from = 3;
+        e.adv.to = 6;
+        assert_eq!(participants(&e), vec![2, 3, 4, 5], "positions 3 to 6");
+        e.adv.from = 0;
+        e.adv.to = 0;
+        e.adv.every = 3;
+        assert_eq!(participants(&e), vec![0, 3, 6]);
+        e.adv.every_offset = 1;
+        assert_eq!(participants(&e), vec![1, 4, 7]);
+        e.adv.every = 0;
+        e.adv.every_offset = 0;
+        e.adv.to = 99;
+        assert_eq!(participants(&e).len(), 8, "a range past the end is just the end");
+    }
+
+    #[test]
+    fn phase_slots_follow_order_groups_blocks_and_wings() {
+        let mut e = eff(6);
+        let idx = |e: &Effect, m: usize| phase_slots(e, m).iter().map(|x| x.0).collect::<Vec<_>>();
+        assert_eq!(idx(&e, 6), vec![0, 1, 2, 3, 4, 5]);
+        e.adv.order = EffOrder::Reverse;
+        assert_eq!(idx(&e, 6), vec![5, 4, 3, 2, 1, 0]);
+        e.adv.order = EffOrder::CentreOut;
+        assert_eq!(idx(&e, 6), vec![2, 1, 0, 0, 1, 2], "the two middle ones go first, together");
+        assert_eq!(idx(&e, 5), vec![2, 1, 0, 1, 2]);
+        e.adv.order = EffOrder::EdgesIn;
+        assert_eq!(idx(&e, 5), vec![0, 1, 2, 1, 0]);
+        e.adv.order = EffOrder::Random;
+        let r = idx(&e, 6);
+        let mut sorted = r.clone();
+        sorted.sort();
+        assert_eq!(sorted, vec![0, 1, 2, 3, 4, 5], "a shuffle uses every slot once");
+        assert_eq!(r, idx(&e, 6), "and is the same every time");
+        e.adv.order = EffOrder::Normal;
+        e.adv.groups = 2;
+        assert_eq!(phase_slots(&e, 6), vec![(0, 2), (1, 2), (0, 2), (1, 2), (0, 2), (1, 2)], "A B A B A B");
+        e.adv.groups = 0;
+        e.adv.blocks = 2;
+        assert_eq!(phase_slots(&e, 6), vec![(0, 3), (0, 3), (1, 3), (1, 3), (2, 3), (2, 3)]);
+        e.adv.blocks = 0;
+        e.adv.wings = 2;
+        assert_eq!(idx(&e, 6), vec![0, 1, 2, 2, 1, 0], "mirrored");
+        assert_eq!(phase_slots(&e, 6)[0].1, 3);
+        assert!(phase_slots(&e, 0).is_empty());
+    }
+
+    #[test]
+    fn direction_and_width() {
+        assert_eq!(directed_phase(EffDir::Forward, 0.3), 0.3);
+        assert_eq!(directed_phase(EffDir::Backward, 0.3), -0.3);
+        assert!((directed_phase(EffDir::Bounce, 0.25) - 0.25).abs() < 1e-9);
+        assert!((directed_phase(EffDir::Bounce, 1.25) - 0.75).abs() < 1e-9, "on the way back");
+        assert!((directed_phase(EffDir::Bounce, 2.25) - 0.25).abs() < 1e-9);
+        // duty cycle of a square wave
+        assert_eq!(shape_value_w(Shape::Square, 0.2, 0, 0.25), 1.0);
+        assert_eq!(shape_value_w(Shape::Square, 0.3, 0, 0.25), -1.0);
+        assert_eq!(shape_value_w(Shape::Square, 0.3, 0, 0.0), 1.0, "0 = default 50 %");
+        assert_eq!(shape_value_w(Shape::Pulse, 0.3, 0, 0.5), 1.0);
+        assert_eq!(shape_value_w(Shape::Pulse, 0.3, 0, 0.0), -1.0);
+    }
+
+    use super::*;
+
+    #[test]
+    fn shapes_in_range() {
+        for s in [Shape::Sine, Shape::Triangle, Shape::Saw, Shape::Square, Shape::Random, Shape::Circle, Shape::Eight, Shape::Ramp, Shape::Pulse] {
+            for i in 0..200 {
+                let v = shape_value(s, i as f64 * 0.037, 3);
+                assert!((-1.0..=1.0).contains(&v), "{s:?} {v}");
+            }
+        }
+        assert!((shape_value(Shape::Sine, 0.25, 0) - 1.0).abs() < 1e-6);
+        assert_eq!(shape_value(Shape::Triangle, 0.25, 0), 1.0);
+        assert_eq!(shape_value(Shape::Triangle, 0.75, 0), -1.0);
+        assert_eq!(shape_value(Shape::Square, 0.1, 0), 1.0);
+        assert_eq!(shape_value(Shape::Square, 0.6, 0), -1.0);
+    }
+
+    #[test]
+    fn hsv() {
+        assert_eq!(hsv_to_rgb(0.0, 1.0, 1.0), (1.0, 0.0, 0.0));
+        let (r, g, b) = hsv_to_rgb(1.0 / 3.0, 1.0, 1.0);
+        assert!(r < 0.01 && (g - 1.0).abs() < 0.01 && b < 0.01);
+    }
+
+    #[test]
+    fn ramp_and_pulse() {
+        assert_eq!(shape_value(Shape::Ramp, 0.0, 0), 1.0);
+        assert!((shape_value(Shape::Ramp, 0.5, 0)).abs() < 1e-6);
+        assert!(shape_value(Shape::Ramp, 0.999, 0) < -0.99);
+        assert_eq!(shape_value(Shape::Pulse, 0.05, 0), 1.0);
+        assert_eq!(shape_value(Shape::Pulse, 0.2, 0), -1.0);
+    }
+
+    #[test]
+    fn circle_has_constant_radius_and_rotation_keeps_it() {
+        for i in 0..100 {
+            let (x, y) = shape_xy(Shape::Circle, i as f64 * 0.0137);
+            assert!(((x * x + y * y).sqrt() - 1.0).abs() < 1e-5);
+            let (rx, ry) = rotate(x, y, 37.0);
+            assert!(((rx * rx + ry * ry).sqrt() - 1.0).abs() < 1e-5);
+        }
+        let (x, y) = shape_xy(Shape::Circle, 0.0);
+        assert!((x - 1.0).abs() < 1e-6 && y.abs() < 1e-6);
+        let (x, y) = shape_xy(Shape::Circle, 0.25);
+        assert!(x.abs() < 1e-5 && (y - 1.0).abs() < 1e-5);
+        // 90 degrees maps (1, 0) onto (0, 1)
+        let (x, y) = rotate(1.0, 0.0, 90.0);
+        assert!(x.abs() < 1e-6 && (y - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn figure_eight_crosses_at_the_centre_twice_per_cycle() {
+        let (x, y) = shape_xy(Shape::Eight, 0.0);
+        assert!(x.abs() < 1e-6 && y.abs() < 1e-6);
+        let (x, y) = shape_xy(Shape::Eight, 0.5);
+        assert!(x.abs() < 1e-5 && y.abs() < 1e-5);
+        // lobes: x extreme at a quarter cycle with y = 0, y extreme at an eighth with x = sin(45deg)
+        let (x, y) = shape_xy(Shape::Eight, 0.25);
+        assert!((x - 1.0).abs() < 1e-5 && y.abs() < 1e-5);
+        let (x, y) = shape_xy(Shape::Eight, 0.125);
+        assert!((x - 0.7071).abs() < 1e-3 && (y - 1.0).abs() < 1e-5);
+        // the two lobes mirror each other left/right: x flips sign half a cycle later, y repeats
+        let (x1, y1) = shape_xy(Shape::Eight, 0.125);
+        let (x2, y2) = shape_xy(Shape::Eight, 0.625);
+        assert!((x1 + x2).abs() < 1e-5 && (y1 - y2).abs() < 1e-5);
+    }
+
+    #[test]
+    fn cycles_per_sec_priority() {
+        let mut e = Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Sine, rate: 2.0, depth: 1.0, phase_spread: 0.0, fixtures: vec![], attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default(), lines: vec![] };
+        assert_eq!(cycles_per_sec(&e, None), 2.0);
+        e.bpm = 90.0;
+        assert_eq!(cycles_per_sec(&e, None), 1.5);
+        assert_eq!(cycles_per_sec(&e, Some(120.0)), 2.0); // speed master beats bpm and rate
+    }
+}
+
+#[cfg(test)]
+mod engine_tests {
+    use super::super::tests_support::*;
+    use super::super::*;
+
+    fn fx(shape: Shape) -> Effect {
+        Effect {
+            id: 0, name: "fx".into(), attr: "pan".into(), shape, rate: 1.0, depth: 0.4, phase_spread: 0.0, fixtures: vec![1],
+            attr2: Some("tilt".into()), speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default(), lines: vec![],
+        }
+    }
+
+    fn start(e: &mut Engine, fx: Effect) {
+        e.handle(Command::EffectSave { effect: fx }).unwrap();
+        let id = e.show.effects.last().unwrap().id;
+        e.handle(Command::EffectToggle { id, on: true }).unwrap();
+    }
+
+    fn pan_tilt(e: &mut Engine, now: f64) -> (f32, f32) {
+        let m = e.compute_look(now);
+        (m[&1]["pan"], m[&1]["tilt"])
+    }
+
+    #[test]
+    fn absolute_effect_on_odd_fixtures_only_swings_between_low_and_high() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 4);
+        let mut f = fx(Shape::Square);
+        f.attr = "dimmer".into();
+        f.attr2 = None;
+        f.depth = 1.0;
+        f.fixtures = vec![1, 2, 3, 4];
+        f.adv.parity = Parity::Odd;
+        f.adv.absolute = true;
+        f.adv.low = 0.2;
+        f.adv.high = 0.9;
+        start(&mut e, f);
+        let on = e.compute_look(0.1);
+        let off = e.compute_look(0.6);
+        assert!((on[&1]["dimmer"] - 0.9).abs() < 1e-5 && (on[&3]["dimmer"] - 0.9).abs() < 1e-5, "high half of the wave");
+        assert!((off[&1]["dimmer"] - 0.2).abs() < 1e-5, "low half");
+        assert!(on.get(&2).map_or(true, |a| !a.contains_key("dimmer")) && off.get(&4).map_or(true, |a| !a.contains_key("dimmer")), "even fixtures are left alone");
+    }
+
+    #[test]
+    fn relative_offset_shifts_the_centre_and_old_shows_still_load() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        let mut f = fx(Shape::Square);
+        f.attr = "zoom".into();
+        f.attr2 = None;
+        f.depth = 0.0;
+        f.adv.offset = 0.25;
+        start(&mut e, f);
+        let m = e.compute_look(0.1);
+        assert!((m[&1]["zoom"] - (attr_default("zoom") + 0.25)).abs() < 1e-5, "{}", m[&1]["zoom"]);
+        // a saved effect without any `adv` (older show) loads with the defaults
+        let old: Effect = serde_json::from_str(r#"{"id":1,"name":"x","attr":"dimmer","shape":"sine","rate":1.0,"depth":1.0,"phase_spread":0.0,"fixtures":[1]}"#).unwrap();
+        assert_eq!(old.adv, EffectAdv::default());
+        assert_eq!((old.adv.low, old.adv.high), (0.0, 1.0));
+    }
+
+    fn dimmer_fx() -> Effect {
+        let mut f = fx(Shape::Square);
+        f.attr = "dimmer".into();
+        f.attr2 = None;
+        f.fixtures = vec![1];
+        f.adv.absolute = true;
+        f.adv.low = 1.0;
+        f.adv.high = 1.0;
+        f
+    }
+    fn dim(e: &mut Engine, now: f64) -> f32 {
+        e.compute_look(now).get(&1).and_then(|a| a.get("dimmer")).copied().unwrap_or(0.0)
+    }
+
+    #[test]
+    fn an_effect_can_fade_in_and_out() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 1);
+        let mut f = dimmer_fx();
+        f.adv.fade_in = 2.0;
+        f.adv.fade_out = 1.0;
+        start(&mut e, f);
+        let id = e.show.effects.last().unwrap().id;
+        let mut t = 0.0;
+        assert!(dim(&mut e, t) < 0.01, "starts from nothing");
+        let mut at = |e: &mut Engine, until: f64| {
+            while t + 1e-9 < until {
+                t += 0.25;
+                dim(e, t);
+            }
+            dim(e, t)
+        };
+        let half = at(&mut e, 1.0);
+        assert!((half - 0.5).abs() < 0.06, "half way in after 1 s of 2: {half}");
+        let full = at(&mut e, 2.5);
+        assert!((full - 1.0).abs() < 1e-4, "{full}");
+        e.handle(Command::EffectToggle { id, on: false }).unwrap();
+        let out = at(&mut e, 3.0);
+        assert!((out - 0.5).abs() < 0.3 && out < 1.0 && out > 0.0, "still fading out: {out}");
+        let gone = at(&mut e, 4.5);
+        assert_eq!(gone, 0.0, "faded out completely");
+        assert!(e.fx_level.is_empty() && e.fx_clock.is_empty(), "nothing left running");
+    }
+
+    #[test]
+    fn a_once_effect_runs_one_cycle_and_switches_itself_off() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 1);
+        let mut f = dimmer_fx();
+        f.rate = 1.0;
+        f.adv.once = true;
+        start(&mut e, f);
+        let id = e.show.effects.last().unwrap().id;
+        let mut t = 0.0;
+        for _ in 0..4 {
+            dim(&mut e, t);
+            t += 0.2;
+        }
+        assert!(e.effects_on.contains(&id), "still in its cycle at 0.6 s");
+        for _ in 0..6 {
+            dim(&mut e, t);
+            t += 0.2;
+        }
+        assert!(!e.effects_on.contains(&id), "one second later it has switched itself off");
+    }
+
+    #[test]
+    fn extra_lines_drive_other_attributes_at_their_own_speed() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        let mut f = fx(Shape::Square);
+        f.attr = "pan".into();
+        f.attr2 = None;
+        f.depth = 1.0;
+        f.adv.absolute = true;
+        f.adv.low = 0.2;
+        f.adv.high = 0.8;
+        f.lines.push(EffectLine { attr: "tilt".into(), attr2: None, shape: Shape::Square, depth: 1.0, rotation: 0.0, rate_mul: 2.0, phase_offset: 0.0, absolute: true, low: 0.1, high: 0.9, offset: 0.0, width: 0.0 });
+        f.lines.push(EffectLine { attr: "zoom".into(), attr2: None, shape: Shape::Sine, depth: 0.0, rotation: 0.0, rate_mul: 1.0, phase_offset: 0.0, absolute: false, low: 0.0, high: 1.0, offset: 0.25, width: 0.0 });
+        start(&mut e, f);
+        let m = e.compute_look(0.1);
+        assert!((m[&1]["pan"] - 0.8).abs() < 1e-5 && (m[&1]["tilt"] - 0.9).abs() < 1e-5, "{:?}", m[&1]);
+        let m = e.compute_look(0.3);
+        assert!((m[&1]["pan"] - 0.8).abs() < 1e-5, "pan still in its first half");
+        assert!((m[&1]["tilt"] - 0.1).abs() < 1e-5, "tilt runs twice as fast: already in its low half");
+        let m = e.compute_look(0.6);
+        assert!((m[&1]["pan"] - 0.2).abs() < 1e-5 && (m[&1]["tilt"] - 0.9).abs() < 1e-5, "{:?}", m[&1]);
+        assert!((m[&1]["zoom"] - (attr_default("zoom") + 0.25)).abs() < 1e-5, "a third line with its own offset");
+        // old shows have no lines
+        let old: Effect = serde_json::from_str(r#"{"id":1,"name":"x","attr":"dimmer","shape":"sine","rate":1.0,"depth":1.0,"phase_spread":0.0,"fixtures":[1]}"#).unwrap();
+        assert!(old.lines.is_empty());
+    }
+
+    #[test]
+    fn circle_on_a_mover_keeps_its_radius() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        start(&mut e, fx(Shape::Circle));
+        for i in 0..40 {
+            let (p, t) = pan_tilt(&mut e, 0.1 + i as f64 * 0.037);
+            let r = ((p - 0.5).powi(2) + (t - 0.5).powi(2)).sqrt();
+            assert!((r - 0.2).abs() < 1e-4, "radius {r} at step {i}"); // depth 0.4 → radius 0.2
+        }
+    }
+
+    #[test]
+    fn rotation_turns_the_start_point() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        let mut f = fx(Shape::Circle);
+        f.rotation = 90.0;
+        start(&mut e, f);
+        // first call initialises the phase clock at rate·now; sample exactly at phase 0 (now = 0)
+        let (p, t) = pan_tilt(&mut e, 0.0);
+        assert!((p - 0.5).abs() < 1e-4 && (t - 0.7).abs() < 1e-4, "{p} {t}"); // (1,0) rotated 90° → straight up
+    }
+
+    #[test]
+    fn figure_eight_crosses_the_centre() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        start(&mut e, fx(Shape::Eight));
+        let (p, t) = pan_tilt(&mut e, 0.0);
+        assert!((p - 0.5).abs() < 1e-4 && (t - 0.5).abs() < 1e-4);
+        let (p, t) = pan_tilt(&mut e, 0.5); // half a cycle later: centre again, other lobe next
+        assert!((p - 0.5).abs() < 1e-3 && (t - 0.5).abs() < 1e-3, "{p} {t}");
+        let (p, t) = pan_tilt(&mut e, 0.625); // 0.125 cycle after the crossing: x = -sin45°·r, y = r
+        assert!((p - (0.5 - 0.2 * 0.7071)).abs() < 2e-3 && (t - 0.7).abs() < 2e-3, "{p} {t}");
+    }
+
+    #[test]
+    fn speed_master_drives_the_rate_without_phase_jumps() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        e.handle(Command::SpeedSave { master: SpeedMaster { id: 0, name: "M".into(), bpm: 120.0 } }).unwrap();
+        let mut f = fx(Shape::Saw);
+        f.attr = "tilt".into();
+        f.attr2 = None;
+        f.depth = 1.0;
+        f.rate = 5.0; // ignored: the master wins
+        f.speed_master = Some(1);
+        start(&mut e, f);
+        let m = e.compute_look(0.1); // clock starts at phase cps·now = 2 · 0.1 = 0.2
+        assert!((m[&1]["tilt"] - (0.5 + (2.0 * 0.2 - 1.0) * 0.5)).abs() < 1e-3);
+        let m = e.compute_look(0.35); // 120 BPM = 2 Hz → phase 0.7
+        assert!((m[&1]["tilt"] - (0.5 + (2.0 * 0.7 - 1.0) * 0.5)).abs() < 1e-3);
+        e.handle(Command::SpeedSet { id: 1, bpm: 60.0 }).unwrap(); // halve the tempo
+        let m = e.compute_look(0.6); // continues from 0.7 at 1 Hz → 0.95 (an absolute rate·t clock would give 0.6)
+        assert!((m[&1]["tilt"] - (0.5 + (2.0 * 0.95 - 1.0) * 0.5)).abs() < 1e-3, "{}", m[&1]["tilt"]);
+    }
+
+    #[test]
+    fn own_bpm_beats_rate() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        let mut f = fx(Shape::Saw);
+        f.attr = "tilt".into();
+        f.attr2 = None;
+        f.depth = 1.0;
+        f.rate = 9.0;
+        f.bpm = 60.0; // 1 Hz
+        start(&mut e, f);
+        let _ = e.compute_look(0.0);
+        let m = e.compute_look(0.25);
+        assert!((m[&1]["tilt"] - (0.5 + (2.0 * 0.25 - 1.0) * 0.5)).abs() < 1e-3);
+    }
+
+    #[test]
+    fn two_dimensional_effect_needs_both_attributes() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 1); // no pan/tilt
+        start(&mut e, fx(Shape::Circle));
+        let m = e.compute_look(0.2);
+        assert!(m.get(&1).map_or(true, |a| !a.contains_key("pan") && !a.contains_key("tilt")));
+    }
+
+    #[test]
+    fn ramp_and_pulse_on_dimmer_through_the_engine() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 1);
+        set(&mut e, 1, "dimmer", 1.0);
+        let mut f = fx(Shape::Pulse);
+        f.attr = "dimmer".into();
+        f.attr2 = None;
+        f.depth = 1.0;
+        start(&mut e, f);
+        let _ = e.compute_look(0.0); // phase 0 → pulse high → full
+        e.render(0.05);
+        assert_eq!(e.frames[&1][0], 255);
+        e.render(0.5); // pulse low → factor 1 − depth = 0
+        assert_eq!(e.frames[&1][0], 0);
+    }
+}
+

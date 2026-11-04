@@ -1,0 +1,957 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lumos — 3D Stage Visualizer</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#000; overflow:hidden; font-family:'Inter',system-ui,sans-serif; }
+  #canvas-container { width:100vw; height:100vh; cursor:default; }
+  #canvas-container.aim-mode { cursor:crosshair; }
+
+  #overlay {
+    position:fixed; top:0; left:0; right:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 16px;
+    background:linear-gradient(to bottom,rgba(0,0,0,.75),transparent);
+    pointer-events:none;
+    z-index:10;
+  }
+  .ov-logo { color:#9d8ff0; font-size:15px; font-weight:700; pointer-events:auto; }
+  .ov-logo a { color:inherit; text-decoration:none; }
+  .ov-controls { display:flex; gap:8px; pointer-events:auto; flex-wrap:wrap; }
+  .ov-btn {
+    padding:5px 12px; border-radius:5px; border:1px solid rgba(255,255,255,.2);
+    background:rgba(0,0,0,.5); color:#ccc; cursor:pointer; font-size:12px;
+    transition:all .15s; backdrop-filter:blur(4px);
+  }
+  .ov-btn:hover { background:rgba(255,255,255,.1); color:#fff; }
+  .ov-btn.active { background:rgba(124,111,205,.4); border-color:#7c6fcd; color:#9d8ff0; }
+  .ov-btn.aim-active {
+    background:rgba(240,160,48,.35); border-color:#f0a030; color:#f0c060;
+    box-shadow: 0 0 10px rgba(240,160,48,.4);
+    animation: aim-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes aim-pulse {
+    0%,100% { box-shadow: 0 0 8px rgba(240,160,48,.4); }
+    50%      { box-shadow: 0 0 18px rgba(240,160,48,.7); }
+  }
+
+  #info-panel {
+    position:fixed; bottom:0; left:0; right:0;
+    padding:8px 16px;
+    background:linear-gradient(to top,rgba(0,0,0,.7),transparent);
+    display:flex; gap:16px; align-items:center;
+    pointer-events:none;
+    font-size:11px; color:rgba(255,255,255,.4);
+  }
+  .info-fix { display:flex; align-items:center; gap:6px; }
+  .fix-color-dot { width:8px; height:8px; border-radius:50%; }
+
+  #ws-status {
+    position:fixed; top:10px; right:16px;
+    display:flex; align-items:center; gap:6px;
+    font-size:11px; color:rgba(255,255,255,.4);
+    z-index:20;
+  }
+  .ws-dot { width:6px; height:6px; border-radius:50%; background:#4caf78; }
+  .ws-dot.off { background:#666; }
+
+  #side-controls {
+    position:fixed; left:16px; bottom:40px;
+    display:flex; flex-direction:column; gap:4px;
+    pointer-events:auto; z-index:10;
+  }
+  .ctrl-label { font-size:10px; color:rgba(255,255,255,.4); }
+  input[type=range].vctrl {
+    -webkit-appearance:none; width:100px; height:3px;
+    background:rgba(255,255,255,.15); border-radius:2px; outline:none;
+  }
+  input[type=range].vctrl::-webkit-slider-thumb {
+    -webkit-appearance:none; width:10px; height:10px;
+    border-radius:50%; background:#7c6fcd; cursor:pointer;
+  }
+
+  #aim-toast {
+    position:fixed; top:60px; left:50%; transform:translateX(-50%);
+    padding:6px 16px; border-radius:6px;
+    background:rgba(240,160,48,.25); border:1px solid rgba(240,160,48,.5);
+    color:#f0c060; font-size:12px;
+    pointer-events:none; z-index:30;
+    opacity:0; transition:opacity .25s;
+  }
+  #aim-toast.visible { opacity:1; }
+
+  #selection-info {
+    position:fixed; bottom:44px; right:16px;
+    font-size:11px; color:rgba(255,255,255,.35);
+    pointer-events:none; z-index:20;
+    text-align:right;
+  }
+
+  #loading {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    background:#000; color:#9d8ff0; font-size:14px; z-index:100;
+    flex-direction:column; gap:8px;
+  }
+  .spinner {
+    width:28px; height:28px; border:2px solid rgba(124,111,205,.3);
+    border-top-color:#9d8ff0; border-radius:50%;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div id="loading"><div class="spinner"></div>Loading visualizer…</div>
+<div id="canvas-container"></div>
+
+<div id="overlay">
+  <div class="ov-logo"><a href="/">⚡ Lumos</a> <span style="font-size:11px;color:#666;font-weight:400">3D Visualizer</span></div>
+  <div class="ov-controls">
+    <button class="ov-btn aim-active" id="btn-aim" onclick="toggleAimMode()">🎯 Aim Mode</button>
+    <button class="ov-btn" id="btn-select-all" onclick="selectAllMH()">Select All MH</button>
+    <button class="ov-btn" id="btn-deselect" onclick="deselectAll()">Deselect</button>
+    <button class="ov-btn active" id="btn-beams" onclick="toggleBeams()">Beams</button>
+    <button class="ov-btn active" id="btn-bloom" onclick="toggleBloom()">Bloom</button>
+    <button class="ov-btn" id="btn-shadows" onclick="toggleShadows()">Shadows</button>
+    <button class="ov-btn" id="btn-grid" onclick="toggleGrid()">Grid</button>
+    <button class="ov-btn" id="btn-reset" onclick="resetCamera()">Reset Camera</button>
+  </div>
+</div>
+
+<div id="aim-toast">Aim mode — click the stage to point selected heads</div>
+
+<div id="ws-status">
+  <div class="ws-dot off" id="ws-dot"></div>
+  <span id="ws-label">Connecting…</span>
+</div>
+
+<div id="side-controls">
+  <div class="ctrl-label">HAZE</div>
+  <input type="range" class="vctrl" id="haze-slider" min="0" max="100" value="40" oninput="updateHaze(this.value)">
+  <div class="ctrl-label" style="margin-top:6px">AMBIENT</div>
+  <input type="range" class="vctrl" id="ambient-slider" min="0" max="60" value="8" oninput="updateAmbient(this.value)">
+</div>
+
+<div id="selection-info"></div>
+<div id="info-panel"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+// ── Scene setup ──────────────────────────────────────────────────────────────
+const container = document.getElementById('canvas-container');
+const W = () => window.innerWidth, H = () => window.innerHeight;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setSize(W(), H());
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = false;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.8;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000004);
+scene.fog = new THREE.FogExp2(0x000010, 0.012);
+
+const camera = new THREE.PerspectiveCamera(60, W()/H(), 0.1, 200);
+camera.position.set(0, 8, 18);
+camera.lookAt(0, 2, 0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 3;
+controls.maxDistance = 60;
+controls.maxPolarAngle = Math.PI * 0.85;
+controls.update();
+
+// ── Post-processing ──────────────────────────────────────────────────────────
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(W(), H()), 1.4, 0.5, 0.05);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+// ── Ambient ──────────────────────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x101018, 0.08);
+scene.add(ambientLight);
+scene.add(new THREE.HemisphereLight(0x080818, 0x000000, 0.05));
+
+// ── Stage geometry ────────────────────────────────────────────────────────────
+const floor = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 20),
+  new THREE.MeshStandardMaterial({ color: 0x0a0a10, roughness: 0.15, metalness: 0.05 })
+);
+floor.rotation.x = -Math.PI / 2;
+floor.receiveShadow = true;
+floor.name = 'floor';
+scene.add(floor);
+
+const strip = new THREE.Mesh(
+  new THREE.PlaneGeometry(14, 0.08),
+  new THREE.MeshBasicMaterial({ color: 0x332255 })
+);
+strip.rotation.x = -Math.PI/2;
+strip.position.set(0, 0.001, 6);
+scene.add(strip);
+
+const cyc = new THREE.Mesh(
+  new THREE.PlaneGeometry(30, 16),
+  new THREE.MeshStandardMaterial({ color: 0x050508, roughness: 0.9 })
+);
+cyc.position.set(0, 8, -10);
+cyc.receiveShadow = true;
+scene.add(cyc);
+
+const maskL = new THREE.Mesh(
+  new THREE.PlaneGeometry(20, 16),
+  new THREE.MeshStandardMaterial({ color: 0x030305, roughness: 1 })
+);
+maskL.rotation.y = Math.PI/2;
+maskL.position.set(-15, 8, 0);
+scene.add(maskL);
+const maskR = maskL.clone();
+maskR.rotation.y = -Math.PI/2;
+maskR.position.set(15, 8, 0);
+scene.add(maskR);
+
+const gridHelper = new THREE.GridHelper(30, 30, 0x1a1a2e, 0x111128);
+gridHelper.position.y = 0.002;
+gridHelper.visible = false;
+scene.add(gridHelper);
+
+// ── Truss ─────────────────────────────────────────────────────────────────────
+function makeTruss(x1, x2, y, z) {
+  const group = new THREE.Group();
+  const tubeGeo = new THREE.CylinderGeometry(0.04, 0.04, x2-x1, 8);
+  const tubeMat = new THREE.MeshStandardMaterial({ color: 0x555570, roughness: 0.4, metalness: 0.8 });
+  for (const [oy, oz] of [[-0.12,-0.12],[0.12,-0.12],[-0.12,0.12],[0.12,0.12]]) {
+    const t = new THREE.Mesh(tubeGeo, tubeMat);
+    t.rotation.z = Math.PI/2;
+    t.position.set((x1+x2)/2, oy, oz);
+    group.add(t);
+  }
+  const crossMat = new THREE.MeshStandardMaterial({ color: 0x444455, roughness: 0.5, metalness: 0.7 });
+  for (let x = x1; x < x2; x += 0.8) {
+    const crossGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.34, 4);
+    for (const oz of [-0.12, 0.12]) {
+      const c = new THREE.Mesh(crossGeo, crossMat);
+      c.rotation.z = Math.PI/4;
+      c.position.set(x, 0, oz);
+      group.add(c);
+    }
+  }
+  group.position.set(0, y, z);
+  return group;
+}
+scene.add(makeTruss(-7, 7, 9, -2));
+scene.add(makeTruss(-5, 5, 8, 2));
+
+// ── Haze ──────────────────────────────────────────────────────────────────────
+let hazeStrength = 0.40;
+const hazeParticles = (() => {
+  const N = 3000;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    pos[i*3]   = (Math.random()-0.5)*28;
+    pos[i*3+1] = Math.random()*12;
+    pos[i*3+2] = (Math.random()-0.5)*18;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const pts = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0x8888cc, size: 0.18, transparent: true, opacity: 0,
+    depthWrite: false, blending: THREE.AdditiveBlending,
+  }));
+  scene.add(pts);
+  return pts;
+})();
+
+window.updateHaze = (v) => {
+  hazeStrength = v / 100;
+  hazeParticles.material.opacity = hazeStrength * 0.025;
+  scene.fog.density = 0.004 + hazeStrength * 0.022;
+};
+window.updateAmbient = (v) => { ambientLight.intensity = (v / 100) * 0.5; };
+updateHaze(40);
+
+// ── Aim crosshair on floor ────────────────────────────────────────────────────
+const aimCrosshair = (() => {
+  const g = new THREE.Group();
+
+  // Outer ring
+  const ringGeo = new THREE.RingGeometry(0.35, 0.42, 32);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: 0xf0a030, transparent: true, opacity: 0.9,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const ring = new THREE.Mesh(ringGeo, ringMat);
+  ring.rotation.x = -Math.PI/2;
+  g.add(ring);
+
+  // Inner dot
+  const dotGeo = new THREE.CircleGeometry(0.08, 16);
+  const dotMat = new THREE.MeshBasicMaterial({
+    color: 0xffd060, transparent: true, opacity: 1,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const dot = new THREE.Mesh(dotGeo, dotMat);
+  dot.rotation.x = -Math.PI/2;
+  g.add(dot);
+
+  // Cross lines
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xf0a030, transparent: true, opacity: 0.7 });
+  for (const [dx, dz] of [[0.6,0],[0,0.6],[-0.6,0],[0,-0.6]]) {
+    const pts = [new THREE.Vector3(0,0,0), new THREE.Vector3(dx*0.4,0,dz*0.4)];
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
+    line.rotation.x = -Math.PI/2;
+    g.add(line);
+  }
+
+  g.position.y = 0.008;
+  g.visible = false;
+  scene.add(g);
+  return g;
+})();
+
+// ── Selection ring around fixture ─────────────────────────────────────────────
+function makeSelectionRing() {
+  const geo = new THREE.RingGeometry(0.22, 0.27, 24);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xf0a030, transparent: true, opacity: 0.85,
+    side: THREE.DoubleSide, depthWrite: false,
+  });
+  const m = new THREE.Mesh(geo, mat);
+  m.rotation.x = -Math.PI/2;
+  m.visible = false;
+  return m;
+}
+
+// ── Fixture system ────────────────────────────────────────────────────────────
+class FixtureViz {
+  constructor(data) {
+    this.data = data;
+    this.group = new THREE.Group();
+    this.beamGroup = new THREE.Group();
+    this.isMovingHead = this._isMovingHead();
+    this.selected = false;
+
+    this.channels = {};
+    this.targetPan = 0;
+    this.targetTilt = 0;
+    this.currentPan = 0;
+    this.currentTilt = 0;
+    this.color = new THREE.Color(1, 1, 1);
+    this.intensity = 0;
+
+    this._buildBody();
+    this._buildBeam();
+
+    const pos = data.position || [0, 0, 0];
+    this.worldPos = new THREE.Vector3(pos[0], pos[1] || 9, pos[2]);
+    this.group.position.copy(this.worldPos);
+    this.beamGroup.position.copy(this.worldPos);
+
+    // Selection ring sits at floor level, centered under fixture
+    this.selRing = makeSelectionRing();
+    this.selRing.position.set(this.worldPos.x, 0.01, this.worldPos.z);
+    scene.add(this.selRing);
+
+    scene.add(this.group);
+    scene.add(this.beamGroup);
+  }
+
+  _isMovingHead() {
+    const t = (this.data.fixture_type || this.data.type || '').toLowerCase();
+    return t.includes('moving') || t.includes('mover');
+  }
+
+  _buildBody() {
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a1a2a, roughness: 0.3, metalness: 0.7 });
+    this.bodyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.22, 0.14), bodyMat);
+    this.group.add(this.bodyMesh);
+
+    const yokeGeo = new THREE.TorusGeometry(0.15, 0.018, 8, 16, Math.PI);
+    const yokeMat = new THREE.MeshStandardMaterial({ color: 0x222236, roughness: 0.4, metalness: 0.8 });
+    this.yokeMesh = new THREE.Mesh(yokeGeo, yokeMat);
+    this.yokeMesh.rotation.y = Math.PI/2;
+    this.group.add(this.yokeMesh);
+
+    this.headGroup = new THREE.Group();
+    const headMat = new THREE.MeshStandardMaterial({ color: 0x252535, roughness: 0.25, metalness: 0.75 });
+    this.headMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.10, 0.18, 12), headMat);
+    this.headMesh.rotation.x = Math.PI/2;
+    this.headGroup.add(this.headMesh);
+
+    this.lensMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    this.lensMesh = new THREE.Mesh(new THREE.CircleGeometry(0.065, 16), this.lensMat);
+    this.lensMesh.position.z = 0.09;
+    this.headGroup.add(this.lensMesh);
+
+    this.group.add(this.headGroup);
+
+    // Make body meshes selectable via raycasting
+    this.bodyMesh.userData.fixtureViz = this;
+    this.headMesh.userData.fixtureViz = this;
+    this.yokeMesh.userData.fixtureViz = this;
+  }
+
+  _buildBeam() {
+    const coneH = 16;
+    const coneR = coneH * Math.tan(THREE.MathUtils.degToRad(10));
+
+    this.coneMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0,
+      side: THREE.FrontSide, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this.coneMesh = new THREE.Mesh(new THREE.ConeGeometry(coneR, coneH, 32, 8, true), this.coneMat);
+    this.coneMesh.position.y = -coneH / 2 - 0.09;
+    this.beamGroup.add(this.coneMesh);
+
+    this.coreMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    const coreMesh = new THREE.Mesh(new THREE.ConeGeometry(coneR * 0.18, coneH, 16, 1, true), this.coreMat);
+    coreMesh.position.y = -coneH / 2 - 0.09;
+    this.beamGroup.add(coreMesh);
+
+    this.poolMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff, transparent: true, opacity: 0,
+      depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this.poolMesh = new THREE.Mesh(new THREE.CircleGeometry(1.2, 32), this.poolMat);
+    this.poolMesh.rotation.x = -Math.PI/2;
+    this.poolMesh.position.y = -this.worldPos.y + 0.01;
+    this.beamGroup.add(this.poolMesh);
+
+    this.spotlight = new THREE.SpotLight(0xffffff, 0, 30, Math.PI/8, 0.4, 1.2);
+    this.spotlight.target.position.set(0, -12, 0);
+    this.beamGroup.add(this.spotlight);
+    this.beamGroup.add(this.spotlight.target);
+  }
+
+  setSelected(v) {
+    this.selected = v;
+    this.selRing.visible = v;
+    // Highlight body when selected
+    this.bodyMesh.material.color.setHex(v ? 0x3a3a5a : 0x1a1a2a);
+    this.bodyMesh.material.emissive.setHex(v ? 0x2a204a : 0x000000);
+  }
+
+  // Calculate pan/tilt DMX values to aim at world point `target` (THREE.Vector3)
+  aimAt(target) {
+    if (!this.isMovingHead) return null;
+
+    const dx = target.x - this.worldPos.x;
+    const dy = target.y - this.worldPos.y;  // negative (target is below)
+    const dz = target.z - this.worldPos.z;
+
+    // Pan: azimuth angle around Y axis
+    const pan = Math.atan2(dx, -dz);  // 0 = straight ahead (negative Z)
+
+    // Tilt: elevation angle (positive = tilted down toward floor)
+    const horizDist = Math.sqrt(dx*dx + dz*dz);
+    const tilt = Math.atan2(-dy, horizDist); // positive when aiming down
+
+    // Convert to DMX (must match _applyChannels ranges in the visualizer)
+    // Pan: (-1.5π … +1.5π) → 0…255
+    const PAN_RANGE  = Math.PI * 3.0;
+    const TILT_RANGE = Math.PI * 1.33;
+    const panDmx  = Math.round(THREE.MathUtils.clamp(pan  / PAN_RANGE  + 0.5, 0, 1) * 255);
+    const tiltDmx = Math.round(THREE.MathUtils.clamp(tilt / TILT_RANGE + 0.5, 0, 1) * 255);
+
+    return { pan: panDmx, tilt: tiltDmx };
+  }
+
+  setChannels(channelValues) {
+    this.channels = { ...this.channels, ...channelValues };
+    this._applyChannels();
+  }
+
+  _applyChannels() {
+    const ch = this.channels;
+    const dimmer = ch['Dimmer'] ?? ch['Intensity'] ?? ch['Master'] ?? 0;
+    this.intensity = dimmer / 255;
+
+    const r = (ch['Red'] ?? 255) / 255;
+    const g = (ch['Green'] ?? 255) / 255;
+    const b = (ch['Blue'] ?? 255) / 255;
+    this.color.setRGB(r, g, b);
+
+    const panRaw  = ch['Pan']  ?? 128;
+    const panFine = (ch['Pan Fine']  ?? 0) / 255 / 255;
+    this.targetPan = ((panRaw / 255 + panFine) - 0.5) * Math.PI * 3;
+
+    const tiltRaw  = ch['Tilt']  ?? 128;
+    const tiltFine = (ch['Tilt Fine'] ?? 0) / 255 / 255;
+    this.targetTilt = ((tiltRaw / 255 + tiltFine) - 0.5) * Math.PI * 1.33;
+
+    const cw = ch['Color Wheel'];
+    if (cw !== undefined) {
+      const cwColor = getColorWheelColor(cw);
+      if (cwColor) this.color.multiply(cwColor);
+    }
+
+    const shutter = ch['Shutter'];
+    const shutterOpen = shutter === undefined || (shutter >= 32 && shutter < 64) || shutter >= 128;
+    if (!shutterOpen) this.intensity = 0;
+  }
+
+  update(dt) {
+    const speed = 1 - Math.exp(-dt * 6);
+    this.currentPan  += (this.targetPan  - this.currentPan)  * speed;
+    this.currentTilt += (this.targetTilt - this.currentTilt) * speed;
+
+    this.group.rotation.y = this.currentPan;
+    this.headGroup.rotation.x = this.currentTilt;
+    this.beamGroup.rotation.copy(this.group.rotation);
+
+    const eff = this.intensity * hazeStrength * 0.38 + this.intensity * 0.04;
+    this.coneMat.opacity = eff * 0.7;
+    this.coreMat.opacity = eff * 1.2;
+    this.poolMat.opacity = this.intensity * 0.28;
+
+    const col = this.color;
+    this.coneMat.color.copy(col);
+    this.coreMat.color.copy(col);
+    this.poolMat.color.copy(col);
+    this.lensMat.color.setRGB(col.r * this.intensity, col.g * this.intensity, col.b * this.intensity);
+    this.spotlight.color.copy(col);
+    this.spotlight.intensity = this.intensity * 25;
+
+    // Pulse selection ring
+    if (this.selected) {
+      this.selRing.material.opacity = 0.6 + 0.3 * Math.sin(Date.now() * 0.003);
+    }
+  }
+
+  dispose() {
+    scene.remove(this.group);
+    scene.remove(this.beamGroup);
+    scene.remove(this.selRing);
+  }
+}
+
+function getColorWheelColor(val) {
+  const ranges = [
+    [0,7,   new THREE.Color(1,1,1)],
+    [8,15,  new THREE.Color(1,0.1,0.1)],
+    [16,23, new THREE.Color(1,0.9,0.1)],
+    [24,31, new THREE.Color(0.1,1,0.2)],
+    [32,39, new THREE.Color(0.1,0.3,1)],
+    [40,47, new THREE.Color(1,0.1,0.8)],
+    [48,55, new THREE.Color(0.1,0.9,1)],
+  ];
+  for (const [mn, mx, col] of ranges) {
+    if (val >= mn && val <= mx) return col;
+  }
+  return null;
+}
+
+// ── Fixture manager ───────────────────────────────────────────────────────────
+const fixtureVizMap = new Map();
+
+function positionFixtureOnTruss(index, total, truss) {
+  const x = total <= 1 ? 0 : (index / (total - 1) - 0.5) * 12;
+  return truss === 0
+    ? new THREE.Vector3(x, 9, -2)
+    : new THREE.Vector3(x, 8, 2);
+}
+
+function syncFixtures(patchData) {
+  const existing = new Set(fixtureVizMap.keys());
+  const incoming = new Set(patchData.map(f => f.id));
+
+  for (const id of existing) {
+    if (!incoming.has(id)) {
+      fixtureVizMap.get(id).dispose();
+      fixtureVizMap.delete(id);
+    }
+  }
+
+  const truss0 = patchData.filter((_, i) => i % 2 === 0);
+  const truss1 = patchData.filter((_, i) => i % 2 === 1);
+  for (let i = 0; i < patchData.length; i++) {
+    const f = patchData[i];
+    if (!fixtureVizMap.has(f.id)) {
+      const isOdd = i % 2;
+      const group = isOdd ? truss1 : truss0;
+      const groupIdx = isOdd ? truss1.indexOf(f) : truss0.indexOf(f);
+      const pos = positionFixtureOnTruss(groupIdx, group.length, isOdd);
+      fixtureVizMap.set(f.id, new FixtureViz({ ...f, position: [pos.x, pos.y, pos.z] }));
+    }
+  }
+  updateInfoPanel(patchData);
+  updateSelectionInfo();
+}
+
+function updateInfoPanel(fixtures) {
+  const el = document.getElementById('info-panel');
+  if (!fixtures.length) { el.innerHTML = ''; return; }
+  el.innerHTML = fixtures.slice(0, 8).map(f => {
+    const viz = fixtureVizMap.get(f.id);
+    if (!viz) return '';
+    const c = viz.color;
+    const hex = '#' + [c.r, c.g, c.b].map(v => Math.round(v*255).toString(16).padStart(2,'0')).join('');
+    return `<div class="info-fix">
+      <div class="fix-color-dot" style="background:${hex};opacity:${0.3 + viz.intensity*0.7}"></div>
+      <span>${f.name}</span>
+      <span style="opacity:.5">${Math.round(viz.intensity*100)}%</span>
+    </div>`;
+  }).join('') + (fixtures.length > 8 ? `<span>+${fixtures.length-8} more</span>` : '');
+}
+
+function updateSelectionInfo() {
+  const sel = [...fixtureVizMap.values()].filter(v => v.selected);
+  const el = document.getElementById('selection-info');
+  if (!sel.length) { el.textContent = ''; return; }
+  const mh = sel.filter(v => v.isMovingHead).length;
+  el.textContent = `${sel.length} selected${mh ? ` · ${mh} moving heads` : ''}`;
+}
+
+// ── Aim mode ──────────────────────────────────────────────────────────────────
+let aimMode = true;  // on by default
+
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+window.toggleAimMode = () => {
+  aimMode = !aimMode;
+  const btn = document.getElementById('btn-aim');
+  btn.classList.toggle('aim-active', aimMode);
+  btn.classList.toggle('active', aimMode);
+  container.classList.toggle('aim-mode', aimMode);
+  controls.enabled = !aimMode;  // disable orbit in aim mode
+  if (!aimMode) {
+    aimCrosshair.visible = false;
+    controls.enabled = true;
+  } else {
+    controls.enabled = false;
+  }
+  showAimToast(aimMode);
+};
+
+let toastTimer = null;
+function showAimToast(show) {
+  const t = document.getElementById('aim-toast');
+  t.classList.toggle('visible', show);
+  clearTimeout(toastTimer);
+  if (show) toastTimer = setTimeout(() => t.classList.remove('visible'), 3000);
+}
+
+window.selectAllMH = () => {
+  for (const viz of fixtureVizMap.values()) {
+    viz.setSelected(viz.isMovingHead);
+  }
+  updateSelectionInfo();
+};
+
+window.deselectAll = () => {
+  for (const viz of fixtureVizMap.values()) viz.setSelected(false);
+  updateSelectionInfo();
+};
+
+// ── Click handling ────────────────────────────────────────────────────────────
+let pointerMoved = false;
+let pointerDownPos = { x: 0, y: 0 };
+
+container.addEventListener('pointerdown', (e) => {
+  pointerMoved = false;
+  pointerDownPos = { x: e.clientX, y: e.clientY };
+});
+
+container.addEventListener('pointermove', (e) => {
+  if (Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) > 4) {
+    pointerMoved = true;
+  }
+  if (aimMode) {
+    // Track mouse for crosshair preview
+    mouse.x = (e.clientX / W()) * 2 - 1;
+    mouse.y = -(e.clientY / H()) * 2 + 1;
+    raycaster.setFromCamera(mouse, camera);
+    const hit = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(floorPlane, hit)) {
+      aimCrosshair.position.set(hit.x, 0.008, hit.z);
+      aimCrosshair.visible = true;
+    }
+  }
+});
+
+container.addEventListener('pointerup', (e) => {
+  if (pointerMoved) return;  // was a drag, not a click
+
+  mouse.x = (e.clientX / W()) * 2 - 1;
+  mouse.y = -(e.clientY / H()) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  if (aimMode) {
+    // First check if clicking on a fixture body (to select/deselect)
+    const bodyMeshes = [...fixtureVizMap.values()].flatMap(v =>
+      [v.bodyMesh, v.headMesh, v.yokeMesh]
+    );
+    const bodyHits = raycaster.intersectObjects(bodyMeshes, false);
+    if (bodyHits.length > 0) {
+      const viz = bodyHits[0].object.userData.fixtureViz;
+      if (viz) {
+        const multiSelect = e.shiftKey || e.ctrlKey || e.metaKey;
+        if (!multiSelect) {
+          // Single select — deselect others
+          for (const v of fixtureVizMap.values()) {
+            if (v !== viz) v.setSelected(false);
+          }
+        }
+        viz.setSelected(!viz.selected);
+        updateSelectionInfo();
+        return;
+      }
+    }
+
+    // Click on floor — aim selected moving heads
+    const hit = new THREE.Vector3();
+    if (raycaster.ray.intersectPlane(floorPlane, hit)) {
+      aimSelectedHeads(hit);
+    }
+  } else {
+    // In orbit mode, allow fixture selection with shift+click
+    if (e.shiftKey || e.ctrlKey || e.metaKey) {
+      const bodyMeshes = [...fixtureVizMap.values()].flatMap(v =>
+        [v.bodyMesh, v.headMesh, v.yokeMesh]
+      );
+      const bodyHits = raycaster.intersectObjects(bodyMeshes, false);
+      if (bodyHits.length > 0) {
+        const viz = bodyHits[0].object.userData.fixtureViz;
+        if (viz) {
+          viz.setSelected(!viz.selected);
+          updateSelectionInfo();
+        }
+      }
+    }
+  }
+});
+
+function aimSelectedHeads(targetPoint) {
+  const selected = [...fixtureVizMap.values()].filter(v => v.selected && v.isMovingHead);
+  if (!selected.length) {
+    // No selection — aim all moving heads
+    for (const viz of fixtureVizMap.values()) {
+      if (viz.isMovingHead) {
+        sendAim(viz, targetPoint);
+      }
+    }
+  } else {
+    for (const viz of selected) {
+      sendAim(viz, targetPoint);
+    }
+  }
+
+  // Animate crosshair burst
+  aimCrosshair.position.set(targetPoint.x, 0.008, targetPoint.z);
+  aimCrosshair.visible = true;
+}
+
+function sendAim(viz, target) {
+  const dmx = viz.aimAt(target);
+  if (!dmx) return;
+
+  // Optimistically update local state for instant visual feedback
+  viz.setChannels({ 'Pan': dmx.pan, 'Pan Fine': 0, 'Tilt': dmx.tilt, 'Tilt Fine': 0 });
+
+  // Send to backend
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ action: 'set_channel', fixture_id: viz.data.id, channel: 'Pan',      value: dmx.pan  }));
+    ws.send(JSON.stringify({ action: 'set_channel', fixture_id: viz.data.id, channel: 'Pan Fine', value: 0        }));
+    ws.send(JSON.stringify({ action: 'set_channel', fixture_id: viz.data.id, channel: 'Tilt',     value: dmx.tilt }));
+    ws.send(JSON.stringify({ action: 'set_channel', fixture_id: viz.data.id, channel: 'Tilt Fine',value: 0        }));
+  }
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+let ws = null;
+const wsUrl = (location.protocol === 'https:' ? 'wss:' : 'ws:') + '//' + location.host + '/api/ws';
+
+function connectWS() {
+  ws = new WebSocket(wsUrl);
+  ws.onopen = () => {
+    document.getElementById('ws-dot').className = 'ws-dot';
+    document.getElementById('ws-label').textContent = 'Live';
+  };
+  ws.onclose = () => {
+    document.getElementById('ws-dot').className = 'ws-dot off';
+    document.getElementById('ws-label').textContent = 'Reconnecting…';
+    setTimeout(connectWS, 2000);
+  };
+  ws.onmessage = (e) => {
+    const { event, data } = JSON.parse(e.data);
+    if (event === 'init') {
+      syncFixtures(data.fixtures || []);
+    } else if (event === 'patch_updated') {
+      syncFixtures(data || []);
+    } else if (event === 'channel_update') {
+      const viz = fixtureVizMap.get(data.fixture_id);
+      if (viz) viz.setChannels({ [data.channel]: data.value });
+    } else if (event === 'dmx_update') {
+      for (const [id, viz] of fixtureVizMap) {
+        const f = viz.data;
+        if (f.universe !== data.universe) continue;
+        const dmx = data.data;
+        const ch = {};
+        for (let i = 0; i < (f.channels?.length || 0); i++) {
+          const dmxIdx = f.address - 1 + i;
+          if (dmxIdx < dmx.length) ch[f.channels[i]] = dmx[dmxIdx];
+        }
+        viz.setChannels(ch);
+      }
+    }
+  };
+}
+
+async function loadInitial() {
+  try {
+    const r = await fetch('/api/patch');
+    syncFixtures(await r.json());
+  } catch(e) {}
+}
+
+// ── UI controls ───────────────────────────────────────────────────────────────
+let showBeams = true, showBloom = true;
+
+window.toggleBeams = () => {
+  showBeams = !showBeams;
+  document.getElementById('btn-beams').classList.toggle('active', showBeams);
+  for (const v of fixtureVizMap.values()) v.beamGroup.visible = showBeams;
+};
+window.toggleBloom = () => {
+  showBloom = !showBloom;
+  document.getElementById('btn-bloom').classList.toggle('active', showBloom);
+  bloomPass.strength = showBloom ? 1.4 : 0;
+};
+window.toggleShadows = () => {
+  const s = !renderer.shadowMap.enabled;
+  renderer.shadowMap.enabled = s;
+  document.getElementById('btn-shadows').classList.toggle('active', s);
+  for (const v of fixtureVizMap.values()) v.spotlight.castShadow = s;
+};
+window.toggleGrid = () => {
+  gridHelper.visible = !gridHelper.visible;
+  document.getElementById('btn-grid').classList.toggle('active', gridHelper.visible);
+};
+window.resetCamera = () => {
+  camera.position.set(0, 8, 18);
+  controls.target.set(0, 2, 0);
+  controls.update();
+};
+
+// Keyboard shortcuts
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'a' || e.key === 'A') toggleAimMode();
+  if (e.key === 'Escape') deselectAll();
+  if (e.key === 'm' || e.key === 'M') selectAllMH();
+});
+
+// ── Haze animation ────────────────────────────────────────────────────────────
+let hazeTime = 0;
+function animateHaze(dt) {
+  hazeTime += dt;
+  const pos = hazeParticles.geometry.attributes.position.array;
+  for (let i = 0; i < pos.length; i += 3) {
+    pos[i+1] += dt * 0.04;
+    if (pos[i+1] > 12) pos[i+1] = 0;
+    pos[i] += Math.sin(hazeTime * 0.3 + i) * dt * 0.01;
+  }
+  hazeParticles.geometry.attributes.position.needsUpdate = true;
+}
+
+// ── Crosshair pulse animation ─────────────────────────────────────────────────
+let crosshairPulse = 0;
+function animateCrosshair(dt) {
+  if (!aimCrosshair.visible) return;
+  crosshairPulse += dt * 3;
+  const s = 1 + 0.1 * Math.sin(crosshairPulse);
+  aimCrosshair.scale.set(s, s, s);
+  aimCrosshair.rotation.y += dt * 0.8;
+}
+
+// ── Render loop ───────────────────────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  if (!aimMode) controls.update();
+  animateHaze(dt);
+  animateCrosshair(dt);
+  for (const viz of fixtureVizMap.values()) viz.update(dt);
+  composer.render();
+}
+
+window.addEventListener('resize', () => {
+  camera.aspect = W() / H();
+  camera.updateProjectionMatrix();
+  renderer.setSize(W(), H());
+  composer.setSize(W(), H());
+});
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+document.getElementById('loading').style.display = 'none';
+
+// Init: aim mode on, disable orbit, show toast
+container.classList.add('aim-mode');
+controls.enabled = false;
+showAimToast(true);
+
+connectWS();
+loadInitial();
+animate();
+
+// Demo fixtures if patch is empty
+setTimeout(async () => {
+  const r = await fetch('/api/patch');
+  const fixtures = await r.json();
+  if (!fixtures.length) {
+    const defs = [
+      { def: 'Generic::Moving Head Spot', mode: '8ch',  base: 1  },
+      { def: 'Generic::Moving Head Wash', mode: '11ch', base: 9  },
+    ];
+    for (let i = 0; i < 3; i++) {
+      for (const { def, mode, base } of defs) {
+        await fetch('/api/patch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            definition_id: def,
+            name: `${def.split('::')[1]} ${i+1}`,
+            universe: 1, address: base + i * 11, mode, group: 'Truss',
+          }),
+        });
+      }
+    }
+    syncFixtures(await (await fetch('/api/patch')).json());
+  }
+}, 2000);
+
+</script>
+</body>
+</html>

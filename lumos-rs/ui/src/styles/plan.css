@@ -1,0 +1,59 @@
+/* 2D plan / elevation workspace — floating touch cards (same grammar as the 3D board). Tokens only. */
+.pl-root { position: relative; height: 100%; min-height: 0; background: var(--bg-0); overflow: hidden; touch-action: none; }
+.pl-canvas { position: absolute; inset: 0; display: block; touch-action: none; }
+
+/* card primitives (also defined in stage.css; repeated so the 2D view never depends on load order) */
+.pl-root .st-card {
+  background: color-mix(in srgb, var(--ink-1) 93%, transparent); border: 1px solid var(--line); border-radius: var(--r-xl);
+  backdrop-filter: blur(8px); box-shadow: var(--shadow-1); pointer-events: auto;
+}
+.pl-root .st-h { font-size: var(--fs-xs); font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); }
+
+.pl-bar { position: absolute; top: var(--s-4); left: var(--s-4); right: var(--s-4); display: flex; flex-wrap: wrap; align-items: center; gap: 10px; pointer-events: none; z-index: 5; }
+.pl-bar > * { pointer-events: auto; }
+.pl-group { display: flex; align-items: center; gap: 6px; padding: 6px; }
+.pl-group .btn { border-radius: var(--r-md); }
+.pl-group .btn.icon { width: var(--touch); }
+
+.pl-bottom { position: absolute; left: var(--s-4); right: var(--s-4); bottom: var(--s-4); z-index: 5; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; pointer-events: none; }
+.pl-bottom > * { pointer-events: auto; }
+.pl-dock { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; width: 100%; pointer-events: none; }
+.pl-dock > * { pointer-events: auto; }
+select.input.pl-sel { width: 168px; flex: none; min-height: 48px; background: color-mix(in srgb, var(--ink-1) 93%, transparent); border-radius: var(--r-lg); }
+.pl-hud {
+  margin-left: auto; height: 36px; display: inline-flex; align-items: center; padding: 0 var(--s-3); font-size: var(--fs-sm); color: var(--dim);
+  background: color-mix(in srgb, var(--ink-1) 85%, transparent); border: 1px solid var(--line); border-radius: var(--r-sm); pointer-events: none !important;
+}
+
+/* popover cards (layers / plan image) flow above the dock */
+.pl-pop { width: 440px; max-width: 100%; display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-4); }
+.pl-swgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--s-4); }
+.pl-sw { background: none; border: 0; color: var(--text); text-align: left; padding: 0; font-size: var(--fs-sm); }
+.pl-num { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: var(--s-2); font-size: var(--fs-sm); color: var(--dim); }
+.pl-num .input, .pl-in { min-height: 52px; }
+.pl-check { min-height: 48px; }
+.pl-pop input[type=range] { min-height: 44px; }
+
+.pl-banner { padding: 10px 18px; background: var(--cyan-fill); border: 1px solid var(--cyan); border-radius: var(--r-lg); font-size: var(--fs-md); font-weight: 600; pointer-events: none !important; }
+.pl-banner-b { background: color-mix(in srgb, var(--ink-2) 94%, transparent); border-color: var(--line-strong); font-weight: 500; font-size: var(--fs-sm); }
+.pl-info { max-width: 420px; padding: var(--s-2) var(--s-3); font-size: var(--fs-sm); pointer-events: none !important; }
+.pl-legend { width: 300px; max-width: 100%; padding: var(--s-3) var(--s-4); font-size: var(--fs-xs); pointer-events: none !important; }
+.pl-leg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; margin-top: 6px; color: var(--dim); }
+.pl-leg-grid b { display: inline-block; width: 22px; color: var(--text); font-size: var(--fs-md); }
+.pl-leg-note { margin-top: 6px; line-height: 1.35; }
+
+.pl-menu { position: absolute; z-index: 9; min-width: 240px; padding: 6px; background: var(--ink-1); border: 1px solid var(--line-strong); border-radius: var(--r-lg); box-shadow: var(--shadow-2); display: flex; flex-direction: column; }
+.pl-item { text-align: left; min-height: 48px; padding: 0 var(--s-3); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; font-size: var(--fs-md); color: var(--text); }
+.pl-item:hover:not(:disabled) { background: var(--cyan-fill); }
+.pl-item:disabled { color: var(--mute); cursor: default; }
+.pl-sep { height: 1px; margin: 4px 0; background: var(--line); }
+
+/* ≤ 820 px (small windows, second monitors in portrait): icon-only tools, sheets fill the width */
+@media (max-width: 820px) {
+  .pl-l { display: none; }
+  .pl-sel { width: 132px; }
+  .pl-hud { display: none; }
+  .pl-legend { display: none; }
+  .pl-pop { width: 100%; max-height: 55vh; overflow-y: auto; }
+  .pl-swgrid { grid-template-columns: 1fr; }
+}

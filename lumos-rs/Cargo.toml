@@ -1,0 +1,54 @@
+[package]
+name = "lumos"
+version = "0.3.0"
+edition = "2021"
+description = "Lumos — professional theatrical lighting control (engine + web console)"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+axum = { version = "0.8", features = ["ws", "multipart"] }
+tower-http = { version = "0.6", features = ["cors", "fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ts-rs = { version = "10", features = ["serde-compat"] }
+rust-embed = { version = "8", features = ["mime-guess"] }
+mime_guess = "2"
+rosc = "0.10"
+serialport = { version = "4", default-features = false }
+socket2 = { version = "0.5", features = ["all"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+parking_lot = "0.12"
+futures-util = "0.3"
+local-ip-address = "0.6"
+rusb = { version = "0.9", optional = true }
+midir = { version = "0.10", optional = true }
+whisper-rs = { version = "0.16", optional = true }
+cpal = { version = "0.17", optional = true }
+symphonia = { version = "0.5", default-features = false, features = ["wav", "mp3", "flac", "ogg", "vorbis", "pcm", "aac", "isomp4"], optional = true }
+zip = { version = "2", default-features = false, features = ["deflate"] }
+roxmltree = "0.20"
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls-webpki-roots-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+bytes = "1"
+sha2 = "0.10"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+pdf-extract = "0.9"
+
+mlua = { version = "0.10", features = ["lua54", "vendored", "serialize"] }
+
+[features]
+# Raw USB DMX interfaces (uDMX). Needs libusb-1.0 at build time.
+usb = ["dep:rusb"]
+# Native MIDI in/out (needs libasound2-dev on Linux). Desktop app and CI enable it.
+midi = ["dep:midir"]
+# Local speech recognition (whisper.cpp) from the microphone, for following the Guion offline. Needs cmake + a C++ compiler (+ libasound2-dev on Linux).
+whisper = ["audio", "dep:whisper-rs"]
+# Audio I/O: device selection, channel routing, sound playback, LTC, audio-reactive input (cpal + symphonia).
+audio = ["dep:cpal", "dep:symphonia"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 4

@@ -1,0 +1,122 @@
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import type { Fixture } from "../types";
+import { library, rt, selection, send, show, toast } from "../store";
+import { EmptyState, NumberField, PageHead, Segmented, Select, TextField, VirtualList, confirmDialog } from "../ui";
+import { collisions, footprint, modeOf, profileById } from "../lib/fixtures";
+import { AddDialog } from "./patch/AddDialog";
+import { ImportDialog } from "./patch/ImportDialog";
+import { MorphDialog } from "./patch/MorphDialog";
+import { ProfileEditorDialog } from "./patch/ProfileEditor";
+import { CurveDialog } from "./patch/CurveDialog";
+import { OrientDialog } from "./patch/OrientDialog";
+import { LocateDialog } from "./patch/LocateDialog";
+import { UniverseMap } from "./patch/UniverseMap";
+import { t, tp } from "../i18n";
+import "../styles/settings.css";
+
+const ROW = 56;
+const upd = (f: Fixture, p: Partial<Fixture>) => send({ type: "fixture_update", fixture: { ...f, ...p } }, { quiet: false }).catch(() => {});
+
+function NameCell(props: { x: Fixture }) {
+  const [v, setV] = useState(props.x.name);
+  useEffect(() => setV(props.x.name), [props.x.name]);
+  return <TextField class="bare" label={t("Name")} value={v} onChange={setV} onCommit={(nm) => nm.trim() && nm !== props.x.name && upd(props.x, { name: nm })} />;
+}
+
+export function Patch() {
+  const fixtures = show.value?.fixtures ?? [];
+  const [view, setView] = useState<"table" | "map">("table");
+  const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [morphing, setMorphing] = useState(false);
+  const [curving, setCurving] = useState(false);
+  const [orienting, setOrienting] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [q, setQ] = useState("");
+  const anchor = useRef<number | null>(null);
+  const sorted = useMemo(() => [...fixtures].sort((a, b) => a.id - b.id), [fixtures]);
+  const bad = useMemo(() => collisions(fixtures), [fixtures, library.value, show.value?.profiles]);
+  const f = q.trim().toLowerCase();
+  const rows = f ? sorted.filter((x) => `${x.id} ${x.name} ${x.profile} ${x.mode}`.toLowerCase().includes(f)) : sorted;
+  const sel = new Set(selection.value);
+  const unis = (show.value?.universes ?? []).map((u) => ({ value: u.id, label: String(u.id) }));
+  const identifying = new Set(rt.value?.identifying ?? []);
+  const selFix = selection.value.filter((id) => fixtures.some((x) => x.id === id));
+  const selIdentOn = selFix.length > 0 && selFix.every((id) => identifying.has(id));
+  const identifySel = () => { for (const fixture of selFix) void send({ type: "identify", fixture, on: !selIdentOn }, { quiet: true }).catch(() => {}); };
+
+  const click = (e: MouseEvent, id: number, idx: number) => {
+    if (e.shiftKey && anchor.current !== null) {
+      const a = rows.findIndex((r) => r.id === anchor.current);
+      selection.value = rows.slice(Math.min(a, idx), Math.max(a, idx) + 1).map((r) => r.id);
+    } else if (e.ctrlKey || e.metaKey) selection.value = sel.has(id) ? selection.value.filter((x) => x !== id) : [...selection.value, id];
+    else selection.value = [id];
+    anchor.current = id;
+  };
+  const del = async () => {
+    const ids = selection.value.filter((id) => fixtures.some((x) => x.id === id));
+    if (!ids.length) return;
+    if (await confirmDialog(t("Delete fixtures"), tp(ids.length, "Delete {n} fixture? Recorded cues keep their values.", "Delete {n} fixtures? Recorded cues keep their values."), { danger: true, ok: t("Delete") }))
+      await send({ type: "fixture_remove", ids }).catch(() => {});
+  };
+  const cell = (n: number) => ({ width: n, flex: "none" as const });
+
+  return (
+    <div class="patch-wrap"><div class="set-card patch-card"><div class="page">
+      <PageHead title={t("Patch")} sub={`${tp(fixtures.length, "{n} fixture", "{n} fixtures")} · ${bad.size ? t("{n} with address conflicts", { n: bad.size }) : t("no conflicts")}`}>
+        <input class="input" style={{ width: 168 }} placeholder={t("Filter…")} aria-label={t("Filter fixtures")} value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+        <Segmented size="lg" value={view} onChange={setView} label={t("View")} options={[{ value: "table", label: t("Table") }, { value: "map", label: t("Universe map") }]} />
+        <button class="btn tall" onClick={() => setEditingProfile(true)} title={t("Create or correct a fixture profile by hand")}>{t("Profile editor…")}</button>
+        <button class="btn tall" onClick={() => setImporting(true)} title={t("Import GDTF, QLC+ (.qxf) or Open Fixture Library (.json) fixture files")}>{t("Import fixtures…")}</button>
+        <button class={`btn tall ${selIdentOn ? "on" : ""}`} disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={identifySel}
+          title={t("Locate the selected fixtures: full light, open shutter, home position, lamp on")}>{selIdentOn ? t("Stop identifying") : t("Identify selection")}</button>
+        <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setLocating(true)}
+          title={t("Set what “Identify” does for this fixture model (dimmer, colour, shutter, lamp on…)")}>{t("Locate look…")}</button>
+        <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setCurving(true)} title={t("Dimmer law of the selected fixtures")}>{t("Dimmer curve…")}</button>
+        <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setOrienting(true)} title={t("Invert or swap pan and tilt of the selected fixtures")}>{t("Pan/tilt…")}</button>
+        <button class="btn tall" disabled={!selection.value.some((id) => fixtures.some((x) => x.id === id))} onClick={() => setMorphing(true)}
+          title={t("Replace the selected fixtures with another model keeping cues, scenes and groups")}>{t("Swap (Morph)")}</button>
+        <button class="btn tall danger" disabled={!selection.value.length} onClick={del}>{t("Delete")}{selection.value.length ? ` (${selection.value.length})` : ""}</button>
+        <button class="btn tall primary" onClick={() => setAdding(true)}>{t("+ Add fixtures")}</button>
+      </PageHead>
+      {view === "map" ? <div class="grow scroll"><UniverseMap fixtures={fixtures} /></div> : <>
+        <div class="vrow patch-cols">
+          <span style={cell(48)}>ID</span><span style={cell(190)}>{t("Name")}</span><span class="grow hide-narrow">{t("Profile")}</span><span class="grow-narrow" style={cell(150)}>{t("Mode")}</span><span style={cell(88)}>{t("Univ")}</span><span style={cell(96)}>{t("Addr")}</span><span class="hide-narrow" style={cell(44)}>{t("Ch")}</span><span style={cell(56)}>{t("End")}</span><span style={cell(56)} title={t("Identify")}>◎</span>
+          <span class="hide-narrow" style={cell(88)}>X</span><span class="hide-narrow" style={cell(88)}>Y</span><span class="hide-narrow" style={cell(88)}>Z</span>
+        </div>
+        {rows.length === 0 ? <EmptyState icon="⌖" title={fixtures.length ? t("No fixtures match the filter") : t("Nothing patched yet")} hint={t("Add fixtures from the library, choose a universe and DMX address.")} >
+          {!fixtures.length && <button class="btn primary tall" onClick={() => setAdding(true)}>{t("+ Add fixtures")}</button>}</EmptyState> :
+          <VirtualList class="grow" label={t("Fixtures")} items={rows} rowHeight={ROW} render={(x, idx) => {
+            const m = modeOf(x), fp = footprint(m), p = profileById(x.profile);
+            return (
+              <div key={x.id} role="listitem" class={`vrow patch-row ${sel.has(x.id) ? "sel" : ""} ${bad.has(x.id) ? "bad" : ""}`} style={{ height: ROW }} onClick={(e) => click(e as MouseEvent, x.id, idx)}>
+                <span class="mono" style={cell(48)}>{x.id}</span>
+                <span style={cell(190)} onClick={(e) => e.stopPropagation()}><NameCell x={x} /></span>
+                <span class="grow dim hide-narrow" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={x.profile}>{p ? `${p.manufacturer} ${p.model}` : <span style={{ color: "var(--stop)" }}>{t("missing:")} {x.profile}</span>}</span>
+                <span style={cell(150)} onClick={(e) => e.stopPropagation()}>
+                  <Select class="bare" label={t("Mode")} value={x.mode} options={(p?.modes ?? [{ name: x.mode }]).map((md) => ({ value: md.name, label: md.name }))} onChange={(mode) => upd(x, { mode })} /></span>
+                <span style={cell(88)} onClick={(e) => e.stopPropagation()}><Select<number> class="bare" label={t("Universe")} value={x.universe} options={unis.some((u) => u.value === x.universe) ? unis : [...unis, { value: x.universe, label: String(x.universe) }]} onChange={(universe) => upd(x, { universe })} /></span>
+                <span style={cell(96)} onClick={(e) => e.stopPropagation()}><NumberField class="bare" label={t("Address")} value={x.address} min={1} max={512} onChange={(address) => upd(x, { address })} /></span>
+                <span class="mono dim hide-narrow" style={cell(44)}>{fp}</span>
+                <span class="mono" style={{ ...cell(56), color: bad.has(x.id) ? "var(--stop)" : undefined }}>{x.address + fp - 1}</span>
+                <span style={cell(56)} onClick={(e) => e.stopPropagation()}>
+                  <button class={`btn icon ${identifying.has(x.id) ? "on" : ""}`} aria-pressed={identifying.has(x.id)} aria-label={t("Identify fixture {id}", { id: x.id })}
+                    title={t("Identify (locate)")} onClick={() => send({ type: "identify", fixture: x.id, on: !identifying.has(x.id) }, { quiet: true }).catch(() => {})}>◎</button>
+                </span>
+                {[0, 1, 2].map((i) => <span key={i} class="hide-narrow" style={cell(88)} onClick={(e) => e.stopPropagation()}>
+                  <NumberField float class="bare" label={"XYZ"[i]} value={x.pos[i]} step={0.5} onChange={(v) => { const pos = [...x.pos] as [number, number, number]; pos[i] = v; upd(x, { pos }); }} /></span>)}
+              </div>
+            );
+          }} />}
+      </>}
+      {adding && <AddDialog onClose={() => setAdding(false)} />}
+      {importing && <ImportDialog onClose={() => setImporting(false)} />}
+      {editingProfile && <ProfileEditorDialog onClose={() => setEditingProfile(false)} />}
+      {curving && <CurveDialog ids={selection.value} onClose={() => setCurving(false)} />}
+      {orienting && <OrientDialog ids={selection.value} onClose={() => setOrienting(false)} />}
+      {morphing && <MorphDialog ids={selection.value} onClose={() => setMorphing(false)} />}
+      {locating && (() => { const fx = fixtures.find((x) => selection.value.includes(x.id)); return fx ? <LocateDialog fixture={fx} onClose={() => setLocating(false)} /> : null; })()}
+    </div></div></div>
+  );
+}
