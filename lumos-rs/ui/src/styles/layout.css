@@ -1,0 +1,21 @@
+.lw { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.lw-bar { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line, #2a313c); flex-wrap: wrap; }
+.lw-bar .input { min-height: 32px; padding: 2px 8px; width: auto; min-width: 140px; }
+.lw-sep { width: 1px; height: 22px; background: var(--line, #2a313c); }
+.lw-snap { display: flex; gap: 4px; align-items: center; font-size: 12px; color: var(--text-dim, #9aa4b2); }
+.lw-add { position: relative; }
+.lw-back { position: fixed; inset: 0; z-index: 40; }
+.lw-menu { position: absolute; top: 100%; left: 0; z-index: 41; margin-top: 4px; min-width: 200px; display: flex; flex-direction: column; gap: 2px; padding: 6px; background: var(--surface-2, #12161d); border: 1px solid var(--line, #2a313c); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+.lw-menu .btn { justify-content: flex-start; }
+.lw-menu-h { margin: 6px 4px 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-faint, #6b7686); }
+.lw-desk { position: relative; flex: 1; min-height: 0; overflow: hidden; background: radial-gradient(circle, rgba(255,255,255,.05) 1px, transparent 1px) 0 0 / 20px 20px; }
+.lw-empty { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; text-align: center; padding: 30px; color: var(--text-dim, #9aa4b2); }
+.lw-win { position: absolute; display: flex; flex-direction: column; background: var(--surface-1, #0f1319); border: 1px solid var(--line, #2a313c); border-radius: 8px; box-shadow: 0 8px 28px rgba(0,0,0,.45); overflow: hidden; }
+.lw-win.max { border-radius: 0; }
+.lw-title { display: flex; align-items: center; gap: 6px; padding: 3px 6px; background: var(--surface-2, #171c24); border-bottom: 1px solid var(--line, #2a313c); cursor: grab; user-select: none; touch-action: none; }
+.lw-sel { background: transparent; border: 0; color: inherit; font-weight: 700; font-size: 12px; cursor: pointer; max-width: 60%; }
+.lw-btn { background: transparent; border: 0; color: var(--text-dim, #9aa4b2); width: 26px; height: 24px; cursor: pointer; border-radius: 4px; }
+.lw-btn:hover { background: rgba(255,255,255,.08); color: var(--text, #e6e9ee); }
+.lw-body { flex: 1; min-height: 0; overflow: auto; position: relative; display: flex; flex-direction: column; }
+.lw-body > * { flex: 1; min-height: 0; }
+.lw-grip { position: absolute; right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, var(--text-faint, #6b7686) 50%, var(--text-faint, #6b7686) 58%, transparent 58%, transparent 70%, var(--text-faint, #6b7686) 70%, var(--text-faint, #6b7686) 78%, transparent 78%); }

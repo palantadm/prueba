@@ -22,3 +22,11 @@ La consola se divide en espacios de trabajo. Se cambia de espacio con el menú s
 ## Bloquear la mesa
 El botón 🔒 de la barra superior congela la mesa **en todas las pantallas** (y el asistente) hasta que se introduzca el PIN. La primera vez pide definir un PIN de 4 a 12 cifras; el clic derecho (o pulsación larga) del botón permite cambiarlo o quitarlo. Con la mesa bloqueada solo funciona el **blackout de emergencia**; tras 5 PIN incorrectos hay que esperar 30 s. El PIN se guarda cifrado (sal + SHA-256) en la carpeta de datos. Es una protección contra manos ajenas, no contra quien tenga acceso al ordenador.
 <!--ai-->El asistente no puede desbloquear ni cambiar el PIN. `lock` bloquea.<!--/ai-->
+
+## Disposición libre de ventanas
+El espacio **Disposición** (tecla `L`) es un escritorio donde cada vista de Lumos (En vivo, Cues, Monitor, 3D, Consola virtual, Patch…) puede estar en su propia **ventana flotante**:
+- **+ Ventana** añade una vista; también hay plantillas (p. ej. En vivo + Cues + Monitor, 3D + En vivo).
+- Arrastra una ventana por su título; redimensiónala desde la esquina inferior derecha; doble clic en el título la maximiza. En el título puedes cambiar la vista que muestra.
+- **Mosaico** reparte las ventanas por el escritorio. «Ajustar a la rejilla» alinea al mover.
+- Puedes tener **varias disposiciones** con nombre (una para ensayo, otra para el directo…) y cambiar entre ellas. Se guardan en este navegador o aplicación.
+- Con la ventana nueva de la app de escritorio puedes llevar una disposición a otra pantalla.
