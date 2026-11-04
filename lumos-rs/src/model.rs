@@ -1164,6 +1164,8 @@ pub enum ScriptAction {
     Console { text: String },
     /// OSC message to an external app (QLab, Resolume, ProPresenter…). `args` are typed by content: int, float, true/false, else string.
     Osc { host: String, port: u16, address: String, args: Vec<String> },
+    /// A stored Lua script.
+    Lua { id: u32 },
     /// MIDI message (port `None` = every enabled output).
     Midi { port: Option<String>, kind: MidiKind, channel: u8, number: u8, value: u8 },
     /// HTTP request (e.g. VLC / OBS / webhook).
@@ -1910,6 +1912,42 @@ pub struct PsnRt {
     pub follows: Vec<FollowRt>,
 }
 
+/// A Lua script stored in the show.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LuaScript {
+    pub id: u32,
+    pub name: String,
+    pub code: String,
+    /// Run once when the show is loaded.
+    #[serde(default)]
+    pub on_start: bool,
+    /// Run again every this many seconds while `enabled` (0 = only when started by hand, a button, a macro or a cue mark).
+    #[serde(default)]
+    pub every_s: f32,
+    #[serde(default)]
+    pub enabled: bool,
+}
+
+/// One line of what scripts printed or the errors they raised (newest last).
+#[derive(Clone, Debug, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LuaLog {
+    /// Seconds since the engine started.
+    pub t: f32,
+    pub script: String,
+    pub ok: bool,
+    pub text: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct LuaRt {
+    pub log: Vec<LuaLog>,
+    /// Timers scheduled by scripts (`lumos.after` / `lumos.every`).
+    pub timers: u32,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub struct Show {
@@ -1956,6 +1994,8 @@ pub struct Show {
     #[serde(default)]
     pub follows: Vec<TrackFollow>,
     #[serde(default)]
+    pub lua: Vec<LuaScript>,
+    #[serde(default)]
     pub osc_targets: Vec<OscTarget>,
     /// Programs added by the user (their own action lists), next to the built-in catalog.
     #[serde(default)]
@@ -1990,6 +2030,7 @@ impl Default for Show {
             profiles: vec![],
             vconsole: vec![],
             follows: vec![],
+            lua: vec![],
             osc_targets: vec![],
             osc_software: vec![],
         }
@@ -2077,6 +2118,8 @@ pub enum VcAction {
     SceneMorph { a: u32, b: u32 },
     /// XY pad: `group` moves `x_attr`/`y_attr` (typically pan/tilt).
     Xy { group: u32, x_attr: String, y_attr: String },
+    /// Run a stored Lua script (tap = run).
+    Lua { script: u32 },
     /// Send an OSC message to another program. Buttons send the widget's `out_max` (on) / `out_min` (off) as `value`,
     /// sliders their value; `args` go first. `target` > 0 uses that [`OscTarget`]'s host and port, else `host`/`port`.
     Osc {
@@ -2382,6 +2425,8 @@ pub struct Runtime {
     pub rdm: RdmRt,
     #[serde(default)]
     pub psn: PsnRt,
+    #[serde(default)]
+    pub lua: LuaRt,
     /// Output test pattern running.
     #[serde(default)]
     pub testing: bool,
@@ -2545,6 +2590,15 @@ pub enum Command {
     /// Follow mode: when a linked Lumos cue fires, the reader jumps to its mark.
     ScriptFollow { id: u32, on: bool },
     ScriptReset { id: u32 },
+    // ── Lua scripting ──
+    LuaSave { script: LuaScript },
+    LuaRemove { id: u32 },
+    /// Run a stored script now.
+    LuaRun { id: u32 },
+    /// Run a piece of Lua code once (to try something out); output goes to the script log.
+    LuaEval { code: String },
+    /// Cancel every timer scripts have scheduled.
+    LuaStop,
     // ── tracking (PSN / BlackTrax) ──
     FollowSave { follow: TrackFollow },
     FollowRemove { id: u32 },

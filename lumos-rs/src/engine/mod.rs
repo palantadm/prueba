@@ -7,6 +7,7 @@ mod data;
 mod effects;
 mod history;
 mod lock;
+mod lua;
 mod macros;
 mod morph;
 mod msc;
@@ -269,6 +270,7 @@ struct Engine {
     lock: lock::LockState,
     rdm: rdm::RdmHub,
     track: track::TrackState,
+    lua: lua::LuaState,
     /// Script reader pointers and follow flags (see script.rs).
     script: script::ScriptState,
 }
@@ -333,6 +335,7 @@ impl Engine {
             lock: lock::LockState::load(&store),
             rdm: Default::default(),
             track: Default::default(),
+            lua: lua::LuaState::new(),
             script: Default::default(),
             store,
             t0: now,
@@ -630,6 +633,7 @@ impl Engine {
         self.data_before_replace();
         self.prog = Default::default();
         self.script.reset();
+        self.lua.reset();
         self.show = show;
         self.programmer.clear();
         self.runs.clear();
@@ -1083,6 +1087,7 @@ impl Engine {
             ScriptFire { id, block, mark } => self.script_fire(id, block, mark)?,
             ScriptFollow { id, on } => self.script_follow_set(id, on)?,
             ScriptReset { id } => self.script_reset(id)?,
+            c @ (LuaSave { .. } | LuaRemove { .. } | LuaRun { .. } | LuaEval { .. } | LuaStop) => self.lua_command(c)?,
             c @ (FollowSave { .. } | FollowRemove { .. } | FollowSet { .. }) => self.follow_command(c)?,
             c @ (OscTargetSave { .. } | OscTargetRemove { .. } | OscSoftwareSave { .. } | OscSoftwareRemove { .. } | OscSend { .. } | VcAddOsc { .. }) => self.osc_command(c)?,
             c @ (RdmScan { .. } | RdmRefresh { .. } | RdmIdentify { .. } | RdmSetAddress { .. } | RdmSetLabel { .. } | RdmSetPersonality { .. } | RdmClear) => self.rdm_command(c)?,
@@ -2113,6 +2118,7 @@ impl Engine {
         self.audio_tick();
         self.schedule_tick();
         self.rdm_tick();
+        self.lua_tick(now);
 
         let before = self.ext_dmx.len();
         self.ext_dmx.retain(|_, (t, _)| t.elapsed() < Duration::from_secs(3));
@@ -2294,6 +2300,7 @@ impl Engine {
         effects_running.sort_unstable();
         let frames = self.tc_display();
         let psn = self.psn_rt(&inputs);
+        let lua = self.lua_rt();
         Runtime {
             grand_master: self.grand_master,
             blackout: self.blackout,
@@ -2324,6 +2331,7 @@ impl Engine {
             lock: self.lock_rt(),
             rdm: self.rdm_rt(),
             psn,
+            lua,
             macros_running: self.macros_running_ids(),
             testing: self.data.test.is_some(),
             identifying: self.data.identifying.iter().copied().collect(),

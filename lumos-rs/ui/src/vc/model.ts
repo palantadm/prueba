@@ -100,6 +100,7 @@ export function describeAction(a: VcAction, show: Show | null): string {
     case "page": return t("Page {name}", { name: show?.vconsole.find((p) => p.id === a.page)?.name ?? `#${a.page}` });
     case "xy": return `${nm(show?.groups, a.group)} ${a.x_attr}/${a.y_attr}`;
     case "command": return t("Command: {text}", { text: a.text.length > 40 ? a.text.slice(0, 40) + "…" : a.text });
+    case "lua": return t("Lua script {name}", { name: show?.lua?.find((x) => x.id === a.script)?.name ?? `#${a.script}` });
     case "osc": return `OSC ${show?.osc_targets?.find((x) => x.id === a.target)?.name ?? a.host ?? ""} ${a.address}`;
   }
 }
@@ -124,10 +125,11 @@ export const ACTION_TYPES: { type: VcAction["type"]; label: string }[] = [
   { type: "xy", label: "XY (group)" },
   { type: "command", label: "Command" },
   { type: "osc", label: "Another program (OSC)" },
+  { type: "lua", label: "Lua script" },
 ];
 export function actionTypesFor(k: VcKind): VcAction["type"][] {
   switch (k) {
-    case "button": return ["none", "exec", "cuelist", "scene", "blackout", "grand_master", "effect_toggle", "palette_apply", "prog_clear", "page", "dmx", "command", "osc"];
+    case "button": return ["none", "exec", "cuelist", "scene", "blackout", "grand_master", "effect_toggle", "palette_apply", "prog_clear", "page", "dmx", "command", "osc", "lua"];
     case "slider": case "knob": return ["none", "exec", "cuelist", "scene", "scene_morph", "grand_master", "group_attr", "fixture_attr", "dmx", "effect_rate", "osc"];
     case "xy_pad": return ["xy", "none"];
     case "cue_list": return ["cuelist", "none"];
@@ -151,6 +153,7 @@ export function defaultAction(type: VcAction["type"], show: Show | null, kind: V
     case "page": return { type, page: show?.vconsole[0]?.id ?? 0 };
     case "xy": return { type, group: show?.groups[0]?.id ?? 0, x_attr: "pan", y_attr: "tilt" };
     case "command": return { type, text: "go" };
+    case "lua": return { type, script: show?.lua?.[0]?.id ?? 0 };
     case "osc": return { type, target: show?.osc_targets?.[0]?.id ?? 0, host: "127.0.0.1", port: 7000, address: "/", args: [], value: "float" };
     default: return { type } as VcAction;
   }

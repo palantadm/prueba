@@ -104,6 +104,7 @@ function ActionEditor({ w }: { w: VcWidget }) {
       {a.type === "command" && <Row label={t("Command line")}>
         <TextField class="bare mono" value={a.text} placeholder="go cuelist 1; scene 3 on" onChange={(v) => set({ ...a, text: v })} />
       </Row>}
+      {a.type === "lua" && <Row label={t("Lua script")}><Picker value={a.script} options={(show.value?.lua ?? []).map((x) => ({ value: x.id, label: x.name }))} onChange={(v) => set({ ...a, script: v })} /></Row>}
       {a.type === "osc" && <>
         <Row label={t("Program")}>
           <Select class="bare" value={a.target} options={[{ value: 0, label: t("Other (IP below)") }, ...(show.value?.osc_targets ?? []).map((x) => ({ value: x.id, label: `${x.name} · ${x.host}:${x.port}` }))]} onChange={(v) => set({ ...a, target: v })} />

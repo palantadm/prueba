@@ -26,6 +26,7 @@ pub mod reports;
 pub mod schedule;
 pub mod script_import;
 pub mod showmerge;
+pub mod xml;
 
 use std::net::SocketAddr;
 use std::path::PathBuf;

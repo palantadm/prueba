@@ -216,7 +216,7 @@ impl Engine {
                 let t = self.vc.toggled.get(&w.id).copied().unwrap_or(false);
                 (self.vc.values.get(&w.id).copied().unwrap_or(t as u8 as f32), t)
             }
-            VcAction::Command { .. } => (0.0, false),
+            VcAction::Command { .. } | VcAction::Lua { .. } => (0.0, false),
             VcAction::ProgClear => {
                 let a = !self.programmer.is_empty();
                 (a as u8 as f32, a)
@@ -429,7 +429,7 @@ impl Engine {
                 }
                 Ok(())
             }
-            VcAction::PaletteApply { .. } | VcAction::ProgClear | VcAction::Command { .. } => {
+            VcAction::PaletteApply { .. } | VcAction::ProgClear | VcAction::Command { .. } | VcAction::Lua { .. } => {
                 if on {
                     self.vc_trigger(w)?;
                 }
@@ -547,6 +547,7 @@ impl Engine {
             }
             VcAction::ProgClear => self.exec_action(Action::ProgClear, 1.0, true),
             VcAction::Command { text } => self.run_cmdline_new(text),
+            VcAction::Lua { script } => self.handle(Command::LuaRun { id: *script }),
             VcAction::Dmx { .. } | VcAction::FixtureAttr { .. } | VcAction::GroupAttr { .. } => {
                 // A trigger on a value target "pulses" it to out_max and releases on the next press.
                 let (_, cur) = self.vc_state_of(w);

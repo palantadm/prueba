@@ -1,3 +1,4 @@
+import { logAdd } from "./log";
 // REST helpers for reports, CSV/MVR exchange (wave 2).
 export type ReportKind = "patch" | "channels" | "cues" | "power" | "scenes" | "plot";
 
@@ -22,7 +23,7 @@ export async function uploadFile<T>(path: string, file: File): Promise<T> {
   fd.append("file", file, file.name);
   const r = await fetch(path, { method: "POST", body: fd });
   const txt = await r.text();
-  if (!r.ok) throw new Error(txt || `${path} ${r.status}`);
+  if (!r.ok) { logAdd("err", path, txt || `${r.status}`); throw new Error(txt || `${path} ${r.status}`); }
   try { return JSON.parse(txt) as T; } catch { return {} as T; }
 }
 

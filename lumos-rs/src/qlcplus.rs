@@ -205,7 +205,7 @@ pub fn import(xml: &str, show: &mut Show, profs: &HashMap<String, FixtureProfile
 
 /// QLC+ files start with `<!DOCTYPE Workspace>`; roxmltree refuses DTDs unless allowed (its entity limits still apply).
 fn parse_workspace(xml: &str) -> Result<Document<'_>, String> {
-    Document::parse_with_options(xml, roxmltree::ParsingOptions { allow_dtd: true, ..Default::default() }).map_err(|e| format!("No es un workspace de QLC+ válido: {e}"))
+    crate::xml::parse(xml).map_err(|e| format!("No es un workspace de QLC+ válido: {e}"))
 }
 
 fn import_doc(doc: &Document, show: &mut Show, profs: &HashMap<String, FixtureProfile>, replace: bool) -> Result<Report, String> {

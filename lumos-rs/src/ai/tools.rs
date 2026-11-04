@@ -752,7 +752,7 @@ pub fn get_runtime(st: &AiState, verbose: bool) -> String {
         "morph": rt.morph, "chases": rt.chases.iter().filter(|c| c.running).collect::<Vec<_>>(), "effects_running": rt.effects_running,
         "speed_masters": rt.speed, "timelines": rt.timelines.iter().filter(|t| t.running).collect::<Vec<_>>(),
         "outputs": rt.outputs, "inputs": rt.inputs, "timecode": rt.timecode.text, "timecode_running": rt.timecode.running,
-        "parked": rt.parked, "testing": rt.testing, "identifying": rt.identifying, "scripts": rt.scripts, "audio": rt.audio, "rdm": rt.rdm, "speech": rt.speech, "macros_running": rt.macros_running, "learn": rt.learn,
+        "parked": rt.parked, "testing": rt.testing, "identifying": rt.identifying, "scripts": rt.scripts, "audio": rt.audio, "rdm": rt.rdm, "lua": rt.lua, "speech": rt.speech, "macros_running": rt.macros_running, "learn": rt.learn,
         "last_commands": rt.cmd_log.iter().rev().take(6).collect::<Vec<_>>(),
     });
     if verbose {

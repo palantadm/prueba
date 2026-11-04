@@ -156,3 +156,6 @@ export type { PsnTrackerRt } from "./gen/PsnTrackerRt";
 export type { FollowRt } from "./gen/FollowRt";
 export type { TrackFollow } from "./gen/TrackFollow";
 export type { EffectLine } from "./gen/EffectLine";
+export type { LuaScript } from "./gen/LuaScript";
+export type { LuaLog } from "./gen/LuaLog";
+export type { LuaRt } from "./gen/LuaRt";

@@ -2025,6 +2025,7 @@ pub fn resolve(stmt: &Stmt, ctx: &Ctx, sess: &mut Session) -> R<Compiled> {
                 ScriptAction::Midi { kind, channel, number, value, .. } => format!("MIDI {kind:?} ch{channel} #{number} v{value}").to_lowercase(),
                 ScriptAction::Http { method, url, .. } => format!("HTTP {method} {url}"),
                 ScriptAction::Console { text } => text.clone(),
+                ScriptAction::Lua { id } => format!("Lua {id}"),
             };
             Ok(Compiled { cmds: vec![], summary })
         }

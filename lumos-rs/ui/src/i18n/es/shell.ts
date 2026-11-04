@@ -945,4 +945,11 @@ export const shell: Record<string, string> = {
   "Fade out (s)": "Salida (s)",
   "Run once": "Una sola vez",
   "Runs one cycle and switches itself off": "Hace un solo ciclo y se apaga solo",
+  "Log": "Registro",
+  "Copy what is shown, to paste in a bug report": "Copia lo que se ve, para pegarlo en un informe de error",
+  "Errors": "Errores",
+  "No errors. Anything that goes wrong shows up here.": "Sin errores. Todo lo que falle aparece aquí.",
+  "Nothing yet. Messages appear here as they happen.": "Aún nada. Los mensajes aparecen aquí según ocurren.",
+  "Open the manual on this": "Abrir el manual sobre esto",
+  "Live log (Ctrl+Shift+L)": "Registro en directo (Ctrl+Mayús+L)",
 };

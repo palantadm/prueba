@@ -1,4 +1,5 @@
 import type { CueMark, MarkKind, Script, ScriptAction, ScriptBlock, ScriptKind, ScriptRt, Show } from "../types";
+import { show } from "../store";
 import { t } from "../i18n";
 
 export const KIND_COLOR: Record<MarkKind, string> = {
@@ -75,6 +76,7 @@ export function actionSummary(a: ScriptAction): string {
     case "osc": return `OSC ${a.host}:${a.port} ${a.address}${a.args.length ? " " + a.args.join(" ") : ""}`;
     case "midi": return `MIDI ${({ note: t("Note"), cc: "CC", program: "PC" } as Record<string, string>)[a.kind]} ${a.number}/${a.value} ${t("ch {n}", { n: a.channel })}`;
     case "http": return `${a.method} ${a.url}`;
+    case "lua": return `Lua · ${show.value?.lua?.find((x) => x.id === a.id)?.name ?? `#${a.id}`}`;
   }
 }
 export function marksSummary(m: CueMark, show: Show | null): string {

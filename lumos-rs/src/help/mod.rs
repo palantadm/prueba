@@ -26,6 +26,7 @@ pub const TOPICS: &[(&str, &str, &str)] = &[
     ("audio", "Audio: dispositivos, canales de entrada/salida, matriz, sonidos, LTC y audio reactivo", include_str!("audio.md")),
     ("guion", "Guion: escaleta, marcas de cue y seguimiento en directo", include_str!("guion.md")),
     ("consola-virtual", "Consola virtual", include_str!("consola-virtual.md")),
+    ("scripting", "Scripting con Lua", include_str!("scripting.md")),
     ("seguimiento", "Seguimiento de personas: PSN y BlackTrax", include_str!("seguimiento.md")),
     ("programas-externos", "Programas externos por OSC (Resolume, QLab, Ableton…)", include_str!("programas-externos.md")),
     ("escenario", "Visualizador 3D, planta 2D y escenario", include_str!("escenario.md")),

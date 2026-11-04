@@ -1,3 +1,4 @@
+import { logAdd } from "./lib/log";
 // Global client state + WebSocket link to the Lumos engine.
 // The server is authoritative: the UI only sends Commands and renders what comes back.
 import { signal } from "@preact/signals";
@@ -25,6 +26,7 @@ export type Toast = { id: number; msg: string; kind: "info" | "ok" | "err" };
 export const toasts = signal<Toast[]>([]);
 let toastId = 1;
 export function toast(msg: string, kind: Toast["kind"] = "info", ms = 3500) {
+  logAdd(kind, "aviso", msg);
   const t = { id: toastId++, msg, kind };
   toasts.value = [...toasts.value, t];
   setTimeout(() => (toasts.value = toasts.value.filter((x) => x.id !== t.id)), ms);

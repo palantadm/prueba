@@ -611,7 +611,7 @@ fn parse_wheels(ft: Node, pack: &Pack, files: &mut Vec<(String, Vec<u8>)>) -> Ve
 
 pub fn import_gdtf(bytes: &[u8]) -> Result<Imported, String> {
     let (xml, pack) = load_pack(bytes)?;
-    let doc = Document::parse(&xml).map_err(|e| format!("description.xml: {e}"))?;
+    let doc = crate::xml::parse(&xml).map_err(|e| format!("description.xml: {e}"))?;
     let ft = doc
         .descendants()
         .find(|n| n.is_element() && n.has_tag_name("FixtureType"))

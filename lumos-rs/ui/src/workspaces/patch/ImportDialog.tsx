@@ -1,3 +1,4 @@
+import { logAdd } from "../../lib/log";
 import { useRef, useState } from "preact/hooks";
 import { Modal } from "../../ui";
 import { toast } from "../../store";
@@ -52,6 +53,7 @@ export function ImportDialog(props: { onClose: () => void }) {
       setResult(r);
       if (r.imported.length) toast(tp(r.imported.length, "Imported {n} fixture type", "Imported {n} fixture types"), "ok");
       if (r.errors.length) toast(tp(r.errors.length, "{n} file failed", "{n} files failed"), "err");
+      for (const e of r.errors) logAdd("err", e.file, e.error);
       setFiles([]);
     } catch (e) {
       toast((e as Error).message, "err");

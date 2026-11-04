@@ -193,6 +193,7 @@ pub fn valid_http(method: &str, url: &str) -> Result<(reqwest::Method, reqwest::
 
 fn validate_action(a: &ScriptAction) -> Result<(), String> {
     match a {
+        ScriptAction::Lua { .. } => Ok(()),
         ScriptAction::Console { text } => {
             if text.len() > 2000 {
                 return Err("console action too long (max 2000 bytes)".into());
@@ -452,6 +453,10 @@ impl Engine {
     pub(super) fn script_action(&mut self, a: &ScriptAction) -> Result<(), String> {
         match a {
             ScriptAction::Console { text } => self.run_cmdline_new(text),
+            ScriptAction::Lua { id } => {
+                let s = self.show.lua.iter().find(|s| s.id == *id).cloned().ok_or_else(|| format!("El script Lua {id} no existe"))?;
+                self.lua_run_code(&s.name, &s.code)
+            }
             ScriptAction::Osc { host, port, address, args } => {
                 valid_osc_target(host, *port, address, args)?;
                 let osc_args: Vec<rosc::OscType> = args.iter().map(|s| osc_arg(s)).collect();

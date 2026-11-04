@@ -6,6 +6,7 @@ import type { CuelistRt } from "./CuelistRt";
 import type { ExecRt } from "./ExecRt";
 import type { InputStatus } from "./InputStatus";
 import type { LockRt } from "./LockRt";
+import type { LuaRt } from "./LuaRt";
 import type { OutputStatus } from "./OutputStatus";
 import type { ParkedChannel } from "./ParkedChannel";
 import type { PsnRt } from "./PsnRt";
@@ -75,7 +76,7 @@ lock: LockRt,
 /**
  * RDM devices found on the DMX lines.
  */
-rdm: RdmRt, psn: PsnRt, 
+rdm: RdmRt, psn: PsnRt, lua: LuaRt, 
 /**
  * Output test pattern running.
  */

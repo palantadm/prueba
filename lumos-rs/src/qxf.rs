@@ -119,7 +119,7 @@ fn category(t: &str) -> &'static str {
 }
 
 pub fn import_qxf(xml: &str) -> Result<FixtureProfile, String> {
-    let doc = Document::parse(xml.trim_start_matches('\u{feff}')).map_err(|e| format!("QXF: {e}"))?;
+    let doc = crate::xml::parse(xml).map_err(|e| format!("QXF: {e}"))?;
     let root = doc
         .descendants()
         .find(|n| n.is_element() && n.has_tag_name("FixtureDefinition"))
@@ -261,6 +261,17 @@ mod tests {
   <Channel Number="6">Gobos</Channel><Channel Number="7">Zoom</Channel>
  </Mode>
 </FixtureDefinition>"##;
+
+    #[test]
+    fn real_files_with_a_doctype_import() {
+        // QLC+ writes `<!DOCTYPE FixtureDefinition>` before the root element; this failed with "XML with DTD detected"
+        let with = QXF.replacen("<FixtureDefinition", "<!DOCTYPE FixtureDefinition>\n<FixtureDefinition", 1);
+        assert!(with.contains("<!DOCTYPE"));
+        let p = import_qxf(&with).expect("DOCTYPE accepted");
+        assert_eq!(p.id, "qxf/acme-spot-300");
+        // and with a byte-order mark in front
+        assert!(import_qxf(&format!("\u{feff}{with}")).is_ok());
+    }
 
     #[test]
     fn imports_qlcplus_head() {

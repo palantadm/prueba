@@ -302,7 +302,7 @@ pub fn parse(bytes: &[u8]) -> Result<Parsed, String> {
         }
     }
     let xml = xml.ok_or("GeneralSceneDescription.xml missing in archive")?;
-    let doc = Document::parse(&xml).map_err(|e| format!("GeneralSceneDescription.xml: {e}"))?;
+    let doc = crate::xml::parse(&xml).map_err(|e| format!("GeneralSceneDescription.xml: {e}"))?;
     let root = doc.root_element();
     if root.tag_name().name() != "GeneralSceneDescription" {
         return Err("not an MVR scene description".into());

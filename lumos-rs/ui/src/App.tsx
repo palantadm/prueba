@@ -24,6 +24,8 @@ import { LockButton, LockOverlay } from "./lock/Lock";
 import { closeHelp, helpPage, openHelp } from "./help/state";
 import { BackupsDialog, CsvImportDialog, MvrDialog, QlcDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
 import { MergeDialog } from "./workspaces/exchange/MergeDialog";
+import { LogWindow } from "./ui/LogWindow";
+import { logErrors, logOpen } from "./lib/log";
 
 export const current = signal(initialWorkspace());
 export function goto(id: string) {
@@ -207,6 +209,7 @@ function MainApp() {
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === "b") { e.preventDefault(); void send({ type: "blackout", on: !rt.value?.blackout }); return; }
       if (mod && !e.altKey && e.key.toLowerCase() === "k") { e.preventDefault(); toggleQuick(); return; }
+      if (mod && e.shiftKey && e.key.toLowerCase() === "l") { e.preventDefault(); logOpen.value = !logOpen.value; return; }
       if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); void send({ type: "show_save", name: null }).then(() => toast(t("Show saved"), "ok", 1500)).catch(() => {}); return; }
       if ((e.target as HTMLElement)?.matches?.("input,textarea,select")) return;
       if (mod && !e.altKey && e.key.toLowerCase() === "z") { e.preventDefault(); void send({ type: e.shiftKey ? "redo" : "undo" }).catch(() => {}); return; }
@@ -248,6 +251,7 @@ function MainApp() {
         <UBars />
         <StatusChip />
         <LockButton />
+        <button class="btn icon ghost" aria-label={t("Log")} title={t("Live log (Ctrl+Shift+L)")} onClick={() => { logOpen.value = !logOpen.value; }} style={{ position: "relative" }}>≣{logErrors.value > 0 && !logOpen.value && <span class="chip err" style={{ position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, padding: "0 4px", fontSize: 10 }}>{logErrors.value}</span>}</button>
         <button class="btn icon ghost" aria-label={t("Help")} title={t("Help (?)")} onClick={() => openHelp()}>?</button>
       </header>
       <TestBanner />
@@ -272,6 +276,7 @@ function MainApp() {
       <QuickAsk />
       <DialogHost />
       <Toasts />
+      <LogWindow />
     </div>
   );
 }
@@ -340,6 +345,7 @@ function SecondaryApp() {
       <LockOverlay />
       <DialogHost />
       <Toasts />
+      <LogWindow />
     </div>
   );
 }

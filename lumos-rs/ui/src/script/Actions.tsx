@@ -26,6 +26,7 @@ export const PRESETS: Preset[] = [
   { id: "scene", group: "Lumos", label: "Lumos: scene on", make: () => ({ type: "console", text: `scene ${show.value?.scenes?.[0]?.id ?? 1} on` }) },
   { id: "macro", group: "Lumos", label: "Lumos: run macro", make: () => ({ type: "console", text: `macro ${show.value?.macros?.[0]?.id ?? 1}` }) },
   { id: "bo", group: "Lumos", label: "Lumos: blackout", make: () => ({ type: "console", text: "blackout on" }) },
+  { id: "lua", group: "Lumos", label: "Lumos: Lua script", make: () => ({ type: "lua", id: show.value?.lua?.[0]?.id ?? 0 }) },
   { id: "console", group: "Lumos", label: "Lumos: custom command", make: () => ({ type: "console", text: "" }) },
   { id: "qlab", group: "QLab", label: "QLab: start cue", make: osc("QLab", "127.0.0.1", 53000, "/cue/1/start") },
   { id: "qlab-go", group: "QLab", label: "QLab: GO", make: osc("QLab", "127.0.0.1", 53000, "/go") },
@@ -74,7 +75,7 @@ export function ActionEditor(props: { a: ScriptAction; onChange: (a: ScriptActio
   const { a } = props;
   const [open, setOpen] = useState(true);
   const outs = nativeMidi.value?.outputs ?? [];
-  const title = { console: t("Lumos command"), osc: "OSC", midi: "MIDI", http: "HTTP" }[a.type];
+  const title = { console: t("Lumos command"), lua: t("Lua script"), osc: "OSC", midi: "MIDI", http: "HTTP" }[a.type];
   return (
     <div class="sc-action">
       <div class="sc-action-head">
@@ -89,6 +90,9 @@ export function ActionEditor(props: { a: ScriptAction; onChange: (a: ScriptActio
         <div class="sc-action-body">
           {a.type === "console" && (
             <TextField label={t("Command line")} mono value={a.text} placeholder="go cuelist 1; scene 3 on" onChange={(text) => props.onChange({ ...a, text })} />
+          )}
+          {a.type === "lua" && (
+            <Select<number> label={t("Lua script")} value={a.id} options={[{ value: 0, label: t("— choose a script —") }, ...(show.value?.lua ?? []).map((x) => ({ value: x.id, label: x.name }))]} onChange={(id) => props.onChange({ ...a, id })} />
           )}
           {a.type === "osc" && (
             <>

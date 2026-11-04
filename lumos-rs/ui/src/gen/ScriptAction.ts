@@ -4,4 +4,4 @@ import type { MidiKind } from "./MidiKind";
 /**
  * Something a cue mark does when it fires. Executed by the engine (works with the UI closed).
  */
-export type ScriptAction = { "type": "console", text: string, } | { "type": "osc", host: string, port: number, address: string, args: Array<string>, } | { "type": "midi", port: string | null, kind: MidiKind, channel: number, number: number, value: number, } | { "type": "http", method: string, url: string, body: string, };
+export type ScriptAction = { "type": "console", text: string, } | { "type": "osc", host: string, port: number, address: string, args: Array<string>, } | { "type": "lua", id: number, } | { "type": "midi", port: string | null, kind: MidiKind, channel: number, number: number, value: number, } | { "type": "http", method: string, url: string, body: string, };

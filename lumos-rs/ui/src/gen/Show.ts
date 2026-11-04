@@ -7,6 +7,7 @@ import type { Executor } from "./Executor";
 import type { Fixture } from "./Fixture";
 import type { FixtureProfile } from "./FixtureProfile";
 import type { Group } from "./Group";
+import type { LuaScript } from "./LuaScript";
 import type { Macro } from "./Macro";
 import type { OscSoftware } from "./OscSoftware";
 import type { OscTarget } from "./OscTarget";
@@ -48,7 +49,7 @@ vconsole: Array<VcPage>,
 /**
  * Programs on the network that the virtual console / scripts send OSC to.
  */
-follows: Array<TrackFollow>, osc_targets: Array<OscTarget>, 
+follows: Array<TrackFollow>, lua: Array<LuaScript>, osc_targets: Array<OscTarget>, 
 /**
  * Programs added by the user (their own action lists), next to the built-in catalog.
  */
