@@ -169,3 +169,44 @@ export function BackupsDialog(props: { onClose: () => void }) {
     </Modal>
   );
 }
+
+// ── QLC+ workspace import / export ──────────────────────────────────
+export function QlcDialog(props: { onClose: () => void }) {
+  const file = useRef<HTMLInputElement>(null);
+  const [replace, setReplace] = useState(false);
+  const [res, setRes] = useState<MvrResult | null>(null);
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const list = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => (typeof x === "string" ? x : JSON.stringify(x))) : []);
+  return (
+    <Modal title={t("QLC+ workspace")} width={640} onClose={props.onClose} footer={<button class="btn tall" style={BTN} onClick={props.onClose}>{t("Close")}</button>}>
+      <div class="dim">{t("Exchange the patch, scenes and chasers with QLC+ (.qxw). Cuelists leave as chasers of full scenes. Fixtures are matched by manufacturer and model with the library; import their definitions first if some do not match.")}</div>
+      <div class="row" style={{ gap: 8, flexWrap: "wrap" }}>
+        <button class="btn tall" style={BTN} onClick={() => saveFromUrl("/api/export/show.qxw", `${(show.value?.name ?? "show").replace(/[^\w\-]+/g, "_")}.qxw`).catch((e) => toast(tErr(e.message), "err"))}>{t("Export QLC+")}</button>
+        <button class="btn tall primary" style={BTN} disabled={busy} onClick={() => file.current?.click()}>{busy ? t("Working…") : t("Import QLC+…")}</button>
+        <label class="row" style={{ gap: 6 }}><input type="checkbox" checked={replace} onChange={(e) => setReplace((e.target as HTMLInputElement).checked)} />{t("Replace fixtures, scenes and chases")}</label>
+      </div>
+      <input ref={file} type="file" accept=".qxw,.xml,application/xml,text/xml" hidden onChange={async (e) => {
+        const el = e.target as HTMLInputElement; const f = el.files?.[0]; el.value = "";
+        if (!f) return;
+        setBusy(true); setRes(null); setErr("");
+        try { setRes(await uploadFile<MvrResult>(`/api/import/qlcplus${replace ? "?replace=1" : ""}`, f)); } catch (x) { setErr(tErr((x as Error).message)); }
+        setBusy(false);
+      }} />
+      {err && <div class="chip err" style={{ alignSelf: "flex-start", height: "auto", padding: "6px 10px", whiteSpace: "normal" }}>{err}</div>}
+      {res && (
+        <div class="col" style={{ gap: 8 }}>
+          <div class="chip ok" style={{ alignSelf: "flex-start", minHeight: 32 }}>{t("{f} fixtures · {s} scenes · {c} chasers imported", { f: Number(res.imported ?? 0), s: Number(res.scenes ?? 0), c: Number(res.chasers ?? 0) })}</div>
+          {list(res.unmatched).length > 0 && <>
+            <b>{t("Unmatched fixtures")} ({list(res.unmatched).length})</b>
+            <div class="scroll mono" style={{ maxHeight: 160, fontSize: "var(--fs-sm)" }}>{list(res.unmatched).map((u, i) => <div key={i}>{u}</div>)}</div>
+          </>}
+          {list(res.warnings).length > 0 && <>
+            <b>{t("Warnings")} ({list(res.warnings).length})</b>
+            <div class="scroll mono" style={{ maxHeight: 120, color: "var(--live)", fontSize: "var(--fs-sm)" }}>{list(res.warnings).map((u, i) => <div key={i}>{u}</div>)}</div>
+          </>}
+        </div>
+      )}
+    </Modal>
+  );
+}

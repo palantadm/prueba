@@ -6,7 +6,7 @@
 
 use crate::engine::Handle;
 use crate::model::*;
-use crate::{csv, gdtf, library, mvr, reports};
+use crate::{csv, gdtf, library, mvr, qlcplus, reports};
 use axum::{
     extract::{DefaultBodyLimit, Multipart, Path, Query, State},
     http::{header, StatusCode},
@@ -21,6 +21,8 @@ pub fn routes() -> Router<Handle> {
         .route("/api/report/{name}", get(report))
         .route("/api/export/patch.csv", get(export_csv))
         .route("/api/export/show.mvr", get(export_mvr))
+        .route("/api/export/show.qxw", get(export_qlcplus))
+        .route("/api/import/qlcplus", post(import_qlcplus).layer(DefaultBodyLimit::max(64 * 1024 * 1024)))
         .route("/api/import/patch.csv", post(import_csv).layer(DefaultBodyLimit::max(32 * 1024 * 1024)))
         .route("/api/import/mvr", post(import_mvr).layer(DefaultBodyLimit::max(512 * 1024 * 1024)))
 }
@@ -215,5 +217,47 @@ async fn import_mvr(State(h): State<Handle>, Query(o): Query<Opts>, mut mp: Mult
             Json(v).into_response()
         }
         Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, e),
+    }
+}
+
+async fn export_qlcplus(State(h): State<Handle>) -> Response {
+    let Some(show) = h.get_show().await else { return err(StatusCode::SERVICE_UNAVAILABLE, "engine stopped") };
+    let fname = file_name(&show, "qxw");
+    let res = tokio::task::spawn_blocking(move || qlcplus::export(&show, &profile_map(&show))).await;
+    match res {
+        Ok(xml) => (
+            [
+                (header::CONTENT_TYPE, "application/xml".to_string()),
+                (header::CONTENT_DISPOSITION, format!("attachment; filename=\"{fname}\"")),
+            ],
+            xml,
+        )
+            .into_response(),
+        Err(e) => err(StatusCode::INTERNAL_SERVER_ERROR, format!("export failed: {e}")),
+    }
+}
+
+async fn import_qlcplus(State(h): State<Handle>, Query(o): Query<Opts>, mut mp: Multipart) -> Response {
+    let (_, bytes) = match first_file(&mut mp).await {
+        Ok(x) => x,
+        Err(r) => return r,
+    };
+    let text = String::from_utf8_lossy(&bytes).into_owned();
+    let replace = truthy(&o.replace);
+    let res = h
+        .edit_show(move |show, profs| {
+            let rep = qlcplus::import(&text, show, profs, replace)?;
+            Ok(serde_json::json!({
+                "imported": rep.fixtures,
+                "scenes": rep.scenes,
+                "chasers": rep.chasers,
+                "unmatched": rep.unmatched.iter().map(|(f, s)| serde_json::json!({ "fixture": f, "spec": s })).collect::<Vec<_>>(),
+                "warnings": rep.warnings,
+            }))
+        })
+        .await;
+    match res {
+        Ok(v) => Json(v).into_response(),
+        Err(e) => err(StatusCode::BAD_REQUEST, e),
     }
 }

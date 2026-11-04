@@ -22,7 +22,7 @@ import { setSettingsCat } from "./workspaces/Settings";
 import { HelpCenter } from "./help/HelpCenter";
 import { LockButton, LockOverlay } from "./lock/Lock";
 import { closeHelp, helpPage, openHelp } from "./help/state";
-import { BackupsDialog, CsvImportDialog, MvrDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
+import { BackupsDialog, CsvImportDialog, MvrDialog, QlcDialog, ReportsDialog } from "./workspaces/exchange/DataDialogs";
 import { MergeDialog } from "./workspaces/exchange/MergeDialog";
 
 export const current = signal(initialWorkspace());
@@ -48,7 +48,7 @@ function ShowMenu() {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const file = useRef<HTMLInputElement>(null);
-  const [dataDlg, setDataDlg] = useState<"reports" | "csv" | "mvr" | "backups" | "merge" | null>(null);
+  const [dataDlg, setDataDlg] = useState<"reports" | "csv" | "mvr" | "qlc" | "backups" | "merge" | null>(null);
   useEffect(() => {
     if (!open) return;
     const h = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
@@ -99,12 +99,14 @@ function ShowMenu() {
           <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("reports"))}>{t("Reports…")}</button>
           <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("csv"))}>{t("Patch CSV…")}</button>
           <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("mvr"))}>{t("MVR…")}</button>
+          <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("qlc"))}>{t("QLC+…")}</button>
           <button role="menuitem" style={{ minHeight: 44 }} onClick={run(() => setDataDlg("backups"))}>{t("Backups…")}</button>
         </div>
       )}
       {dataDlg === "reports" && <ReportsDialog onClose={() => setDataDlg(null)} />}
       {dataDlg === "csv" && <CsvImportDialog onClose={() => setDataDlg(null)} />}
       {dataDlg === "mvr" && <MvrDialog onClose={() => setDataDlg(null)} />}
+      {dataDlg === "qlc" && <QlcDialog onClose={() => setDataDlg(null)} />}
       {dataDlg === "backups" && <BackupsDialog onClose={() => setDataDlg(null)} />}
       {dataDlg === "merge" && <MergeDialog onClose={() => setDataDlg(null)} />}
       <input ref={file} type="file" accept=".json,application/json" hidden onChange={async (e) => {

@@ -18,6 +18,7 @@ pub mod mvr;
 pub mod pdf;
 pub mod persist;
 pub mod psn;
+pub mod qlcplus;
 pub mod qxf;
 pub mod oscpresets;
 pub mod rdm;

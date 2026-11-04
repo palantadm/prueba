@@ -23,3 +23,12 @@ Los cambios en los datos del show (aparatos, grupos, paletas, escenas, cuelists,
 - Los aparatos fusionados que caigan en direcciones ocupadas se **recolocan** en el primer hueco libre (revisa el patch).
 - **No se reescriben** las macros, timelines ni acciones del guion que llaman a cues, escenas o grupos por número (por ejemplo `go cuelist 2`): si hubo renumeraciones, se avisa para que las revises.
 <!--ai-->Por protocolo: `show_merge {name, parts[]}`.<!--/ai-->
+
+## Intercambio con otros programas
+Menú del show → Datos:
+- **MVR** (estándar): el rig con posiciones y GDTF. Lo leen grandMA3, ChamSys MagicQ, Vectorworks, Capture, Depence y otros.
+- **CSV del patch**: lista de aparatos para hojas de cálculo.
+- **QLC+** (`.qxw`): exporta e importa el patch, las escenas y los chasers. Las cuelists salen como chasers de escenas completas (el tracking se resuelve antes). Al importar, los aparatos se emparejan con la biblioteca por fabricante y modelo; los que no coinciden se listan para que importes su definición. «Reemplazar» sustituye aparatos, escenas y chases actuales.
+- **GDTF** y definiciones de QLC+ (`.qxf`): perfiles de aparato desde Patch → Importar.
+- Los formatos propios de ChamSys (`.shw`), grandMA (`.show`/XML) y Freestyler no se pueden leer ni escribir: son cerrados. Para pasar el rig usa MVR. Si necesitas más, envía un archivo de ejemplo exportado por ese programa y se puede estudiar.
+<!--ai-->Estos intercambios se hacen desde la interfaz (no hay comando de protocolo): indica al usuario dónde está el menú.<!--/ai-->

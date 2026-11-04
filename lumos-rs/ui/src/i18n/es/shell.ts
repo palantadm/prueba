@@ -920,4 +920,11 @@ export const shell: Record<string, string> = {
   "Applied at the output, so cues, palettes and effects keep their values. Swap is done first, then the inversions.": "Se aplica en la salida, así que cues, paletas y efectos conservan sus valores. Primero se intercambia y luego se invierte.",
   "Invert or swap pan and tilt of the selected fixtures": "Invertir o intercambiar pan y tilt de los aparatos seleccionados",
   "Pan/tilt…": "Pan/tilt…",
+  "QLC+ workspace": "Workspace de QLC+",
+  "Exchange the patch, scenes and chasers with QLC+ (.qxw). Cuelists leave as chasers of full scenes. Fixtures are matched by manufacturer and model with the library; import their definitions first if some do not match.": "Intercambia el patch, escenas y chasers con QLC+ (.qxw). Las cuelists salen como chasers de escenas completas. Los aparatos se emparejan con la biblioteca por fabricante y modelo; importa antes sus definiciones si alguno no coincide.",
+  "Export QLC+": "Exportar QLC+",
+  "Import QLC+…": "Importar QLC+…",
+  "Replace fixtures, scenes and chases": "Reemplazar aparatos, escenas y chases",
+  "{f} fixtures · {s} scenes · {c} chasers imported": "{f} aparatos · {s} escenas · {c} chasers importados",
+  "QLC+…": "QLC+…",
 };

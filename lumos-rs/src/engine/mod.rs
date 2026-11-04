@@ -10,7 +10,7 @@ mod lock;
 mod macros;
 mod morph;
 mod msc;
-mod patch;
+pub mod patch;
 mod pixelmap;
 mod oscsw;
 mod track;
