@@ -84,7 +84,7 @@ function RecordCue({ onClose }: { onClose: () => void }) {
 
   const createList = async () => {
     const id = Math.max(0, ...lists.map((l) => l.id)) + 1;
-    await send({ type: "cuelist_save", cuelist: { id, name: t("Cuelist {n}", { n: id }), cues: [], looped: false, tracking: true, priority: 0, auto_mark: false } });
+    await send({ type: "cuelist_save", cuelist: { id, name: t("Cuelist {n}", { n: id }), cues: [], looped: false, tracking: true, priority: 0, auto_mark: false, rate: 1, release_others: false, release_at_end: false } });
     setList(id);
   };
   const go = async () => {

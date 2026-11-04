@@ -799,6 +799,7 @@ mod tests {
             tracking: true,
             priority: 0,
             auto_mark: false,
+            rate: 1.0, release_others: false, release_at_end: false,
         });
         let c = generate(Kind::Cues, &show, Lang::Es, "d");
         assert!(has(&c, "Hoja de cues"));

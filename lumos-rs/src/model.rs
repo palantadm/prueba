@@ -419,6 +419,15 @@ pub struct Cuelist {
     /// in the current cue and lit in the next one, while the current cue plays.
     #[serde(default)]
     pub auto_mark: bool,
+    /// Speed of the whole list: 2 = every delay, fade and follow time runs twice as fast, 0.5 = half speed.
+    #[serde(default = "d_one")]
+    pub rate: f32,
+    /// When this list starts, release every other running cuelist (swop / kill others).
+    #[serde(default)]
+    pub release_others: bool,
+    /// A GO after the last cue releases the list instead of doing nothing.
+    #[serde(default)]
+    pub release_at_end: bool,
 }
 
 fn d_true() -> bool {
@@ -2595,6 +2604,13 @@ pub enum Command {
     CuelistRemove { id: u32 },
     CueSave { cuelist: u32, cue: Cue },
     CueRemove { cuelist: u32, number: f64 },
+    /// Copy a cue to a new number (same cuelist or `to_cuelist`). In a tracking list the copy stores the cue's full
+    /// resolved look, so it looks the same wherever it lands. Fails if the target number exists.
+    CueCopy { cuelist: u32, number: f64, #[serde(default)] to_cuelist: Option<u32>, to_number: f64 },
+    /// Give a cue another number (moves it in the order). Fails if the target number exists.
+    CueMove { cuelist: u32, number: f64, to_number: f64 },
+    /// Renumber every cue of a list `start`, `start + step`… keeping the order.
+    CueRenumber { cuelist: u32, start: f64, step: f64 },
     // ── playback ──
     Go { cuelist: u32 },
     Back { cuelist: u32 },

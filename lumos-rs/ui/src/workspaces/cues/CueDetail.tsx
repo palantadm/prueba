@@ -6,6 +6,7 @@ import { attrLabel, fixtureById, fmtNum, pct } from "../../lib/attrs";
 import { CURVES, curveValue } from "../../lib/curves";
 import { focusPalette } from "../../lib/state";
 import { goto } from "../../App";
+import { promptDialog } from "../../ui";
 import { Modal } from "../../ui";
 import { Cell, TC_RE } from "./CueTable";
 import { SwitchRow } from "./SwitchRow";
@@ -62,6 +63,16 @@ export function CueDetail({ list, number, onDeleted }: { list: Cuelist; number: 
       <div class="cu-df">
         <button class="btn" onClick={() => send({ type: "cue_load", cuelist: list.id, number: cue.number }).then(() => toast(t("Cue {n} loaded into the programmer", { n: fmtNum(cue.number) }), "ok"))
           .catch(() => {})} title={t("Copy this cue's look into the programmer to edit it")}>{t("Load into programmer")}</button>
+        <button class="btn" title={t("Copy this cue to another number")} onClick={async () => {
+          const v = await promptDialog(t("Copy cue {n}", { n: fmtNum(cue.number) }), t("New cue number"), fmtNum(cue.number + 1));
+          const n = v === null ? NaN : parseFloat(v.replace(",", "."));
+          if (Number.isFinite(n) && n >= 0) send({ type: "cue_copy", cuelist: list.id, number: cue.number, to_cuelist: null, to_number: n }).catch(() => {});
+        }}>{t("Copy…")}</button>
+        <button class="btn" title={t("Number every cue of the list again, in order")} onClick={async () => {
+          const v = await promptDialog(t("Renumber cues"), t("Start and step, e.g. 10 10 gives 10, 20, 30…"), "10 10");
+          const [a, b] = (v ?? "").split(/[\s,;]+/).map((x) => parseFloat(x));
+          if (Number.isFinite(a) && Number.isFinite(b) && b > 0) send({ type: "cue_renumber", cuelist: list.id, start: a, step: b }).catch(() => {});
+        }}>{t("Renumber…")}</button>
         <button class="btn primary" onClick={() => setUpd(true)}>{t("Update…")}</button>
       </div>
       {upd && <UpdateDialog list={list} cue={cue} onClose={() => setUpd(false)} />}

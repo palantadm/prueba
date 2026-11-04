@@ -296,7 +296,7 @@ mod tests {
 
     #[test]
     fn tracking_accumulates_and_blocks() {
-        let mut cl = Cuelist { auto_mark: false, id: 1, name: "t".into(), cues: vec![cue(1.0, 1, "dimmer", 1.0), cue(2.0, 1, "red", 0.5), cue(3.0, 2, "dimmer", 0.3)], looped: false, tracking: true, priority: 0 };
+        let mut cl = Cuelist { auto_mark: false, id: 1, name: "t".into(), cues: vec![cue(1.0, 1, "dimmer", 1.0), cue(2.0, 1, "red", 0.5), cue(3.0, 2, "dimmer", 0.3)], looped: false, tracking: true, priority: 0, rate: 1.0, release_others: false, release_at_end: false };
         let s = tracked_state(&cl, 2);
         assert_eq!(s[&1]["dimmer"], 1.0);
         assert_eq!(s[&1]["red"], 0.5);

@@ -413,7 +413,7 @@ mod tests {
         let mut b = Attrs::new();
         b.insert("blue".into(), 1.0);
         c2.changes.insert(1, b);
-        s.cuelists.push(Cuelist { id: 1, name: "Acto 1".into(), cues: vec![c1, c2], looped: false, tracking: true, priority: 0, auto_mark: false });
+        s.cuelists.push(Cuelist { id: 1, name: "Acto 1".into(), cues: vec![c1, c2], looped: false, tracking: true, priority: 0, auto_mark: false, rate: 1.0, release_others: false, release_at_end: false });
         let xml = export(&s, &profs());
         let mut t = Show::default();
         let rep = import(&xml, &mut t, &profs(), true).unwrap();

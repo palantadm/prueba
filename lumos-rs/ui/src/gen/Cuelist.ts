@@ -10,4 +10,16 @@ priority: number,
  * Auto-mark ("move on dark"): pre-position non-intensity attributes of fixtures that are dark
  * in the current cue and lit in the next one, while the current cue plays.
  */
-auto_mark: boolean, };
+auto_mark: boolean, 
+/**
+ * Speed of the whole list: 2 = every delay, fade and follow time runs twice as fast, 0.5 = half speed.
+ */
+rate: number, 
+/**
+ * When this list starts, release every other running cuelist (swop / kill others).
+ */
+release_others: boolean, 
+/**
+ * A GO after the last cue releases the list instead of doing nothing.
+ */
+release_at_end: boolean, };

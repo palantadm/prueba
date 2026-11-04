@@ -663,7 +663,7 @@ pub(crate) mod tests {
         let mut e = engine();
         add(&mut e, "generic/dimmer", "1ch", 1);
         e.handle(Command::CuelistSave {
-            cuelist: Cuelist { id: 1, name: "L".into(), cues: vec![], looped: false, tracking: true, priority: 0, auto_mark: false },
+            cuelist: Cuelist { id: 1, name: "L".into(), cues: vec![], looped: false, tracking: true, priority: 0, auto_mark: false, rate: 1.0, release_others: false, release_at_end: false },
         })
         .unwrap();
         set(&mut e, 1, "dimmer", 0.5);
@@ -696,7 +696,7 @@ pub(crate) mod tests {
     fn follow_jumps_without_firing_and_ignores_own_cues() {
         let mut e = engine();
         e.handle(Command::CuelistSave {
-            cuelist: Cuelist { id: 1, name: "L".into(), cues: vec![], looped: false, tracking: true, priority: 0, auto_mark: false },
+            cuelist: Cuelist { id: 1, name: "L".into(), cues: vec![], looped: false, tracking: true, priority: 0, auto_mark: false, rate: 1.0, release_others: false, release_at_end: false },
         })
         .unwrap();
         for n in 1..=3 {

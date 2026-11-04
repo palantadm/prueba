@@ -33,7 +33,7 @@ export function Cues() {
 
   const newList = (name: string) => {
     const id = Math.max(0, ...lists.map((l) => l.id)) + 1;
-    send({ type: "cuelist_save", cuelist: { id, name, cues: [], looped: false, tracking: true, priority: 0, auto_mark: false } }).then(() => (activeCuelist.value = id));
+    send({ type: "cuelist_save", cuelist: { id, name, cues: [], looped: false, tracking: true, priority: 0, auto_mark: false, rate: 1, release_others: false, release_at_end: false } }).then(() => (activeCuelist.value = id));
   };
   const renumber = () => {
     if (!cur) return;
@@ -116,6 +116,16 @@ function ListOptions(p: { list: Cuelist; save: (patch: Partial<Cuelist>) => void
       <SwitchRow on={l.looped} onChange={(v) => p.save({ looped: v })} label={t("Loop")} />
       <SwitchRow on={l.auto_mark} onChange={(v) => p.save({ auto_mark: v })} label={t("Auto-mark")} title={t("Pre-position moving heads that are dark in this cue and lit in the next one")} />
       <SwitchRow on={l.tracking} onChange={(v) => p.save({ tracking: v })} label={t("Tracking")} />
+      <SwitchRow on={l.release_others} onChange={(v) => p.save({ release_others: v })} label={t("Release other lists on GO")} title={t("When this list starts from rest, every other running cuelist is released (swop)")} />
+      <SwitchRow on={l.release_at_end} onChange={(v) => p.save({ release_at_end: v })} label={t("Release after the last cue")} title={t("A GO after the last cue releases the list instead of staying on it")} />
+      <div class="row" style={{ gap: 12 }}>
+        <span style={{ fontWeight: 600 }} title={t("Speed of the whole list: 2 = all times twice as fast, 0.5 = half speed")}>{t("Rate")}</span><span class="sp" />
+        <div class="stepper">
+          <button aria-label="−" onClick={() => p.save({ rate: Math.max(0.1, Math.round((l.rate - (l.rate > 1 ? 0.5 : 0.1)) * 10) / 10) })}>−</button>
+          <span class="val">×{l.rate}</span>
+          <button aria-label="+" onClick={() => p.save({ rate: Math.min(10, Math.round((l.rate + (l.rate >= 1 ? 0.5 : 0.1)) * 10) / 10) })}>+</button>
+        </div>
+      </div>
       <div class="row" style={{ gap: 12 }}>
         <span style={{ fontWeight: 600 }}>{t("Priority")}</span><span class="sp" />
         <div class="stepper">

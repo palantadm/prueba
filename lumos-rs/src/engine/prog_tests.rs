@@ -30,7 +30,7 @@ fn cue_with(number: f64, vals: &[(u32, &str, f32)]) -> Cue {
 fn save_cue(e: &mut Engine, cl: u32, c: Cue) {
     if !e.show.cuelists.iter().any(|x| x.id == cl) {
         e.handle(Command::CuelistSave {
-            cuelist: Cuelist { id: cl, name: "t".into(), cues: vec![], looped: false, tracking: true, priority: 0, auto_mark: false },
+            cuelist: Cuelist { id: cl, name: "t".into(), cues: vec![], looped: false, tracking: true, priority: 0, auto_mark: false, rate: 1.0, release_others: false, release_at_end: false },
         })
         .unwrap();
     }

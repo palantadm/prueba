@@ -12,6 +12,7 @@ mod morph;
 mod msc;
 pub mod patch;
 mod pixelmap;
+mod cueops;
 mod oscsw;
 mod track;
 mod rdm;
@@ -886,6 +887,7 @@ impl Engine {
                 cl.cues.retain(|c| !same_number(c.number, number));
                 self.after_cuelist_edit(cuelist);
             }
+            c @ (CueCopy { .. } | CueMove { .. } | CueRenumber { .. }) => self.cue_ops(c)?,
             Go { cuelist } => self.go(cuelist)?,
             Back { cuelist } => self.back(cuelist)?,
             GoTo { cuelist, number } => self.go_to(cuelist, number)?,
@@ -1301,6 +1303,7 @@ impl Engine {
                 tracking: true,
                 priority: 0,
                 auto_mark: false,
+                rate: 1.0, release_others: false, release_at_end: false,
             });
         }
         let prog = self.programmer.clone();
@@ -1382,6 +1385,10 @@ impl Engine {
             None => 0,
             Some(i) if i + 1 < len => i + 1,
             Some(_) if looped => 0,
+            Some(_) if self.show.cuelists.iter().any(|c| c.id == id && c.release_at_end) => {
+                self.release_cuelist(id);
+                return Ok(());
+            }
             Some(_) => return Ok(()),
         };
         self.start_cue(id, idx);
@@ -1470,6 +1477,17 @@ impl Engine {
         let now = self.now();
         let Some(cl) = self.show.cuelists.iter().find(|c| c.id == id) else { return };
         let Some(cue) = cl.cues.get(idx).cloned() else { return };
+        // "release others": starting this list from rest takes the others off
+        let others: Vec<u32> = if cl.release_others && !self.runs.get(&id).map_or(false, |r| r.state != PlayState::Idle) {
+            self.runs.iter().filter(|(k, r)| **k != id && (r.state != PlayState::Idle || !r.values.is_empty()) && !r.releasing).map(|(k, _)| *k).collect()
+        } else {
+            vec![]
+        };
+        let k = 1.0 / if cl.rate.is_finite() { cl.rate.clamp(0.05, 20.0) } else { 1.0 };
+        for o in others {
+            self.release_cuelist(o);
+        }
+        let Some(cl) = self.show.cuelists.iter().find(|c| c.id == id) else { return };
         let mut to = tracked_state(cl, idx);
         // auto-mark: dark fixtures take the next cue's non-intensity attributes early
         let marks = self.compute_marks(cl, idx, &to);
@@ -1510,20 +1528,20 @@ impl Engine {
         run.to = to_full;
         run.drop = drop;
         run.start = now;
-        run.delay = cue.delay.max(0.0);
-        run.fade_in = cue.fade_in.max(0.0);
-        run.fade_out = cue.fade_out.max(0.0);
+        run.delay = cue.delay.max(0.0) * k;
+        run.fade_in = cue.fade_in.max(0.0) * k;
+        run.fade_out = cue.fade_out.max(0.0) * k;
         run.paused_at = None;
         run.go_seq = seq;
-        run.follow_at = cue.follow.map(|s| now + s.max(0.0) as f64);
+        run.follow_at = cue.follow.map(|s| now + (s.max(0.0) * k) as f64);
         run.settled = false;
         run.releasing = false;
         run.progress = 0.0;
-        run.timing = cue.timing.clone();
+        run.timing = cue.timing.iter().map(|(g, t)| (g.clone(), AttrTiming { delay: t.delay * k, fade: t.fade * k })).collect();
         run.curve = cue.curve;
-        run.stagger = if cue.stagger.is_finite() { cue.stagger.max(0.0) } else { 0.0 };
+        run.stagger = if cue.stagger.is_finite() { cue.stagger.max(0.0) * k } else { 0.0 };
         run.marks = marks.iter().map(|(f, a, _)| (*f, a.clone())).collect();
-        run.mark_fade = cue.fade_in.max(cue.fade_out).max(1.0);
+        run.mark_fade = (cue.fade_in.max(cue.fade_out) * k).max(1.0);
         run.manual = None;
         run.compute_span();
         self.dirty = true;
