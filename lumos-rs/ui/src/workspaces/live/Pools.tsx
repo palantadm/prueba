@@ -1,6 +1,6 @@
 import { useEffect, useState } from "preact/hooks";
 import { rt, selection, send, show } from "../../store";
-import type { Effect, Palette, PaletteKind, Shape } from "../../types";
+import type { Effect, EffectLine, Palette, PaletteKind, Shape } from "../../types";
 import { ALL_ATTRS, ATTR_META, attrLabel, fixtureById, rgbToHex } from "../../lib/attrs";
 import { useClock, useLongPress } from "../../lib/hooks";
 import { Modal } from "../../ui";
@@ -186,7 +186,7 @@ function EffectPool() {
     id: Math.max(0, ...effects.map((e) => e.id)) + 1, name: t("Effect {n}", { n: effects.length + 1 }),
     attr: "dimmer", shape: "sine", rate: 0.5, depth: 0.5, phase_spread: 0, fixtures: [...selection.value],
     attr2: null, speed_master: null, bpm: 0, rotation: 0,
-    adv: { parity: "all", from: 0, to: 0, every: 0, every_offset: 0, order: "normal", groups: 0, blocks: 0, wings: 0, direction: "forward", phase_offset: 0, width: 0, offset: 0, absolute: false, low: 0, high: 1, fade_in: 0, fade_out: 0, once: false },
+    adv: { parity: "all", from: 0, to: 0, every: 0, every_offset: 0, order: "normal", groups: 0, blocks: 0, wings: 0, direction: "forward", phase_offset: 0, width: 0, offset: 0, absolute: false, low: 0, high: 1, fade_in: 0, fade_out: 0, once: false }, lines: [],
   });
   return (
     <>
@@ -346,6 +346,39 @@ function EffectEditor({ e, exists, onClose }: { e: Effect; exists: boolean; onCl
           <label class="row" style={{ gap: 6, alignSelf: "flex-end", minHeight: 44 }} title={t("Runs one cycle and switches itself off")}><input type="checkbox" checked={d.adv.once} onChange={(ev) => upAdv({ once: (ev.target as HTMLInputElement).checked })} />{t("Run once")}</label>
         </div>
       </details>
+      <div class="field"><label>{t("Extra attribute lines")}</label>
+        {d.lines.map((l, i) => {
+          const setL = (patch: Partial<EffectLine>) => setD({ ...d, lines: d.lines.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+          return (
+            <div key={i} class="col" style={{ gap: 6, borderTop: "1px solid var(--line)", paddingTop: 8, marginTop: 6 }}>
+              <div class="row wrap" style={{ gap: 6 }}>
+                <select class="input grow" style={{ minHeight: 44 }} aria-label={t("Attribute")} value={l.attr} onChange={(ev) => setL({ attr: (ev.target as HTMLSelectElement).value })}>
+                  <option value="hue">{t("Hue (rainbow)")}</option>
+                  {ALL_ATTRS.map((a) => <option key={a} value={a}>{attrLabel(a)}</option>)}
+                </select>
+                <select class="input" style={{ minHeight: 44 }} aria-label={t("Shape")} value={l.shape} onChange={(ev) => setL({ shape: (ev.target as HTMLSelectElement).value as Shape })}>
+                  {SHAPES.filter((x) => !is2D(x)).map((x) => <option key={x} value={x}>{t(x)}</option>)}
+                </select>
+                <button class="btn danger" style={{ minHeight: 44 }} aria-label={t("Remove line")} onClick={() => setD({ ...d, lines: d.lines.filter((_, j) => j !== i) })}>✕</button>
+              </div>
+              <div class="row wrap">
+                {numField(t("Depth %"), Math.round(l.depth * 100), (v) => setL({ depth: v / 100 }), 0, 100)}
+                <div class="field grow"><label>{t("Speed ×")}</label><input class="input num" style={{ minHeight: 44 }} type="number" min="0.1" max="64" step="0.5" value={l.rate_mul} onInput={(ev) => setL({ rate_mul: Math.max(0.1, num((ev.target as HTMLInputElement).value, 1)) })} /></div>
+                {numField(t("Phase °"), l.phase_offset, (v) => setL({ phase_offset: v }), -360, 360)}
+              </div>
+              <div class="row wrap" style={{ alignItems: "flex-end" }}>
+                <label class="row" style={{ gap: 6, minHeight: 44 }}><input type="checkbox" checked={l.absolute} onChange={(ev) => setL({ absolute: (ev.target as HTMLInputElement).checked })} />{t("Absolute")}</label>
+                {l.absolute ? <>
+                  {numField(t("Low %"), Math.round(l.low * 100), (v) => setL({ low: v / 100 }), 0, 100)}
+                  {numField(t("High %"), Math.round(l.high * 100), (v) => setL({ high: v / 100 }), 0, 100)}
+                </> : numField(t("Offset %"), Math.round(l.offset * 100), (v) => setL({ offset: v / 100 }), -100, 100)}
+              </div>
+            </div>
+          );
+        })}
+        <button class="btn" style={{ minHeight: 44 }} onClick={() => setD({ ...d, lines: [...d.lines, { attr: d.attr === "dimmer" ? "tilt" : "dimmer", attr2: null, shape: "sine", depth: 0.5, rotation: 0, rate_mul: 1, phase_offset: 0, absolute: false, low: 0, high: 1, offset: 0, width: 0 }] })}>{t("+ Attribute line")}</button>
+        <span class="dim" style={{ fontSize: 11 }}>{t("Each line drives another attribute with the same fixtures, order and speed source; its own shape, depth and speed ratio.")}</span>
+      </div>
       <div class="row">
         <span class="dim grow">{t("Fixtures:")} {d.fixtures.length ? d.fixtures.join(", ") : t("none")}</span>
         <button class="btn" style={{ minHeight: 44 }} disabled={!selection.value.length} onClick={() => up({ fixtures: selection.value.filter((i) => fixtureById(i)) })}>{t("Use selection ({n})", { n: selection.value.length })}</button>

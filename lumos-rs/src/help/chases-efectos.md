@@ -23,6 +23,7 @@ Como en ChamSys o GrandMA, cada efecto tiene opciones para decidir **quién** pa
 - **Ancho** del ciclo en ondas cuadrada y pulso.
 - **Entrada y salida** (segundos): el efecto aparece y desaparece con un fundido al activarlo y desactivarlo, en vez de entrar de golpe.
 - **Una sola vez**: hace un ciclo completo y se apaga solo.
+- **Líneas de atributo extra**: un mismo efecto puede mover varios atributos a la vez (p. ej. pan, tilt y zoom). Cada línea tiene su atributo, forma, profundidad, **proporción de velocidad** (×2 = el doble de rápido), fase y rango propios; comparten los aparatos, el orden, la dirección y la velocidad del efecto.
 <!--ai-->Por protocolo, todo esto va en el objeto `adv` de `effect_save` (mira `get_help comando effect_save`).<!--/ai-->
 
 - Para un barrido de color: efecto `hue` con `phase_spread` 360 y `rate` bajo.

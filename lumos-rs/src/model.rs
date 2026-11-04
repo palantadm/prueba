@@ -564,6 +564,42 @@ pub struct Effect {
     /// Advanced settings: which fixtures take part, in which order, how phase is shared, direction, absolute range.
     #[serde(default)]
     pub adv: EffectAdv,
+    /// More attribute lines driven by the same effect (who takes part, phase order, direction, fades, speed source
+    /// are shared; each line has its own attribute, shape, size, speed ratio and range).
+    #[serde(default)]
+    pub lines: Vec<EffectLine>,
+}
+
+/// An extra attribute line of an [`Effect`].
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct EffectLine {
+    /// Attribute, or `hue` for a rainbow on RGB fixtures.
+    pub attr: String,
+    /// Second attribute of the 2-D shapes (circle, eight).
+    #[serde(default)]
+    pub attr2: Option<String>,
+    pub shape: Shape,
+    /// Amplitude 0..1.
+    pub depth: f32,
+    #[serde(default)]
+    pub rotation: f32,
+    /// Speed relative to the effect (2 = twice as fast, 0.5 = half).
+    #[serde(default = "d_one")]
+    pub rate_mul: f32,
+    /// Extra phase of this line in degrees.
+    #[serde(default)]
+    pub phase_offset: f32,
+    #[serde(default)]
+    pub absolute: bool,
+    #[serde(default)]
+    pub low: f32,
+    #[serde(default = "d_one")]
+    pub high: f32,
+    #[serde(default)]
+    pub offset: f32,
+    #[serde(default)]
+    pub width: f32,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]

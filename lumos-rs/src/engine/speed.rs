@@ -216,7 +216,7 @@ mod tests {
         assert!(e.handle(Command::SpeedTap { id: 9 }).is_err());
         // consumers lose the link when the master goes away
         e.handle(Command::EffectSave {
-            effect: Effect { id: 0, name: "x".into(), attr: "dimmer".into(), shape: Shape::Sine, rate: 1.0, depth: 1.0, phase_spread: 0.0, fixtures: vec![], attr2: None, speed_master: Some(1), bpm: 0.0, rotation: 0.0, adv: Default::default() },
+            effect: Effect { id: 0, name: "x".into(), attr: "dimmer".into(), shape: Shape::Sine, rate: 1.0, depth: 1.0, phase_spread: 0.0, fixtures: vec![], attr2: None, speed_master: Some(1), bpm: 0.0, rotation: 0.0, adv: Default::default(), lines: vec![] },
         })
         .unwrap();
         e.handle(Command::ExecSave { executor: Executor { id: 0, page: 0, slot: 0, label: "S".into(), kind: ExecKind::Speed { master: 1 } } }).unwrap();

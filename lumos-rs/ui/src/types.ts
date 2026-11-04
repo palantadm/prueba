@@ -155,3 +155,4 @@ export type { PsnRt } from "./gen/PsnRt";
 export type { PsnTrackerRt } from "./gen/PsnTrackerRt";
 export type { FollowRt } from "./gen/FollowRt";
 export type { TrackFollow } from "./gen/TrackFollow";
+export type { EffectLine } from "./gen/EffectLine";

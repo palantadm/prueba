@@ -208,73 +208,102 @@ pub fn apply(
             continue;
         }
         let fader = depth_mul(e.id).clamp(0.0, 1.0);
-        let depth = (e.depth * fader).clamp(0.0, 1.0);
         let adv = &e.adv;
-        let base_phase = directed_phase(adv.direction, phase_of(e.id));
         let part = participants(e);
         let slots = phase_slots(e, part.len());
-        let (low, high) = (if adv.low.is_finite() { adv.low.clamp(0.0, 1.0) } else { 0.0 }, if adv.high.is_finite() { adv.high.clamp(0.0, 1.0) } else { 1.0 });
-        let offset = if adv.offset.is_finite() { adv.offset.clamp(-1.0, 1.0) } else { 0.0 };
-        for (k, &pos) in part.iter().enumerate() {
-            let fid = e.fixtures[pos];
-            let Some(pf) = patch.get(fid) else { continue };
-            let (idx, count) = slots[k];
-            let phase = base_phase + (idx as f64 / count as f64) * (e.phase_spread as f64 / 360.0) + adv.phase_offset as f64 / 360.0;
-            let attrs = state.entry(fid).or_default();
-            if is_2d(e) {
-                let y_attr = e.attr2.as_deref().unwrap_or_default();
-                if !(pf.has_attr(&e.attr) && pf.has_attr(y_attr)) {
+        let lines = lines_of(e);
+        for l in &lines {
+            let depth = (l.depth * fader).clamp(0.0, 1.0);
+            let base_phase = directed_phase(adv.direction, phase_of(e.id) * l.rate_mul as f64);
+            let (low, high) = (if l.low.is_finite() { l.low.clamp(0.0, 1.0) } else { 0.0 }, if l.high.is_finite() { l.high.clamp(0.0, 1.0) } else { 1.0 });
+            let offset = if l.offset.is_finite() { l.offset.clamp(-1.0, 1.0) } else { 0.0 };
+            for (k, &pos) in part.iter().enumerate() {
+                let fid = e.fixtures[pos];
+                let Some(pf) = patch.get(fid) else { continue };
+                let (idx, count) = slots[k];
+                let phase = base_phase + (idx as f64 / count as f64) * (e.phase_spread as f64 / 360.0) + (adv.phase_offset + l.phase_offset) as f64 / 360.0;
+                let attrs = state.entry(fid).or_default();
+                if matches!(l.shape, Shape::Circle | Shape::Eight) && l.attr2.is_some() && l.attr != "hue" {
+                    let y_attr = l.attr2.as_deref().unwrap_or_default();
+                    if !(pf.has_attr(&l.attr) && pf.has_attr(y_attr)) {
+                        continue;
+                    }
+                    let (x, y) = shape_xy(l.shape, phase);
+                    let (x, y) = rotate(x, y, l.rotation);
+                    for (name, d) in [(l.attr.as_str(), x), (y_attr, y)] {
+                        let base = attrs.get(name).copied().unwrap_or_else(|| attr_default(name));
+                        let v = if l.absolute { base + ((low + high) / 2.0 + d * (high - low) / 2.0 - base) * fader } else { base + d * depth * 0.5 + offset };
+                        attrs.insert(name.into(), v.clamp(0.0, 1.0));
+                    }
                     continue;
                 }
-                let (x, y) = shape_xy(e.shape, phase);
-                let (x, y) = rotate(x, y, e.rotation);
-                for (name, d) in [(e.attr.as_str(), x), (y_attr, y)] {
-                    let base = attrs.get(name).copied().unwrap_or_else(|| attr_default(name));
-                    let v = if adv.absolute { base + ((low + high) / 2.0 + d * (high - low) / 2.0 - base) * fader } else { base + d * depth * 0.5 + offset };
-                    attrs.insert(name.into(), v.clamp(0.0, 1.0));
-                }
-                continue;
-            }
-            let x = shape_value_w(e.shape, phase, fid.wrapping_add(e.id.wrapping_mul(7919)), adv.width);
-            let abs_val = low + (x + 1.0) / 2.0 * (high - low);
-            if e.attr == "hue" {
-                if !(pf.has_attr("red") && pf.has_attr("green") && pf.has_attr("blue")) {
-                    continue;
-                }
-                let (r, g, b) = hsv_to_rgb(frac(phase) as f32, 1.0, 1.0);
-                for (name, target) in [("red", r), ("green", g), ("blue", b)] {
-                    let base = attrs.get(name).copied().unwrap_or(0.0);
-                    attrs.insert(name.into(), base + (target - base) * depth);
-                }
-            } else if e.attr == "dimmer" {
-                if pf.has_dimmer {
-                    let base = attrs.get("dimmer").copied().unwrap_or(0.0);
-                    let v = if adv.absolute { base + (abs_val - base) * fader } else { base * (1.0 - depth * (0.5 - 0.5 * x)) };
-                    attrs.insert("dimmer".into(), v.clamp(0.0, 1.0));
-                } else {
-                    // no dimmer channel: scale the colour
-                    let factor = if adv.absolute { 1.0 + (abs_val - 1.0) * fader } else { 1.0 - depth * (0.5 - 0.5 * x) };
-                    for a in COLOR_ATTRS {
-                        if pf.has_attr(a) {
-                            if let Some(v) = attrs.get_mut(*a) {
-                                *v = (*v * factor).clamp(0.0, 1.0);
+                let x = shape_value_w(l.shape, phase, fid.wrapping_add(e.id.wrapping_mul(7919)), l.width);
+                let abs_val = low + (x + 1.0) / 2.0 * (high - low);
+                if l.attr == "hue" {
+                    if !(pf.has_attr("red") && pf.has_attr("green") && pf.has_attr("blue")) {
+                        continue;
+                    }
+                    let (r, g, b) = hsv_to_rgb(frac(phase) as f32, 1.0, 1.0);
+                    for (name, target) in [("red", r), ("green", g), ("blue", b)] {
+                        let base = attrs.get(name).copied().unwrap_or(0.0);
+                        attrs.insert(name.into(), base + (target - base) * depth);
+                    }
+                } else if l.attr == "dimmer" {
+                    if pf.has_dimmer {
+                        let base = attrs.get("dimmer").copied().unwrap_or(0.0);
+                        let v = if l.absolute { base + (abs_val - base) * fader } else { base * (1.0 - depth * (0.5 - 0.5 * x)) };
+                        attrs.insert("dimmer".into(), v.clamp(0.0, 1.0));
+                    } else {
+                        // no dimmer channel: scale the colour
+                        let factor = if l.absolute { 1.0 + (abs_val - 1.0) * fader } else { 1.0 - depth * (0.5 - 0.5 * x) };
+                        for a in COLOR_ATTRS {
+                            if pf.has_attr(a) {
+                                if let Some(v) = attrs.get_mut(*a) {
+                                    *v = (*v * factor).clamp(0.0, 1.0);
+                                }
                             }
                         }
                     }
+                } else {
+                    let base = attrs.get(&l.attr).copied().unwrap_or_else(|| attr_default(&l.attr));
+                    let v = if l.absolute { base + (abs_val - base) * fader } else { base + x * depth * 0.5 + offset };
+                    attrs.insert(l.attr.clone(), v.clamp(0.0, 1.0));
                 }
-            } else {
-                let base = attrs.get(&e.attr).copied().unwrap_or_else(|| attr_default(&e.attr));
-                let v = if adv.absolute { base + (abs_val - base) * fader } else { base + x * depth * 0.5 + offset };
-                attrs.insert(e.attr.clone(), v.clamp(0.0, 1.0));
             }
         }
     }
 }
 
+/// The attribute lines of an effect: its own (attr, shape, depth, range…) first, then the extra ones.
+struct LineP {
+    attr: String,
+    attr2: Option<String>,
+    shape: Shape,
+    depth: f32,
+    rotation: f32,
+    rate_mul: f32,
+    phase_offset: f32,
+    absolute: bool,
+    low: f32,
+    high: f32,
+    offset: f32,
+    width: f32,
+}
+
+fn lines_of(e: &Effect) -> Vec<LineP> {
+    let a = &e.adv;
+    let mut v = vec![LineP { attr: e.attr.clone(), attr2: e.attr2.clone(), shape: e.shape, depth: e.depth, rotation: e.rotation, rate_mul: 1.0, phase_offset: 0.0, absolute: a.absolute, low: a.low, high: a.high, offset: a.offset, width: a.width }];
+    for l in e.lines.iter().take(15) {
+        let rm = if l.rate_mul.is_finite() && l.rate_mul > 0.0 { l.rate_mul.min(64.0) } else { 1.0 };
+        v.push(LineP { attr: l.attr.clone(), attr2: l.attr2.clone(), shape: l.shape, depth: l.depth, rotation: l.rotation, rate_mul: rm, phase_offset: l.phase_offset, absolute: l.absolute, low: l.low, high: l.high, offset: l.offset, width: l.width });
+    }
+    v
+}
+
 #[cfg(test)]
 mod tests {
     fn eff(n: u32) -> Effect {
-        Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: (1..=n).collect(), attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: EffectAdv::default() }
+        Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Square, rate: 1.0, depth: 1.0, phase_spread: 360.0, fixtures: (1..=n).collect(), attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: EffectAdv::default(), lines: vec![] }
     }
 
     #[test]
@@ -416,7 +445,7 @@ mod tests {
 
     #[test]
     fn cycles_per_sec_priority() {
-        let mut e = Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Sine, rate: 2.0, depth: 1.0, phase_spread: 0.0, fixtures: vec![], attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default() };
+        let mut e = Effect { id: 1, name: String::new(), attr: "dimmer".into(), shape: Shape::Sine, rate: 2.0, depth: 1.0, phase_spread: 0.0, fixtures: vec![], attr2: None, speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default(), lines: vec![] };
         assert_eq!(cycles_per_sec(&e, None), 2.0);
         e.bpm = 90.0;
         assert_eq!(cycles_per_sec(&e, None), 1.5);
@@ -432,7 +461,7 @@ mod engine_tests {
     fn fx(shape: Shape) -> Effect {
         Effect {
             id: 0, name: "fx".into(), attr: "pan".into(), shape, rate: 1.0, depth: 0.4, phase_spread: 0.0, fixtures: vec![1],
-            attr2: Some("tilt".into()), speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default(),
+            attr2: Some("tilt".into()), speed_master: None, bpm: 0.0, rotation: 0.0, adv: Default::default(), lines: vec![],
         }
     }
 
@@ -550,6 +579,33 @@ mod engine_tests {
             t += 0.2;
         }
         assert!(!e.effects_on.contains(&id), "one second later it has switched itself off");
+    }
+
+    #[test]
+    fn extra_lines_drive_other_attributes_at_their_own_speed() {
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 1);
+        let mut f = fx(Shape::Square);
+        f.attr = "pan".into();
+        f.attr2 = None;
+        f.depth = 1.0;
+        f.adv.absolute = true;
+        f.adv.low = 0.2;
+        f.adv.high = 0.8;
+        f.lines.push(EffectLine { attr: "tilt".into(), attr2: None, shape: Shape::Square, depth: 1.0, rotation: 0.0, rate_mul: 2.0, phase_offset: 0.0, absolute: true, low: 0.1, high: 0.9, offset: 0.0, width: 0.0 });
+        f.lines.push(EffectLine { attr: "zoom".into(), attr2: None, shape: Shape::Sine, depth: 0.0, rotation: 0.0, rate_mul: 1.0, phase_offset: 0.0, absolute: false, low: 0.0, high: 1.0, offset: 0.25, width: 0.0 });
+        start(&mut e, f);
+        let m = e.compute_look(0.1);
+        assert!((m[&1]["pan"] - 0.8).abs() < 1e-5 && (m[&1]["tilt"] - 0.9).abs() < 1e-5, "{:?}", m[&1]);
+        let m = e.compute_look(0.3);
+        assert!((m[&1]["pan"] - 0.8).abs() < 1e-5, "pan still in its first half");
+        assert!((m[&1]["tilt"] - 0.1).abs() < 1e-5, "tilt runs twice as fast: already in its low half");
+        let m = e.compute_look(0.6);
+        assert!((m[&1]["pan"] - 0.2).abs() < 1e-5 && (m[&1]["tilt"] - 0.9).abs() < 1e-5, "{:?}", m[&1]);
+        assert!((m[&1]["zoom"] - (attr_default("zoom") + 0.25)).abs() < 1e-5, "a third line with its own offset");
+        // old shows have no lines
+        let old: Effect = serde_json::from_str(r#"{"id":1,"name":"x","attr":"dimmer","shape":"sine","rate":1.0,"depth":1.0,"phase_spread":0.0,"fixtures":[1]}"#).unwrap();
+        assert!(old.lines.is_empty());
     }
 
     #[test]

@@ -478,6 +478,12 @@ export const live: Record<string, string> = {
   "Reverse": "Inverso",
   "Centre out": "Del centro afuera",
   "Edges in": "De los lados al centro",
+  "Extra attribute lines": "Líneas de atributo extra",
+  "Remove line": "Quitar línea",
+  "Speed ×": "Velocidad ×",
+  "Phase °": "Fase °",
+  "+ Attribute line": "+ Línea de atributo",
+  "Each line drives another attribute with the same fixtures, order and speed source; its own shape, depth and speed ratio.": "Cada línea mueve otro atributo con los mismos aparatos, orden y fuente de velocidad; tiene su propia forma, profundidad y proporción de velocidad.",
 };
 
 /** Labels of wheel/capability slots coming from the built-in fixture library (data, not UI chrome). Unknown labels pass through. */
