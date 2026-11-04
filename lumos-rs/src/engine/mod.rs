@@ -268,6 +268,29 @@ struct Engine {
     script: script::ScriptState,
 }
 
+/// Swap and/or invert pan and tilt of one fixture's attributes.
+pub(crate) fn apply_orient(o: Orient, a: &mut Attrs) {
+    if o.swap_pan_tilt {
+        let (p, t) = (a.remove("pan"), a.remove("tilt"));
+        if let Some(t) = t {
+            a.insert("pan".into(), t);
+        }
+        if let Some(p) = p {
+            a.insert("tilt".into(), p);
+        }
+    }
+    if o.invert_pan {
+        if let Some(v) = a.get_mut("pan") {
+            *v = 1.0 - *v;
+        }
+    }
+    if o.invert_tilt {
+        if let Some(v) = a.get_mut("tilt") {
+            *v = 1.0 - *v;
+        }
+    }
+}
+
 fn next_id(it: impl Iterator<Item = u32>) -> u32 {
     it.max().unwrap_or(0) + 1
 }
@@ -1177,6 +1200,7 @@ impl Engine {
                 pos: [((k % 10) as f32 - 4.5) * 1.2, 5.0, (k / 10) as f32 * 1.5 - 1.0],
                 rot: [0.0, 0.0, 0.0],
                 curve: ResponseCurve::Linear,
+                orient: Default::default(),
             });
             next += 1;
         }
@@ -1956,6 +1980,12 @@ impl Engine {
             }
         }
         self.identify_layer(&mut merged, now);
+        // 4c. pan/tilt wiring: swap, then invert (per fixture)
+        for pf in self.patch.fixtures.iter().filter(|pf| pf.orient != Orient::default()) {
+            if let Some(a) = merged.get_mut(&pf.id) {
+                apply_orient(pf.orient, a);
+            }
+        }
         // 5. patch → DMX
         let mut frames: BTreeMap<u16, Box<[u8; 512]>> = self.frames.keys().map(|u| (*u, Box::new([0u8; 512]))).collect();
         let empty = Attrs::new();
@@ -2518,6 +2548,36 @@ mod tests {
         assert_eq!(frame(&mut e)[0], half);
         e.handle(Command::ExecLevel { id, level: 0.0 }).unwrap();
         assert_eq!(frame(&mut e)[0], 0);
+    }
+
+    #[test]
+    fn pan_tilt_wiring_is_swapped_and_inverted_per_fixture() {
+        let mut a = Attrs::new();
+        a.insert("pan".into(), 0.2);
+        a.insert("tilt".into(), 0.7);
+        let mut b = a.clone();
+        apply_orient(Orient { invert_pan: true, ..Orient::default() }, &mut b);
+        assert!((b["pan"] - 0.8).abs() < 1e-6 && (b["tilt"] - 0.7).abs() < 1e-6);
+        let mut b = a.clone();
+        apply_orient(Orient { swap_pan_tilt: true, ..Orient::default() }, &mut b);
+        assert!((b["pan"] - 0.7).abs() < 1e-6 && (b["tilt"] - 0.2).abs() < 1e-6);
+        let mut b = a.clone();
+        apply_orient(Orient { swap_pan_tilt: true, invert_pan: true, invert_tilt: true }, &mut b);
+        assert!((b["pan"] - 0.3).abs() < 1e-6 && (b["tilt"] - 0.8).abs() < 1e-6, "swap first, then invert the outputs");
+        // end to end on DMX: fixture 2 is hung upside down
+        let mut e = engine();
+        add(&mut e, "generic/mh-spot", "16ch", 2);
+        e.show.fixtures[1].orient.invert_pan = true;
+        e.patch_dirty = true;
+        e.rebuild_derived();
+        for id in [1, 2] {
+            let mut m = Attrs::new();
+            m.insert("pan".into(), 0.25);
+            e.handle(Command::ProgSet { fixtures: vec![id], attrs: m }).unwrap();
+        }
+        let f = frame(&mut e);
+        assert!(f[0].abs_diff(64) <= 1, "{}", f[0]);
+        assert!(f[16].abs_diff(191) <= 1, "{}", f[16]);
     }
 
     #[test]

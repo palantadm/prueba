@@ -297,6 +297,7 @@ pub fn import_patch(
                 pos,
                 rot: [0.0; 3],
                 curve: Default::default(),
+                orient: Default::default(),
             },
             has_pos,
         });
@@ -368,6 +369,7 @@ mod tests {
                 pos: [i as f32 * 1.25, 5.0, -0.5],
                 rot: [0.0; 3],
                 curve: Default::default(),
+                orient: Default::default(),
             });
         }
         s

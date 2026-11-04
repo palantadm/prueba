@@ -481,7 +481,7 @@ mod tests {
 
     fn pfx(chans: Vec<ChannelDef>) -> PatchFixture {
         let has_dimmer = chans.iter().any(|c| c.attr == "dimmer");
-        PatchFixture { id: 1, universe: 1, address: 1, chans, has_dimmer, curve: ResponseCurve::Linear, discrete: vec![] }
+        PatchFixture { id: 1, universe: 1, address: 1, chans, has_dimmer, curve: ResponseCurve::Linear, discrete: vec![], orient: Default::default() }
     }
 
     fn at(pairs: &[(&str, f32)]) -> Attrs {

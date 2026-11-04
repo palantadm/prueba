@@ -912,4 +912,12 @@ export const shell: Record<string, string> = {
   "automatic": "automático",
   "Stage plot": "Plano de escenario (stage plot)",
   "Printable plan and front view of the rig: fixture symbols with their IDs, stage elements, scale and a fixture list.": "Plano imprimible del rig en planta y alzado: símbolos de los aparatos con su ID, elementos de escenario, escala y lista de aparatos.",
+  "Pan/tilt applied to {n} fixtures": "Pan/tilt aplicado a {n} aparatos",
+  "Pan / tilt wiring": "Cableado de pan / tilt",
+  "Invert pan": "Invertir pan",
+  "Invert tilt": "Invertir tilt",
+  "Swap pan and tilt": "Intercambiar pan y tilt",
+  "Applied at the output, so cues, palettes and effects keep their values. Swap is done first, then the inversions.": "Se aplica en la salida, así que cues, paletas y efectos conservan sus valores. Primero se intercambia y luego se invierte.",
+  "Invert or swap pan and tilt of the selected fixtures": "Invertir o intercambiar pan y tilt de los aparatos seleccionados",
+  "Pan/tilt…": "Pan/tilt…",
 };

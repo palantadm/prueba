@@ -273,6 +273,22 @@ pub struct Fixture {
     /// Intensity response (dimmer law) applied at the output.
     #[serde(default)]
     pub curve: ResponseCurve,
+    /// Pan/tilt wiring of this fixture (mounted upside down, mirrored rigs…).
+    #[serde(default)]
+    pub orient: Orient,
+}
+
+/// Per-fixture pan/tilt correction applied at the output: first swap, then invert.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+pub struct Orient {
+    /// Pan and tilt trade values (fixture rigged on its side).
+    #[serde(default)]
+    pub swap_pan_tilt: bool,
+    #[serde(default)]
+    pub invert_pan: bool,
+    #[serde(default)]
+    pub invert_tilt: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, TS)]

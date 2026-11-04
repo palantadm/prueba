@@ -14,6 +14,7 @@ pub struct PatchFixture {
     pub chans: Vec<ChannelDef>,
     pub has_dimmer: bool,
     pub curve: ResponseCurve,
+    pub orient: Orient,
     /// Attributes backed by a channel with named capabilities (wheels, shutter…): never cross-fade.
     pub discrete: Vec<String>,
 }
@@ -54,6 +55,7 @@ impl Patch {
                 chans,
                 has_dimmer,
                 curve: f.curve,
+                orient: f.orient,
                 discrete,
             });
         }

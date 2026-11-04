@@ -24,3 +24,7 @@ El botón **Localizar** de un aparato lo enciende en blanco/pleno de forma que s
 ## Curva de dimmer
 **Patch → «Curva de dimmer…»** da forma a la respuesta de intensidad de los aparatos seleccionados: lineal (por defecto), ley cuadrática (lenta abajo, como una incandescente), curva en S, γ 2,2 (los LED bajan como una lámpara a la vista) o sin regulación (apagado por debajo del 50 %, pleno por encima: contactores, máquinas de humo). Se aplica a la salida, después de los masters, y «Identificar» la ignora. En aparatos sin canal de dimmer se aplica a sus canales de color.
 <!--ai-->Por protocolo: `fixture_update` con `{"id":N,"curve":"linear|square|s_curve|gamma|switched"}`.<!--/ai-->
+
+## Pan/tilt invertido o intercambiado
+Si un cabezal móvil está colgado del revés, de lado o en un rig simétrico, en Patch selecciónalo y pulsa **Pan/tilt…**: puedes invertir el pan, invertir el tilt o intercambiarlos. Se aplica en la salida DMX, así que cues, paletas y efectos no cambian. Primero se intercambia y luego se invierte.
+<!--ai-->Por protocolo: campo `orient` del aparato en `fixture_update`.<!--/ai-->
