@@ -941,4 +941,8 @@ export const shell: Record<string, string> = {
   "A GO after the last cue releases the list instead of staying on it": "Un GO tras el último cue suelta la lista en vez de quedarse en él",
   "Rate": "Velocidad",
   "Speed of the whole list: 2 = all times twice as fast, 0.5 = half speed": "Velocidad de toda la lista: 2 = todos los tiempos al doble, 0,5 = a la mitad",
+  "Fade in (s)": "Entrada (s)",
+  "Fade out (s)": "Salida (s)",
+  "Run once": "Una sola vez",
+  "Runs one cycle and switches itself off": "Hace un solo ciclo y se apaga solo",
 };

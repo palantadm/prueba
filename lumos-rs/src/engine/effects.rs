@@ -486,6 +486,72 @@ mod engine_tests {
         assert_eq!((old.adv.low, old.adv.high), (0.0, 1.0));
     }
 
+    fn dimmer_fx() -> Effect {
+        let mut f = fx(Shape::Square);
+        f.attr = "dimmer".into();
+        f.attr2 = None;
+        f.fixtures = vec![1];
+        f.adv.absolute = true;
+        f.adv.low = 1.0;
+        f.adv.high = 1.0;
+        f
+    }
+    fn dim(e: &mut Engine, now: f64) -> f32 {
+        e.compute_look(now).get(&1).and_then(|a| a.get("dimmer")).copied().unwrap_or(0.0)
+    }
+
+    #[test]
+    fn an_effect_can_fade_in_and_out() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 1);
+        let mut f = dimmer_fx();
+        f.adv.fade_in = 2.0;
+        f.adv.fade_out = 1.0;
+        start(&mut e, f);
+        let id = e.show.effects.last().unwrap().id;
+        let mut t = 0.0;
+        assert!(dim(&mut e, t) < 0.01, "starts from nothing");
+        let mut at = |e: &mut Engine, until: f64| {
+            while t + 1e-9 < until {
+                t += 0.25;
+                dim(e, t);
+            }
+            dim(e, t)
+        };
+        let half = at(&mut e, 1.0);
+        assert!((half - 0.5).abs() < 0.06, "half way in after 1 s of 2: {half}");
+        let full = at(&mut e, 2.5);
+        assert!((full - 1.0).abs() < 1e-4, "{full}");
+        e.handle(Command::EffectToggle { id, on: false }).unwrap();
+        let out = at(&mut e, 3.0);
+        assert!((out - 0.5).abs() < 0.3 && out < 1.0 && out > 0.0, "still fading out: {out}");
+        let gone = at(&mut e, 4.5);
+        assert_eq!(gone, 0.0, "faded out completely");
+        assert!(e.fx_level.is_empty() && e.fx_clock.is_empty(), "nothing left running");
+    }
+
+    #[test]
+    fn a_once_effect_runs_one_cycle_and_switches_itself_off() {
+        let mut e = engine();
+        add(&mut e, "generic/dimmer", "1ch", 1);
+        let mut f = dimmer_fx();
+        f.rate = 1.0;
+        f.adv.once = true;
+        start(&mut e, f);
+        let id = e.show.effects.last().unwrap().id;
+        let mut t = 0.0;
+        for _ in 0..4 {
+            dim(&mut e, t);
+            t += 0.2;
+        }
+        assert!(e.effects_on.contains(&id), "still in its cycle at 0.6 s");
+        for _ in 0..6 {
+            dim(&mut e, t);
+            t += 0.2;
+        }
+        assert!(!e.effects_on.contains(&id), "one second later it has switched itself off");
+    }
+
     #[test]
     fn circle_on_a_mover_keeps_its_radius() {
         let mut e = engine();

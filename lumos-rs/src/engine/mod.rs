@@ -254,6 +254,10 @@ struct Engine {
     speed: SpeedState,
     /// Accumulated phase (cycles) and last update time per running effect.
     fx_clock: HashMap<u32, (f64, f64)>,
+    /// Fade level (0..1) of effects that fade in/out, the phase a `once` effect started at, and the last render time.
+    fx_level: HashMap<u32, f32>,
+    fx_start: HashMap<u32, f64>,
+    fx_last: Option<f64>,
     /// Backups, node discovery, output test, identify (see data.rs).
     data: DataRt,
     /// In-app AI assistant (lives outside the engine task; see `ai/mod.rs`).
@@ -384,6 +388,9 @@ impl Engine {
             chases: ChasesState::default(),
             speed: SpeedState::default(),
             fx_clock: HashMap::new(),
+            fx_level: HashMap::new(),
+            fx_start: HashMap::new(),
+            fx_last: None,
         };
         e.hz = e.show.settings.tick_hz.clamp(10, 100);
         e.blackout = e.show.settings.start_blackout;
@@ -1857,7 +1864,8 @@ impl Engine {
             }
         }
         // 3. effects
-        if !self.effects_on.is_empty() || !self.effect_flash.is_empty() {
+        let mut once_done: Vec<u32> = Vec::new();
+        if !self.effects_on.is_empty() || !self.effect_flash.is_empty() || !self.fx_level.is_empty() {
             let on = &self.effects_on;
             let fl = &self.effect_flash;
             let execs = &self.show.executors;
@@ -1880,12 +1888,38 @@ impl Engine {
                     .collect();
                 &overridden
             };
+            // fade in / out of effects (level 0..1), then the set of effects that currently act
+            let mut level = std::mem::take(&mut self.fx_level);
+            let dt = self.fx_last.map_or(0.0, |l| (now - l).clamp(0.0, 0.5)) as f32;
+            self.fx_last = Some(now);
+            let mut act: std::collections::HashSet<u32> = std::collections::HashSet::new();
+            for e in effs {
+                let want = on.contains(&e.id) || fl.contains(&e.id);
+                let cur = level.get(&e.id).copied().unwrap_or(0.0);
+                let (fi, fo) = (e.adv.fade_in.max(0.0), e.adv.fade_out.max(0.0));
+                let new = if want {
+                    if fi > 0.0 { (cur + dt / fi).min(1.0) } else { 1.0 }
+                } else if fo > 0.0 {
+                    (cur - dt / fo).max(0.0)
+                } else {
+                    0.0
+                };
+                if new > 0.0 || (want && fi > 0.0) {
+                    level.insert(e.id, new);
+                    act.insert(e.id);
+                } else {
+                    level.remove(&e.id);
+                }
+            }
+            level.retain(|id, _| act.contains(id));
             // accumulated phase per running effect: a BPM change (tap tempo, speed master) never makes the shape jump
             let mut phases: HashMap<u32, f64> = HashMap::new();
             let mut clock = std::mem::take(&mut self.fx_clock);
-            clock.retain(|id, _| on.contains(id) || fl.contains(id));
+            let mut start = std::mem::take(&mut self.fx_start);
+            clock.retain(|id, _| act.contains(id));
+            start.retain(|id, _| act.contains(id));
             for e in effs {
-                if !(on.contains(&e.id) || fl.contains(&e.id)) {
+                if !act.contains(&e.id) {
                     continue;
                 }
                 let cps = effects::cycles_per_sec(e, e.speed_master.and_then(|m| self.speed_bpm(m)));
@@ -1893,23 +1927,38 @@ impl Engine {
                 c.0 += cps * (now - c.1).max(0.0);
                 c.1 = c.1.max(now);
                 phases.insert(e.id, c.0);
+                if e.adv.once {
+                    let st = *start.entry(e.id).or_insert(c.0);
+                    if c.0 - st >= 1.0 && (on.contains(&e.id) || fl.contains(&e.id)) {
+                        once_done.push(e.id);
+                    }
+                }
             }
             self.fx_clock = clock;
+            self.fx_start = start;
+            let lv = &level;
             effects::apply(
                 &mut merged,
                 effs,
-                &|id| on.contains(&id) || fl.contains(&id),
+                &|id| act.contains(&id),
                 &|id| {
-                    execs
+                    let fader = execs
                         .iter()
                         .find(|e| matches!(e.kind, ExecKind::Effect { effect } if effect == id))
-                        .map_or(1.0, |e| exec.get(&e.id).map_or(1.0, |s| s.level))
+                        .map_or(1.0, |e| exec.get(&e.id).map_or(1.0, |s| s.level));
+                    fader * lv.get(&id).copied().unwrap_or(1.0)
                 },
                 &|id| phases.get(&id).copied().unwrap_or(0.0),
                 &self.patch,
             );
+            self.fx_level = level;
         } else {
             self.fx_clock.clear();
+            self.fx_start.clear();
+        }
+        for id in once_done {
+            self.effects_on.remove(&id);
+            self.dirty = true;
         }
         merged
     }

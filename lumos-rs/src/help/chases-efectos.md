@@ -21,6 +21,8 @@ Como en ChamSys o GrandMA, cada efecto tiene opciones para decidir **quién** pa
 - **Dirección**: adelante, atrás o ida y vuelta. **Desfase** global en grados.
 - **Rango**: *relativo* (se mueve alrededor del valor actual, con un desplazamiento opcional) o *absoluto* (oscila entre un mínimo y un máximo sin importar el valor actual: lo habitual para efectos de intensidad que enciendan y apaguen).
 - **Ancho** del ciclo en ondas cuadrada y pulso.
+- **Entrada y salida** (segundos): el efecto aparece y desaparece con un fundido al activarlo y desactivarlo, en vez de entrar de golpe.
+- **Una sola vez**: hace un ciclo completo y se apaga solo.
 <!--ai-->Por protocolo, todo esto va en el objeto `adv` de `effect_save` (mira `get_help comando effect_save`).<!--/ai-->
 
 - Para un barrido de color: efecto `hue` con `phase_spread` 360 y `rate` bajo.

@@ -638,11 +638,17 @@ pub struct EffectAdv {
     pub absolute: bool,
     pub low: f32,
     pub high: f32,
+    /// Seconds the effect takes to come in when switched on (0 = at once).
+    pub fade_in: f32,
+    /// Seconds it takes to go out when switched off.
+    pub fade_out: f32,
+    /// Run a single cycle and switch itself off.
+    pub once: bool,
 }
 
 impl Default for EffectAdv {
     fn default() -> Self {
-        EffectAdv { parity: Parity::All, from: 0, to: 0, every: 0, every_offset: 0, order: EffOrder::Normal, groups: 0, blocks: 0, wings: 0, direction: EffDir::Forward, phase_offset: 0.0, width: 0.0, offset: 0.0, absolute: false, low: 0.0, high: 1.0 }
+        EffectAdv { parity: Parity::All, from: 0, to: 0, every: 0, every_offset: 0, order: EffOrder::Normal, groups: 0, blocks: 0, wings: 0, direction: EffDir::Forward, phase_offset: 0.0, width: 0.0, offset: 0.0, absolute: false, low: 0.0, high: 1.0, fade_in: 0.0, fade_out: 0.0, once: false }
     }
 }
 

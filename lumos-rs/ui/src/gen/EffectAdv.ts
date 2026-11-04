@@ -48,4 +48,16 @@ offset: number,
  * Absolute: the wave swings between `low` and `high` whatever the programmer or cue holds,
  * instead of moving around the current value.
  */
-absolute: boolean, low: number, high: number, };
+absolute: boolean, low: number, high: number, 
+/**
+ * Seconds the effect takes to come in when switched on (0 = at once).
+ */
+fade_in: number, 
+/**
+ * Seconds it takes to go out when switched off.
+ */
+fade_out: number, 
+/**
+ * Run a single cycle and switch itself off.
+ */
+once: boolean, };

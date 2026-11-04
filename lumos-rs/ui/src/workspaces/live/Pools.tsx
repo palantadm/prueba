@@ -186,7 +186,7 @@ function EffectPool() {
     id: Math.max(0, ...effects.map((e) => e.id)) + 1, name: t("Effect {n}", { n: effects.length + 1 }),
     attr: "dimmer", shape: "sine", rate: 0.5, depth: 0.5, phase_spread: 0, fixtures: [...selection.value],
     attr2: null, speed_master: null, bpm: 0, rotation: 0,
-    adv: { parity: "all", from: 0, to: 0, every: 0, every_offset: 0, order: "normal", groups: 0, blocks: 0, wings: 0, direction: "forward", phase_offset: 0, width: 0, offset: 0, absolute: false, low: 0, high: 1 },
+    adv: { parity: "all", from: 0, to: 0, every: 0, every_offset: 0, order: "normal", groups: 0, blocks: 0, wings: 0, direction: "forward", phase_offset: 0, width: 0, offset: 0, absolute: false, low: 0, high: 1, fade_in: 0, fade_out: 0, once: false },
   });
   return (
     <>
@@ -339,6 +339,11 @@ function EffectEditor({ e, exists, onClose }: { e: Effect; exists: boolean; onCl
             </> : numField(t("Offset %"), Math.round(d.adv.offset * 100), (v) => upAdv({ offset: v / 100 }), -100, 100, t("Shifts the centre of the wave"))}
             {(d.shape === "square" || d.shape === "pulse") && numField(t("Width %"), Math.round(d.adv.width * 100), (v) => upAdv({ width: v / 100 }), 0, 99, t("Share of the cycle that is on; 0 = default"))}
           </div>
+        </div>
+        <div class="row wrap">
+          <div class="field grow"><label>{t("Fade in (s)")}</label><input class="input num" style={{ minHeight: 44 }} type="number" min="0" step="0.5" value={d.adv.fade_in} onInput={(ev) => upAdv({ fade_in: Math.max(0, num((ev.target as HTMLInputElement).value, 0)) })} /></div>
+          <div class="field grow"><label>{t("Fade out (s)")}</label><input class="input num" style={{ minHeight: 44 }} type="number" min="0" step="0.5" value={d.adv.fade_out} onInput={(ev) => upAdv({ fade_out: Math.max(0, num((ev.target as HTMLInputElement).value, 0)) })} /></div>
+          <label class="row" style={{ gap: 6, alignSelf: "flex-end", minHeight: 44 }} title={t("Runs one cycle and switches itself off")}><input type="checkbox" checked={d.adv.once} onChange={(ev) => upAdv({ once: (ev.target as HTMLInputElement).checked })} />{t("Run once")}</label>
         </div>
       </details>
       <div class="row">
